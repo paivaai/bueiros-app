@@ -41,6 +41,56 @@
     if (App.cur() === l) App.renderEtapa();
   }
 
+  /* ---------- câmera ao vivo (webcam do PC ou câmera do celular) ---------- */
+  let cam = null; // { stream, overlay, facing }
+  function fecharCamera() {
+    if (!cam) return;
+    cam.stream.getTracks().forEach(t => t.stop()); cam.overlay.remove();
+    document.removeEventListener('keydown', teclaCam); cam = null;
+  }
+  const teclaCam = e => { if (e.key === 'Escape') fecharCamera(); };
+  async function iniciarStream(facing) {
+    return navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: facing }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false });
+  }
+  async function abrirCamera() {
+    const usarSistema = () => document.getElementById('fo-cam').click();
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { UI.toast('Câmera ao vivo indisponível aqui. Abrindo o seletor.', 'aviso'); usarSistema(); return; }
+    let stream;
+    try { stream = await iniciarStream('environment'); }
+    catch (e) {
+      UI.toast(e && e.name === 'NotAllowedError' ? 'Permissão da câmera negada. Libere no cadeado do endereço (Permissões > Câmera).' : 'Nenhuma câmera encontrada. Abrindo o seletor de arquivos.', 'aviso');
+      usarSistema(); return;
+    }
+    const overlay = document.createElement('div'); overlay.className = 'cam-overlay';
+    overlay.innerHTML = `<video playsinline autoplay muted></video>
+      <div class="cam-bar"><button type="button" class="btn" data-cam="fechar">Fechar</button>
+      <button type="button" class="btn primary cam-shot" data-cam="foto" aria-label="Tirar foto">📷 Tirar foto</button>
+      <button type="button" class="btn" data-cam="trocar">Trocar</button></div>`;
+    document.body.appendChild(overlay);
+    const v = overlay.querySelector('video'); v.srcObject = stream; v.play().catch(() => {});
+    cam = { stream, overlay, facing: 'environment' };
+    document.addEventListener('keydown', teclaCam);
+  }
+  document.addEventListener('click', async e => {
+    const b = e.target.closest('[data-cam]'); if (!b || !cam) return;
+    const a = b.dataset.cam;
+    if (a === 'fechar') fecharCamera();
+    else if (a === 'trocar') {
+      const novo = cam.facing === 'environment' ? 'user' : 'environment';
+      try { const s2 = await iniciarStream(novo); cam.stream.getTracks().forEach(t => t.stop()); cam.stream = s2; cam.facing = novo; cam.overlay.querySelector('video').srcObject = s2; }
+      catch (err) { UI.toast('Não foi possível trocar de câmera', 'aviso'); }
+    } else if (a === 'foto') {
+      const v = cam.overlay.querySelector('video');
+      if (!v.videoWidth) { UI.toast('Aguarde a câmera abrir', 'aviso'); return; }
+      const cv = document.createElement('canvas'); cv.width = v.videoWidth; cv.height = v.videoHeight;
+      cv.getContext('2d').drawImage(v, 0, 0);
+      const blob = await new Promise(r => cv.toBlob(r, 'image/jpeg', 0.92));
+      fecharCamera();
+      if (blob) adicionar([new File([blob], 'camera.jpg', { type: 'image/jpeg' })], true);
+      else UI.toast('Não foi possível capturar a imagem', 'erro');
+    }
+  });
+
   function cartao(f, i) {
     return `<article class="card foto" data-id="${esc(f.id)}">
       <img class="thumb" data-foid="${esc(f.id)}" alt="Foto ${i + 1}" width="${f.w || 160}" height="${f.h || 120}">
@@ -59,6 +109,7 @@
         ${App.campoHTML({ p: 'caracteristicas.formato', label: 'Formato da seção', t: 'select', opts: BU.Secao.FORMATOS })}</div></div>
       <div class="card"><b>${l.fotos.length} foto(s)</b>
         <div class="row" style="margin-top:10px"><button type="button" class="btn primary" data-fo="camera">📷 Tirar foto</button><button type="button" class="btn" data-fo="galeria">🖼️ Galeria</button></div>
+        <button type="button" class="btn sm" data-fo="camera-ao-vivo" style="margin-top:8px;width:100%">Usar câmera ao vivo (webcam)</button>
         <input type="file" id="fo-cam" accept="image/*" capture="environment" hidden>
         <input type="file" id="fo-gal" accept="image/*" multiple hidden>
         <div id="fo-status" class="gps-status" role="status"></div>
@@ -82,8 +133,12 @@
     const b = e.target.closest('[data-fo]'); if (!b || b.tagName === 'SELECT' || b.tagName === 'INPUT') return;
     const App = BU.App, l = App.cur(); if (!l) return;
     const a = b.dataset.fo, card = b.closest('[data-id]'), f = card ? l.fotos.find(x => x.id === card.dataset.id) : null;
-    if (a === 'camera') document.getElementById('fo-cam').click();
+    if (a === 'camera') {
+      // celular: abre o app de câmera do aparelho (melhor qualidade); computador: câmera ao vivo no app
+      if (window.matchMedia && matchMedia('(pointer: coarse)').matches) document.getElementById('fo-cam').click(); else abrirCamera();
+    }
     else if (a === 'galeria') document.getElementById('fo-gal').click();
+    else if (a === 'camera-ao-vivo') abrirCamera();
     else if (a === 'ver' && f) {
       if (!urls.has(f.id)) await aposRender();
       await UI.escolher(f.legenda || 'Foto', `<img class="foto-grande" src="${urls.get(f.id) || ''}" alt="">`, [{ k: 'x', label: 'Fechar', cls: 'primary' }]);
