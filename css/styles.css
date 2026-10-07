@@ -166,3 +166,15 @@ select[data-pt-filtro] { flex: 1; min-height: 44px; border: 2px solid var(--line
 .cam-overlay video { flex: 1; min-height: 0; width: 100%; object-fit: contain; background: #000; }
 .cam-bar { display: flex; gap: 10px; padding: 12px 14px calc(12px + env(safe-area-inset-bottom, 0px)); background: #111; }
 .cam-bar .btn { flex: 1; } .cam-bar .cam-shot { flex: 2; min-height: 60px; font-size: 19px; }
+
+/* ===== Importação do cadastro (KMZ) e lista filtrável ===== */
+.chip.avistoriar { background: #DCE8FB; color: #0B3D91; }
+.filtros { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
+.fchip { flex: none; min-height: 44px; padding: 0 14px; border: 2px solid var(--line); background: var(--surface); border-radius: 999px; font-weight: 700; font-size: 15px; }
+.fchip span { margin-left: 4px; color: var(--muted); font-weight: 600; }
+.fchip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.fchip[aria-pressed="true"] span { color: #fff; }
+.lev .row a.btn { text-decoration: none; }
+.card.gps a.btn { width: 100%; margin-top: 8px; text-decoration: none; }
+details.cad summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.lista-res { margin: 0 0 8px; padding-left: 20px; }

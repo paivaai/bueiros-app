@@ -77,6 +77,13 @@
       await tx(LEV, 'readwrite', t => t.objectStore(LEV).put(c));
     },
 
+    /* Grava vários levantamentos de uma vez, em uma única transação (usado na importação do cadastro). */
+    async salvarVarios(lista) {
+      const cs = lista.map(clone);
+      if (!idb) { cs.forEach(c => mem[LEV].set(c.id, c)); return; }
+      await tx(LEV, 'readwrite', t => { const s = t.objectStore(LEV); let r; for (const c of cs) r = s.put(c); return r; });
+    },
+
     /* Exclui o levantamento e as fotos ligadas a ele. */
     async excluir(id) {
       if (!idb) { mem[LEV].delete(id); for (const [k, f] of mem[FOTOS]) if (f.levantamentoId === id) mem[FOTOS].delete(k); return; }

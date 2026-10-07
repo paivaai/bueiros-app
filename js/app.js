@@ -12,6 +12,11 @@
   const SCHEMA = 1;
   const UFS = ['AC', 'AL', 'AM', 'AP', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MG', 'MS', 'MT', 'PA', 'PB', 'PE', 'PI', 'PR', 'RJ', 'RN', 'RO', 'RR', 'RS', 'SC', 'SE', 'SP', 'TO'];
   const SN = ['Sim', 'Não', 'Não avaliado'];
+  const OPCOES = {
+    ambiente: ['Rural', 'Urbano'], sentido: ['Crescente', 'Decrescente'],
+    pista: ['Norte', 'Sul', 'Leste', 'Oeste', 'Canteiro central'], lado: ['Direito', 'Esquerdo', 'Centro'],
+  };
+  const STATUS = { a_vistoriar: ['A vistoriar', 'avistoriar'], rascunho: ['Rascunho', 'rascunho'], concluido: ['Concluído', 'concluido'] };
   const BOCA = ['Boca simples', 'Com ala', 'Com muro de testa', 'Com caixa coletora', 'Sem proteção', 'Outro'];
 
   const ETAPAS = [
@@ -26,6 +31,11 @@
       { p: 'estrada', label: 'Nome ou número da estrada', ph: 'ex.: BR-101' },
       { p: 'municipio', label: 'Município' },
       { p: 'estado', label: 'Estado', t: 'select', opts: UFS, half: true },
+      { p: 'km', label: 'Km', ph: '001+470', half: true },
+      { p: 'ambiente', label: 'Ambiente', t: 'select', opts: OPCOES.ambiente, half: true },
+      { p: 'sentido', label: 'Sentido do km', t: 'select', opts: OPCOES.sentido, half: true },
+      { p: 'pistaGe', label: 'Pista (sentido geográfico)', t: 'select', opts: OPCOES.pista, half: true },
+      { p: 'lado', label: 'Lado da rodovia', t: 'select', opts: OPCOES.lado, half: true },
       { p: 'data', label: 'Data', t: 'date', req: true, half: true },
       { p: 'hora', label: 'Hora', t: 'time', half: true },
       { p: 'responsavel', label: 'Responsável', req: true },
@@ -52,7 +62,8 @@
       { p: 'caracteristicas.comprimento', label: 'Comprimento aprox.', t: 'num', unit: 'm', min: 0 },
       { h: 'Condição' },
       { p: 'caracteristicas.situacaoEstrutural', label: 'Situação estrutural', t: 'select', opts: ['Íntegra', 'Fissuras leves', 'Fissuras severas', 'Deformada', 'Colapsada', 'Não avaliada'] },
-      { p: 'caracteristicas.conservacao', label: 'Estado de conservação', t: 'select', opts: ['Bom', 'Regular', 'Ruim', 'Crítico', 'Não avaliado'] },
+      { p: 'caracteristicas.conservacao', label: 'Estado de conservação', t: 'select', opts: ['Bom', 'Regular', 'Precário', 'Ruim', 'Crítico', 'Não avaliado'] },
+      { p: 'caracteristicas.necessita', label: 'Intervenção necessária', ph: 'ex.: Limpeza, Roçada' },
       { h: 'Ocorrências' },
       { p: 'caracteristicas.erosao', label: 'Erosão', t: 'select', opts: SN, half: true },
       { p: 'caracteristicas.assoreamento', label: 'Assoreamento', t: 'select', opts: SN, half: true },
@@ -88,13 +99,14 @@
     const agora = U.agoraISO();
     return {
       versaoSchema: SCHEMA, id: U.uid(), status: 'rascunho',
-      codigo: '', estrada: '', municipio: '', estado: '', data: U.hojeISO(), hora: U.horaAgora(),
+      origem: 'campo', cadastroId: '', cadastro: null, coordOrigem: null,
+      codigo: '', estrada: '', municipio: '', estado: '', km: '', ambiente: '', sentido: '', pistaGe: '', lado: '', data: U.hojeISO(), hora: U.horaAgora(),
       responsavel: '', equipe: '', observacoes: '',
       latitude: null, longitude: null, precisaoGps: null, altitude: null, gpsCapturadoEm: null, fuso: null,
       caracteristicas: {
         tipo: '', formato: '', linhas: null, celulas: null, material: '', diametro: null, largura: null, altura: null, comprimento: null, espessura: null, larguraTopo: null,
         situacaoEstrutural: '', conservacao: '', erosao: '', assoreamento: '', obstrucao: '', agua: '', vegetacao: '',
-        tipoEntrada: '', tipoSaida: '', sentidoFluxo: '', observacoes: '',
+        tipoEntrada: '', tipoSaida: '', sentidoFluxo: '', observacoes: '', necessita: '',
       },
       medicoes: {
         larguraPista: null, larguraAcostamento: null, alturaEntrada: null, larguraEntrada: null, alturaSaida: null, larguraSaida: null,
@@ -124,7 +136,22 @@
     cur: null, etapa: 1, persistido: false,
     dirty: false, rev: 0, timer: null, saveState: 'salvo',
     hashAtual: '#/', ignorar: false,
+    filtro: 'todos', limite: 60, ultimoResp: null,
   };
+
+  /* Ordem de trabalho: em andamento, depois os a vistoriar (na ordem do km), depois os concluídos. */
+  const ORD = { rascunho: 0, a_vistoriar: 1, concluido: 2 };
+  function ordenar(lista) {
+    const cmp = (a, b) => String(a.codigo || '').localeCompare(String(b.codigo || ''), 'pt', { numeric: true });
+    return lista.slice().sort((a, b) => ((ORD[a.status] ?? 1) - (ORD[b.status] ?? 1))
+      || (a.status === 'a_vistoriar' ? cmp(a, b) : String(b.atualizadoEm).localeCompare(String(a.atualizadoEm))));
+  }
+  /* Responsável: lembra o último nome usado neste aparelho para não digitar em cada bueiro. */
+  async function prefillResponsavel(l) {
+    if (l.responsavel) return;
+    try { if (S.ultimoResp == null) S.ultimoResp = (await DB.cfgObter('ultimoResponsavel')) || ''; } catch (e) { S.ultimoResp = ''; }
+    if (S.ultimoResp) l.responsavel = S.ultimoResp;
+  }
 
   /* =========================================================
      Validação e pendências
@@ -142,6 +169,7 @@
     if (!l.data) P.push({ n: 'erro', t: 'Data não preenchida', e: 1 });
     if (!String(l.responsavel || '').trim()) P.push({ n: 'erro', t: 'Responsável não preenchido', e: 1 });
     if (l.latitude == null || l.longitude == null) P.push({ n: 'aviso', t: 'GPS não capturado (coordenadas não informadas)', e: 2 });
+    else if (l.coordOrigem === 'cadastro') P.push({ n: 'aviso', t: 'Coordenadas vêm do cadastro: confirme com o GPS no local', e: 2 });
     if (!l.caracteristicas.tipo) P.push({ n: 'aviso', t: 'Tipo de bueiro não informado', e: 3 });
     if (l.medicoes.cotaEntrada == null) P.push({ n: 'aviso', t: 'Cota de entrada não preenchida', e: 4 });
     if (!l.secao || !l.secao.salvoEm) P.push({ n: 'aviso', t: 'Seção ainda não desenhada', e: 5 });
@@ -179,6 +207,7 @@
     if (el) { el.textContent = SAVE_TXT[s]; el.className = 'chip save ' + s; }
   }
   function marcarSujo() {
+    if (S.cur && S.cur.status === 'a_vistoriar') S.cur.status = 'rascunho'; // começou a vistoria
     S.dirty = true; S.rev++; setSaveState('pendente');
     clearTimeout(S.timer); S.timer = setTimeout(() => salvarAtual(), 700);
   }
@@ -193,6 +222,8 @@
     try {
       await DB.salvar(S.cur);
       S.persistido = true;
+      const resp = String(S.cur.responsavel || '').trim();
+      if (resp && resp !== S.ultimoResp) { S.ultimoResp = resp; DB.cfgSalvar('ultimoResponsavel', resp).catch(() => {}); }
       if (S.rev === rev) { S.dirty = false; setSaveState('salvo'); }
       else { setSaveState('pendente'); clearTimeout(S.timer); S.timer = setTimeout(() => salvarAtual(), 300); }
       return true;
@@ -208,23 +239,26 @@
      ========================================================= */
   function viewHome() {
     const n = S.lista.length;
-    const ultimaData = S.lista.map(l => l.data).filter(Boolean).sort().pop();
-    const alvo = S.lista.find(l => l.status === 'rascunho') || S.lista[0];
+    const feitos = S.lista.filter(l => l.status !== 'a_vistoriar'), aVist = n - feitos.length;
+    const ultimaData = feitos.map(l => l.data).filter(Boolean).sort().pop();
+    const alvo = S.lista.find(l => l.status === 'rascunho') || S.lista.find(l => l.status === 'concluido') || ordenar(S.lista)[0];
+    const proximo = !S.lista.some(l => l.status === 'rascunho') && aVist;
     $('#view').innerHTML = `
       <section class="page">
         <div class="card hero">
           <h1>Cadastro de Bueiros</h1>
           <p class="muted">Levantamento de campo. Funciona sem internet; os dados ficam neste aparelho.</p>
           <div class="stats">
-            <div><b>${n}</b><span>${n === 1 ? 'levantamento salvo' : 'levantamentos salvos'}</span></div>
+            <div><b>${aVist ? feitos.length + ' / ' + n : n}</b><span>${aVist ? `vistoriados (${aVist} a vistoriar)` : (n === 1 ? 'levantamento salvo' : 'levantamentos salvos')}</span></div>
             <div><b>${ultimaData ? esc(U.dataBR(ultimaData)) : '—'}</b><span>último levantamento</span></div>
           </div>
         </div>
         <div class="menu">
           <button type="button" class="btn big primary" data-go="#/novo">+ Novo levantamento</button>
-          <button type="button" class="btn big" data-a="continuar" ${alvo ? `data-id="${esc(alvo.id)}"` : 'disabled'}>Continuar levantamento
+          <button type="button" class="btn big" data-a="continuar" ${alvo ? `data-id="${esc(alvo.id)}"` : 'disabled'}>${proximo ? 'Próximo bueiro a vistoriar' : 'Continuar levantamento'}
             <small>${alvo ? esc(alvo.codigo || 'Sem código') : 'nenhum levantamento ainda'}</small></button>
           <button type="button" class="btn big" data-go="#/lista">Projetos salvos</button>
+          <button type="button" class="btn big" data-a="importar-kmz">Importar cadastro (KMZ/KML) <small>carrega os bueiros do arquivo do cadastro</small></button>
           <button type="button" class="btn big" data-a="importar-home">Importar arquivo TXT <small>cria um levantamento com os pontos do RTK</small></button>
           <button type="button" class="btn big" data-a="backup" ${n ? '' : 'disabled'}>Exportar dados <small>backup completo em JSON, com fotos</small></button>
           <button type="button" class="btn big" data-a="restaurar">Restaurar backup <small>volta os levantamentos de um JSON</small></button>
@@ -236,35 +270,54 @@
   /* =========================================================
      Renderização — Lista
      ========================================================= */
+  function resumoTecnico(l) {
+    const c = l.caracteristicas, N = U.numTxt;
+    const dim = c.diametro != null ? `Ø ${N(c.diametro)} m` : (c.largura != null && c.altura != null ? `${N(c.largura)} × ${N(c.altura)} m` : '');
+    const n = (c.linhas > 1) ? `${c.linhas} linhas` : '';
+    return [c.tipo, c.material, n, dim].filter(Boolean).join(' · ');
+  }
   function cartaoLista(l) {
-    const local = [l.estrada, l.municipio ? l.municipio + (l.estado ? '/' + l.estado : '') : ''].filter(Boolean).join(' · ') || 'Local não informado';
-    const rasc = l.status !== 'concluido';
+    const local = [l.km && 'km ' + l.km, l.municipio ? l.municipio + (l.estado ? '/' + l.estado : '') : '', !l.km && l.estrada].filter(Boolean).join(' · ') || 'Local não informado';
+    const [rot, cls] = STATUS[l.status] || STATUS.rascunho, av = l.status === 'a_vistoriar', tec = resumoTecnico(l);
+    const nav = (l.latitude != null && l.longitude != null)
+      ? `<a class="btn" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${l.latitude},${l.longitude}&travelmode=driving">Navegar</a>` : '';
     return `<article class="card lev" data-id="${esc(l.id)}">
-      <div class="lev-top"><b>${esc(l.codigo || 'Sem código')}</b><span class="chip ${rasc ? 'rascunho' : 'concluido'}">${rasc ? 'Rascunho' : 'Concluído'}</span></div>
+      <div class="lev-top"><b>${esc(l.codigo || 'Sem código')}</b><span class="chip ${cls}">${rot}</span></div>
       <div>${esc(local)}</div>
-      <div class="muted small">${esc(U.dataBR(l.data))} · ${esc(l.responsavel || 'sem responsável')} · atualizado ${esc(U.dataHoraBR(l.atualizadoEm))}</div>
+      ${tec ? `<div class="muted small">${esc(tec)}</div>` : ''}
+      <div class="muted small">${av ? esc(l.observacoes ? l.observacoes.split('\n')[0] : 'Ainda não vistoriado') : `${esc(U.dataBR(l.data))} · ${esc(l.responsavel || 'sem responsável')} · atualizado ${esc(U.dataHoraBR(l.atualizadoEm))}`}</div>
       <div class="row">
-        <button type="button" class="btn primary" data-a="abrir">Abrir</button>
-        <button type="button" class="btn" data-a="duplicar">Duplicar</button>
-        <button type="button" class="btn danger" data-a="excluir">Excluir</button>
-      </div></article>`;
+        <button type="button" class="btn primary" data-a="abrir">${av ? 'Vistoriar' : 'Abrir'}</button>${nav}
+      </div>
+      <div class="row"><button type="button" class="btn sm" data-a="duplicar">Duplicar</button><button type="button" class="btn sm danger" data-a="excluir">Excluir</button></div></article>`;
+  }
+  function listaFiltrada() {
+    const q = S.q.trim().toLowerCase();
+    let l = S.filtro === 'todos' ? S.lista : S.lista.filter(x => x.status === S.filtro);
+    if (q) l = l.filter(x => [x.codigo, x.estrada, x.municipio, x.responsavel, x.km, x.cadastroId].join(' ').toLowerCase().includes(q));
+    return ordenar(l);
   }
   function itensLista() {
-    const q = S.q.trim().toLowerCase();
-    const l = q ? S.lista.filter(x => [x.codigo, x.estrada, x.municipio, x.responsavel].join(' ').toLowerCase().includes(q)) : S.lista;
-    if (!S.lista.length) return '<div class="card vazio">Nenhum levantamento salvo ainda.<br><button type="button" class="btn primary" data-go="#/novo">+ Novo levantamento</button></div>';
-    if (!l.length) return '<div class="card vazio">Nada encontrado para essa busca.</div>';
-    return l.map(cartaoLista).join('');
+    if (!S.lista.length) return '<div class="card vazio">Nenhum levantamento salvo ainda.<br><button type="button" class="btn primary" data-go="#/novo">+ Novo levantamento</button><button type="button" class="btn" data-a="importar-kmz">Importar cadastro (KMZ/KML)</button></div>';
+    const l = listaFiltrada();
+    if (!l.length) return '<div class="card vazio">Nada encontrado para esse filtro ou busca.</div>';
+    return `<div class="muted small">${l.length} bueiro(s)</div>` + l.slice(0, S.limite).map(cartaoLista).join('')
+      + (l.length > S.limite ? `<button type="button" class="btn" data-a="mais-lista">Mostrar mais (${l.length - S.limite})</button>` : '');
   }
   function viewLista() {
+    const cont = { todos: S.lista.length }; for (const k in STATUS) cont[k] = S.lista.filter(x => x.status === k).length;
+    const chips = [['todos', 'Todos'], ['a_vistoriar', 'A vistoriar'], ['rascunho', 'Rascunho'], ['concluido', 'Concluído']]
+      .map(([k, t]) => `<button type="button" class="fchip" data-a="filtro" data-v="${k}" aria-pressed="${S.filtro === k}">${t} <span>${cont[k]}</span></button>`).join('');
     $('#view').innerHTML = `
       <section class="page">
         <div class="page-head"><h1>Projetos salvos</h1><button type="button" class="btn primary" data-go="#/novo">+ Novo</button></div>
-        <input id="busca" class="busca" type="search" placeholder="Buscar por código, estrada, município…" value="${esc(S.q)}" aria-label="Buscar">
+        <div class="filtros" role="group" aria-label="Filtrar por situação">${chips}</div>
+        <input id="busca" class="busca" type="search" placeholder="Buscar por código, km, município…" value="${esc(S.q)}" aria-label="Buscar">
         <div id="itens">${itensLista()}</div>
         <button type="button" class="btn" data-go="#/">‹ Início</button>
       </section>`;
   }
+  function verLista(filtro) { S.filtro = filtro || 'todos'; S.limite = 60; S.q = ''; if (location.hash === '#/lista') rotear(); else location.hash = '#/lista'; }
 
   /* =========================================================
      Renderização — Formulário em etapas
@@ -297,6 +350,12 @@
     return [l.estrada, l.municipio].filter(Boolean).join(' · ') || 'Preencha a identificação';
   }
 
+  function cadastroHTML(l) {
+    if (!l.cadastro || !l.cadastro.itens || !l.cadastro.itens.length) return '';
+    return `<details class="card cad"><summary><b>Dados do cadastro</b> <span class="muted small">${esc(l.cadastro.arquivo || '')}</span></summary>
+      ${l.cadastro.itens.map(([k, v]) => linha(k, v)).join('')}
+      <p class="muted small">Vieram do arquivo importado e não são alterados. Confirme em campo e corrija nos campos do formulário.</p></details>`;
+  }
   function linha(k, v) { return `<div class="kv"><span>${esc(k)}</span><b>${v ? esc(v) : '—'}</b></div>`; }
   function revisaoHTML() {
     const l = S.cur, c = l.caracteristicas, m = l.medicoes, N = U.numTxt;
@@ -324,7 +383,7 @@
     const l = S.cur, n = S.etapa, et = ETAPAS[n - 1];
     let corpo;
     if (n === 2) corpo = BU.GPS.cartaoHTML(l) + `<div class="card"><h3>Coordenadas (graus decimais)</h3>${camposHTML(CAMPOS[2])}</div>`;
-    else if (CAMPOS[n]) corpo = `<div class="card">${camposHTML(CAMPOS[n])}</div>`;
+    else if (CAMPOS[n]) corpo = `<div class="card">${camposHTML(CAMPOS[n])}</div>` + (n === 1 ? cadastroHTML(l) : '');
     else if (n === 5) corpo = BU.Secao.etapaHTML(l);
     else if (n === 6) corpo = BU.Pontos.etapaHTML(l);
     else if (n === 7) corpo = BU.Fotos.etapaHTML(l);
@@ -361,6 +420,7 @@
       const r = validarNumero(el); mostrarErro(el, r.erro); val = r.val;
     }
     U.setPath(S.cur, el.dataset.p, val);
+    if (el.dataset.p === 'latitude' || el.dataset.p === 'longitude') S.cur.coordOrigem = 'manual';
     marcarSujo();
     if (S.etapa === 5) { if (el.dataset.p === 'caracteristicas.formato') { if (e.type === 'change') renderWizard(); } else BU.Secao.redesenhar(); }
     if (['codigo', 'estrada', 'municipio'].includes(el.dataset.p)) {
@@ -414,6 +474,9 @@
     else if (a === 'excluir') excluir(id);
     else if (a === 'backup') backup();
     else if (a === 'importar-home') $('#home-file').click();
+    else if (a === 'importar-kmz') $('#kmz-file').click();
+    else if (a === 'filtro') { S.filtro = t.dataset.v; S.limite = 60; viewLista(); }
+    else if (a === 'mais-lista') { S.limite += 60; $('#itens').innerHTML = itensLista(); }
     else if (a === 'restaurar') $('#restore-file').click();
     else if (a === 'instalar' && S.instalar) { S.instalar.prompt(); try { await S.instalar.userChoice; } catch (e) { /* ignora */ } S.instalar = null; if (S.hashAtual === '#/' || S.hashAtual === '') viewHome(); }
     else if (a === 'voltar') { if (S.etapa > 1) irEtapa(S.etapa - 1); else location.hash = '#/'; }
@@ -421,7 +484,7 @@
     else if (a === 'salvar') { if (await salvarAtual({ forcar: true })) UI.toast('Salvo'); }
     else if (a === 'concluir') concluir();
   });
-  document.addEventListener('input', e => { if (e.target.id === 'busca') { S.q = e.target.value; $('#itens').innerHTML = itensLista(); } });
+  document.addEventListener('input', e => { if (e.target.id === 'busca') { S.q = e.target.value; S.limite = 60; $('#itens').innerHTML = itensLista(); } });
 
   /* =========================================================
      Rotas
@@ -436,7 +499,7 @@
 
     const m = h.match(/^#\/lev\/([^/]+)\/(\d)$/);
     if (h === '#/novo') {
-      S.cur = novoLevantamento(); S.persistido = false; S.dirty = false; S.saveState = 'salvo';
+      S.cur = novoLevantamento(); await prefillResponsavel(S.cur); S.persistido = false; S.dirty = false; S.saveState = 'salvo';
       location.replace(`#/lev/${S.cur.id}/1`); return;
     }
     if (m) {
@@ -445,6 +508,9 @@
         const r = await DB.obter(id);
         if (!r) { UI.toast('Levantamento não encontrado', 'erro'); location.replace('#/lista'); return; }
         S.cur = normalizar(r); S.persistido = true; S.dirty = false; S.saveState = 'salvo';
+        // Bueiro vindo do cadastro: data, hora e responsável entram na hora de vistoriar (só gravam quando você editar ou salvar).
+        if (!S.cur.data) { S.cur.data = U.hojeISO(); S.cur.hora = U.horaAgora(); }
+        await prefillResponsavel(S.cur);
       }
       S.etapa = n; renderWizard(); S.hashAtual = h; return;
     }
@@ -487,6 +553,7 @@
     await BU.Pontos.iniciar();
     $('#restore-file').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) BU.Export.restaurar(f); });
     registrarPWA();
+    $('#kmz-file').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) BU.KMZ.importar(f); });
     $('#home-file').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) BU.Pontos.importarDaHome(f); });
     const v = $('#view'); v.addEventListener('input', aoEditar); v.addEventListener('change', aoEditar);
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') salvarAtual(); });
@@ -495,7 +562,7 @@
   }
   /* Interface usada pelos módulos gps.js, points.js, section-drawing.js e photos.js */
   window.BU.App = {
-    cur: () => S.cur, marcarSujo, salvarAtual, campoHTML, novo: novoLevantamento, normalizar, pendencias, CAMPOS,
+    cur: () => S.cur, marcarSujo, salvarAtual, campoHTML, novo: novoLevantamento, normalizar, pendencias, CAMPOS, OPCOES, UFS, verLista,
     irParaLista: () => { location.hash = '#/lista'; if (S.hashAtual === '#/lista') rotear(); },
     renderEtapa: () => { if (S.cur) renderWizard(); },
   };

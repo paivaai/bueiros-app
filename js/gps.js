@@ -48,7 +48,8 @@
         <div class="kv"><span>Longitude</span><b class="mono">${N(l.longitude)}</b></div>
         <div class="kv"><span>Precisão</span><b>${l.precisaoGps != null ? '±' + N(l.precisaoGps) + ' m' : '—'} ${q ? `<span class="chip ${q.k}">${U.esc(q.t)}</span>` : ''}</b></div>
         <div class="kv"><span>Altitude</span><b>${l.altitude != null ? N(l.altitude) + ' m' : '—'}</b></div>
-        <div class="kv"><span>Capturado em</span><b>${l.gpsCapturadoEm ? U.esc(U.dataHoraBR(l.gpsCapturadoEm)) : 'digitado'}</b></div>`
+        <div class="kv"><span>Capturado em</span><b>${l.gpsCapturadoEm ? U.esc(U.dataHoraBR(l.gpsCapturadoEm)) : (l.coordOrigem === 'cadastro' ? 'do cadastro (confirme no local)' : 'digitado')}</b></div>
+        <a class="btn" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${l.latitude},${l.longitude}&travelmode=driving">Navegar até o ponto</a>`
         : '<p class="muted">Nenhuma localização registrada ainda.</p>'}
       <div id="gps-status" class="gps-status" role="status"></div>
       <button type="button" class="btn primary" data-gps="capturar">${tem ? 'Atualizar GPS' : 'Capturar GPS'}</button>
@@ -67,7 +68,7 @@
       l.latitude = +r.lat.toFixed(7); l.longitude = +r.lon.toFixed(7);
       l.precisaoGps = r.acc != null ? +r.acc.toFixed(1) : null;
       l.altitude = r.alt != null ? +r.alt.toFixed(1) : null;
-      l.gpsCapturadoEm = new Date(r.ts).toISOString();
+      l.gpsCapturadoEm = new Date(r.ts).toISOString(); l.coordOrigem = 'gps';
       App.marcarSujo(); App.renderEtapa();
       if (r.acc > 15) UI.toast(`Precisão ruim (±${Math.round(r.acc)} m). Vá para céu aberto e atualize.`, 'aviso');
       else UI.toast('GPS capturado');

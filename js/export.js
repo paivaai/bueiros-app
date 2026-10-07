@@ -41,6 +41,7 @@
       }
       fecha();
     }
+    if (l.cadastro && l.cadastro.itens && l.cadastro.itens.length) out.push({ grupo: 'Dados do cadastro de origem' + (l.cadastro.arquivo ? ' (' + l.cadastro.arquivo + ')' : ''), itens: l.cadastro.itens });
     return out;
   }
   const quando = () => U.dataHoraBR(U.agoraISO());

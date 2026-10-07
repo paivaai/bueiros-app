@@ -58,12 +58,14 @@
 
     if (tipo === 'Circular') {
       if (!(D > 0)) return null;
-      const ev = eInf ? e0 : D * 0.08, outD = D + 2 * ev, { s, ox, oy } = fit(outD, outD);
-      const cx = ox + outD * s / 2, cy = oy + outD * s / 2, ro = outD * s / 2, ri = D * s / 2;
-      const circ = r => `M${r1(cx - r)} ${r1(cy)}a${r1(r)} ${r1(r)} 0 1 0 ${r1(2 * r)} 0a${r1(r)} ${r1(r)} 0 1 0 ${-r1(2 * r)} 0z`;
-      const b = oy + outD * s;
-      return { e: eInf ? e0 : null, corpo: `<path d="${circ(ro)}${circ(ri)}" fill="${PAT}" fill-rule="evenodd" ${STROKE}/>`,
-        cot: cotaH(cx - ri, cx + ri, b + 16, `Ø int ${f2(D)} m`, b) + (eInf ? cotaH(cx - ro, cx + ro, b + 34, `Ø ext ${f2(outD)} m`, b) : '') };
+      const n = Math.min(4, Math.max(1, Math.round(num(c.linhas) || 1))); // várias linhas = tubos lado a lado
+      const ev = eInf ? e0 : D * 0.08, outD = D + 2 * ev, gap = n > 1 ? D * 0.4 : 0, W = n * outD + (n - 1) * gap;
+      const { s, ox, oy } = fit(W, outD), ro = outD * s / 2, ri = D * s / 2, cy = oy + ro;
+      const circ = (cx, r) => `M${r1(cx - r)} ${r1(cy)}a${r1(r)} ${r1(r)} 0 1 0 ${r1(2 * r)} 0a${r1(r)} ${r1(r)} 0 1 0 ${-r1(2 * r)} 0z`;
+      let d = ''; for (let i = 0; i < n; i++) { const cx = ox + ro + i * (outD + gap) * s; d += circ(cx, ro) + circ(cx, ri); }
+      const cx0 = ox + ro, b = oy + outD * s;
+      return { e: eInf ? e0 : null, corpo: `<path d="${d}" fill="${PAT}" fill-rule="evenodd" ${STROKE}/>`,
+        cot: cotaH(cx0 - ri, cx0 + ri, b + 16, `Ø int ${f2(D)} m`, b) + (eInf ? cotaH(cx0 - ro, cx0 + ro, b + 34, `Ø ext ${f2(outD)} m`, b) : '') };
     }
 
     if (['Retangular', 'Quadrada', 'Aduela simples', 'Aduela dupla'].includes(tipo)) {
@@ -120,7 +122,7 @@
     const notas = (s.notas || []).map(n => `<text x="${n.x}" y="${n.y}" font-size="12" font-weight="700" fill="#fff" stroke="#fff" stroke-width="4" stroke-linejoin="round">${esc(n.t)}</text><text x="${n.x}" y="${n.y}" font-size="12" font-weight="700" fill="${NOTA}">${esc(n.t)}</text>`).join('');
     const par = (a, b) => (a != null && b != null) ? `${f2(a)} × ${f2(b)} m` : null;
     const leg = [
-      [c.formato, c.material, c.tipo].filter(Boolean).join(' · '),
+      [c.formato, c.material, c.tipo, (num(c.linhas) > 1 && c.formato !== 'Aduela dupla') ? c.linhas + ' linhas' : ''].filter(Boolean).join(' · '),
       F && F.e ? `Espessura da parede: ${f2(F.e)} m` : (F ? 'Espessura não informada (parede ilustrativa)' : ''),
       par(m.larguraEntrada, m.alturaEntrada) ? `Entrada: ${par(m.larguraEntrada, m.alturaEntrada)}` : '',
       par(m.larguraSaida, m.alturaSaida) ? `Saída: ${par(m.larguraSaida, m.alturaSaida)}` : '',

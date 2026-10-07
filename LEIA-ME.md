@@ -37,3 +37,10 @@ Só no celular (IndexedDB do Chrome). Não há servidor. **Limpar os dados do Ch
 - Conta de desenvolvedor Google Play: US$ 25, pagamento único.
 - Conta pessoal criada depois de 13/11/2023: exige teste fechado com 12 testadores por 14 dias seguidos antes de publicar. Conta de organização não tem essa exigência.
 - O PWA pode ser empacotado como app Android (TWA, por exemplo com o PWABuilder). Para uma demonstração, instalar pelo Chrome já resolve e é imediato.
+
+## 7. Importar o cadastro (KMZ/KML)
+- Na tela Início: **Importar cadastro (KMZ/KML)** e escolha o arquivo (ex.: BGROTA_FORA_MELHORIA_03.kmz).
+- Cada ponto vira um levantamento com status **A vistoriar**, já com coordenadas, tipo, dimensões, conservação e observações do cadastro.
+- Importar o mesmo arquivo de novo não duplica (os já existentes são ignorados).
+- **Não suba o KMZ para o GitHub público** (dados do cliente). Envie o arquivo ao celular por WhatsApp/Drive e importe pelo app.
+- Ao atualizar, mantenha `VERSAO = 'v3'` (ou maior) no service-worker.js.
