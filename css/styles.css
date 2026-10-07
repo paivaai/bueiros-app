@@ -160,3 +160,9 @@ select[data-pt-filtro] { flex: 1; min-height: 44px; border: 2px solid var(--line
 .col2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .col2 .btn { min-height: 56px; text-align: center; }
 .banner.update { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--sign); color: #1E1A06; }
+
+/* câmera ao vivo */
+.cam-overlay { position: fixed; inset: 0; z-index: 200; background: #000; display: flex; flex-direction: column; }
+.cam-overlay video { flex: 1; min-height: 0; width: 100%; object-fit: contain; background: #000; }
+.cam-bar { display: flex; gap: 10px; padding: 12px 14px calc(12px + env(safe-area-inset-bottom, 0px)); background: #111; }
+.cam-bar .btn { flex: 1; } .cam-bar .cam-shot { flex: 2; min-height: 60px; font-size: 19px; }
