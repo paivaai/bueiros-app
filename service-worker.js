@@ -1,7 +1,7 @@
 /* service-worker.js — cache-first dos arquivos do app, para funcionar sem internet.
    IMPORTANTE: toda vez que você subir arquivos novos para o GitHub, aumente o número da VERSAO abaixo
    (v1 -> v2 -> v3...). É isso que faz os celulares perceberem a atualização. */
-const VERSAO = 'v1';
+const VERSAO = 'v2';
 const CACHE = 'bueiros-' + VERSAO;
 const ARQUIVOS = [
   './', 'index.html', 'offline.html', 'manifest.webmanifest', 'css/styles.css',
