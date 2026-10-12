@@ -28,6 +28,7 @@ self.addEventListener('fetch', e => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
+  if (url.pathname.includes('/gestao/')) return; // painel de gestão: sempre da rede (online), fora do cache do app de campo
   e.respondWith((async () => {
     const cache = await caches.open(CACHE);
     const achou = await cache.match(req, { ignoreSearch: true });

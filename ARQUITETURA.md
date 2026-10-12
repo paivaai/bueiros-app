@@ -113,7 +113,7 @@ O GitHub Pages é público: **no repositório entra apenas a chave `anon` do Sup
 |---|---|---|
 | **A** | Servidor: tabelas, regras, funções, fotos, tempo real | **Pronta e testada** (esta entrega) |
 | **B** | App de campo: login, sincronização, fila de fotos, tela “meus bueiros” | Aguarda sua aprovação |
-| **C** | Painel `/gestao`: login, visão geral, mapa, tabela, detalhe | Depois de B |
+| **C** | Painel `/gestao`: login, visão geral, mapa, tabela, detalhe | **Primeira versão pronta em modo demonstração** (falta ligar ao Supabase real) |
 | **D** | Revisão, atribuição, convites, relatórios em lote | Depois de C |
 
 ## 11. Decisões já tomadas (12/10/2026)
