@@ -7,7 +7,7 @@
 
   const VBW = 400, VBH = 380, AREA = { x: 34, y: 38, w: 236, h: 168 };
   const INK = '#16201A', COTA = '#0B3D91', NOTA = '#9A2A0B';
-  const FORMATOS = ['Circular', 'Retangular', 'Quadrada', 'Trapezoidal', 'Aduela simples', 'Aduela dupla', 'Personalizada'];
+  const FORMATOS = ['Circular', 'Retangular', 'Personalizada'];
   const CAMPOS_TIPO = {
     'Circular': ['diametro', 'espessura'], 'Retangular': ['largura', 'altura', 'espessura'], 'Quadrada': ['largura', 'espessura'],
     'Trapezoidal': ['largura', 'larguraTopo', 'altura', 'espessura'], 'Aduela simples': ['largura', 'altura', 'espessura'],
@@ -58,8 +58,7 @@
 
     if (tipo === 'Circular') {
       if (!(D > 0)) return null;
-      const n = Math.min(4, Math.max(1, Math.round(num(c.linhas) || 1))); // várias linhas = tubos lado a lado
-      const ev = eInf ? e0 : D * 0.08, outD = D + 2 * ev, gap = n > 1 ? D * 0.4 : 0, W = n * outD + (n - 1) * gap;
+      const n = 1, ev = eInf ? e0 : D * 0.08, outD = D + 2 * ev, gap = 0, W = outD;
       const { s, ox, oy } = fit(W, outD), ro = outD * s / 2, ri = D * s / 2, cy = oy + ro;
       const circ = (cx, r) => `M${r1(cx - r)} ${r1(cy)}a${r1(r)} ${r1(r)} 0 1 0 ${r1(2 * r)} 0a${r1(r)} ${r1(r)} 0 1 0 ${-r1(2 * r)} 0z`;
       let d = ''; for (let i = 0; i < n; i++) { const cx = ox + ro + i * (outD + gap) * s; d += circ(cx, ro) + circ(cx, ri); }
@@ -71,7 +70,7 @@
     if (['Retangular', 'Quadrada', 'Aduela simples', 'Aduela dupla'].includes(tipo)) {
       const W = W0, H = tipo === 'Quadrada' ? W0 : H0;
       if (!(W > 0 && H > 0)) return null;
-      const n = tipo === 'Aduela dupla' ? 2 : 1, ev = eInf ? e0 : Math.min(W, H) * 0.08;
+      const n = tipo === 'Aduela dupla' ? 2 : Math.min(4, Math.max(1, Math.round(num(c.celulas) || 1))), ev = eInf ? e0 : Math.min(W, H) * 0.08;
       const outW = n * W + (n + 1) * ev, outH = H + 2 * ev, { s, ox, oy } = fit(outW, outH);
       const cs = tipo.startsWith('Aduela') ? Math.min(W, H) * 0.1 * s : 0;
       let d = rect(ox, oy, outW * s, outH * s);
@@ -114,6 +113,17 @@
     return null;
   }
 
+  /* Dimensões da estrutura para planta e perfil (metros): largura externa, altura interna e espessura. */
+  function dims(l) {
+    const c = l.caracteristicas, tipo = c.formato, D = num(c.diametro), W = num(c.largura), H = num(c.altura), e0 = num(c.espessura) || 0;
+    if (tipo === 'Circular' && D > 0) { const e = e0 > 0 ? e0 : D * 0.08; return { W: D + 2 * e, H: D, e, interno: D, circ: true, rotulo: `Ø ${f2(D)} m` }; }
+    if ((tipo === 'Retangular' || tipo === 'Personalizada') && W > 0 && H > 0) {
+      const n = tipo === 'Retangular' ? Math.min(4, Math.max(1, Math.round(num(c.celulas) || 1))) : 1, e = e0 > 0 ? e0 : Math.min(W, H) * 0.08;
+      return { W: n * W + (n + 1) * e, H, e, interno: W, circ: false, n, rotulo: `${n > 1 ? n + ' × ' : ''}${f2(W)} × ${f2(H)} m` };
+    }
+    return null;
+  }
+
   /* ---------- SVG completo ---------- */
   function gerarSVG(l) {
     const F = forma(l), s = l.secao || {}, c = l.caracteristicas, m = l.medicoes, fluxo = s.fluxo === 'esquerda' ? 'esquerda' : 'direita';
@@ -122,7 +132,7 @@
     const notas = (s.notas || []).map(n => `<text x="${n.x}" y="${n.y}" font-size="12" font-weight="700" fill="#fff" stroke="#fff" stroke-width="4" stroke-linejoin="round">${esc(n.t)}</text><text x="${n.x}" y="${n.y}" font-size="12" font-weight="700" fill="${NOTA}">${esc(n.t)}</text>`).join('');
     const par = (a, b) => (a != null && b != null) ? `${f2(a)} × ${f2(b)} m` : null;
     const leg = [
-      [c.formato, c.material, c.tipo, (num(c.linhas) > 1 && c.formato !== 'Aduela dupla') ? c.linhas + ' linhas' : ''].filter(Boolean).join(' · '),
+      [c.formato, c.material, c.tipo, num(c.celulas) > 1 ? c.celulas + ' células' : ''].filter(Boolean).join(' · '),
       F && F.e ? `Espessura da parede: ${f2(F.e)} m` : (F ? 'Espessura não informada (parede ilustrativa)' : ''),
       par(m.larguraEntrada, m.alturaEntrada) ? `Entrada: ${par(m.larguraEntrada, m.alturaEntrada)}` : '',
       par(m.larguraSaida, m.alturaSaida) ? `Saída: ${par(m.larguraSaida, m.alturaSaida)}` : '',
@@ -155,7 +165,7 @@ ${corpo}${riscos}${notas}${leg}${fl}</svg>`;
     const App = BU.App, tipo = l.caracteristicas.formato, s = l.secao || {};
     const campos = (CAMPOS_TIPO[tipo] || []).map(c => App.campoHTML({ p: 'caracteristicas.' + c, label: rotulo(tipo, c), t: 'num', unit: 'm', min: 0 })).join('');
     const seg = (v, t) => `<button type="button" data-sc="modo" data-v="${v}" aria-pressed="${T.modo === v}">${t}</button>`;
-    return `<div class="card"><div class="grid">
+    return `<h2 class="sub-h">Seção transversal</h2><div class="card"><div class="grid">
         ${App.campoHTML({ p: 'caracteristicas.formato', label: 'Tipo de seção', t: 'select', opts: FORMATOS })}
         ${campos}</div>
         <p class="muted small">Dimensões em metros. O desenho se atualiza sozinho e usa os mesmos valores da etapa Características.</p></div>
@@ -247,5 +257,5 @@ ${corpo}${riscos}${notas}${leg}${fl}</svg>`;
   document.addEventListener('pointerup', fimTraco);
   document.addEventListener('pointercancel', fimTraco);
 
-  BU.Secao = { etapaHTML, redesenhar, miniatura, gerarSVG, exportarPNG, FORMATOS };
+  BU.Secao = { etapaHTML, redesenhar, miniatura, gerarSVG, exportarPNG, FORMATOS, dims, forma };
 })();

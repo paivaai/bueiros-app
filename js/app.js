@@ -38,21 +38,21 @@
       { p: 'lado', label: 'Lado da rodovia', t: 'select', opts: OPCOES.lado, half: true },
       { p: 'data', label: 'Data', t: 'date', req: true, half: true },
       { p: 'hora', label: 'Hora', t: 'time', half: true },
-      { p: 'responsavel', label: 'Responsável', req: true },
-      { p: 'equipe', label: 'Empresa ou equipe' },
+      { p: 'responsavel', label: 'Responsável', req: true, t: 'resp' },
+      { p: 'equipe', label: 'Empresa ou equipe', ph: 'GFA' },
       { p: 'observacoes', label: 'Observações gerais', t: 'textarea' },
     ],
     2: [
-      { p: 'latitude', label: 'Latitude', t: 'num', unit: '°', min: -90, max: 90, neg: true, ph: '-21,2319210' },
-      { p: 'longitude', label: 'Longitude', t: 'num', unit: '°', min: -180, max: 180, neg: true, ph: '-41,3173031' },
-      { p: 'precisaoGps', label: 'Precisão (±)', t: 'num', unit: 'm', min: 0 },
-      { p: 'altitude', label: 'Altitude', t: 'num', unit: 'm', neg: true },
+      { p: 'leste', label: 'Este (E)', t: 'num', unit: 'm', min: 100000, max: 900000, ph: '712392,430' },
+      { p: 'norte', label: 'Norte (N)', t: 'num', unit: 'm', min: 0, max: 10000000, ph: '7480303,180' },
+      { p: 'zona', label: 'Fuso / Zona UTM', t: 'select', opts: BU.GPS.ZONAS, half: true, sem: true },
+      { p: 'hemisferio', label: 'Hemisfério', t: 'select', opts: ['S', 'N'], half: true, sem: true },
+      { p: 'altitude', label: 'Altitude (Z)', t: 'num', unit: 'm', neg: true, ph: '15,904' },
     ],
     3: [
       { h: 'Tipo e geometria' },
       { p: 'caracteristicas.tipo', label: 'Tipo de bueiro', t: 'select', opts: ['Tubular', 'Celular', 'Aduela', 'Galeria', 'Outro'] },
-      { p: 'caracteristicas.formato', label: 'Formato da seção', t: 'select', opts: ['Circular', 'Retangular', 'Quadrada', 'Trapezoidal', 'Aduela simples', 'Aduela dupla', 'Personalizada'] },
-      { p: 'caracteristicas.linhas', label: 'Linhas', t: 'int', min: 0 },
+      { p: 'caracteristicas.formato', label: 'Formato da seção', t: 'select', opts: ['Circular', 'Retangular', 'Personalizada'] },
       { p: 'caracteristicas.celulas', label: 'Células', t: 'int', min: 0 },
       { p: 'caracteristicas.material', label: 'Material', t: 'select', opts: ['Concreto', 'Concreto armado', 'Metal', 'PEAD', 'Pedra', 'Alvenaria', 'Outro'] },
       { h: 'Dimensões' },
@@ -101,10 +101,11 @@
       versaoSchema: SCHEMA, id: U.uid(), status: 'rascunho',
       origem: 'campo', cadastroId: '', cadastro: null, coordOrigem: null,
       codigo: '', estrada: '', municipio: '', estado: '', km: '', ambiente: '', sentido: '', pistaGe: '', lado: '', data: U.hojeISO(), hora: U.horaAgora(),
-      responsavel: '', equipe: '', observacoes: '',
-      latitude: null, longitude: null, precisaoGps: null, altitude: null, gpsCapturadoEm: null, fuso: null,
+      responsavel: '', equipe: 'GFA', observacoes: '',
+      leste: null, norte: null, zona: '23', hemisferio: 'S', altitude: null,
+      latitude: null, longitude: null, // só para o botão Navegar (derivadas do UTM)
       caracteristicas: {
-        tipo: '', formato: '', linhas: null, celulas: null, material: '', diametro: null, largura: null, altura: null, comprimento: null, espessura: null, larguraTopo: null,
+        tipo: '', formato: '', celulas: null, material: '', diametro: null, largura: null, altura: null, comprimento: null, espessura: null, larguraTopo: null,
         situacaoEstrutural: '', conservacao: '', erosao: '', assoreamento: '', obstrucao: '', agua: '', vegetacao: '',
         tipoEntrada: '', tipoSaida: '', sentidoFluxo: '', observacoes: '', necessita: '',
       },
@@ -113,19 +114,28 @@
         profMontante: null, profJusante: null, comprimentoBueiro: null, declividade: null, cotaEntrada: null, cotaSaida: null,
         nivelAgua: null, vazaoEstimada: null, observacoes: '',
       },
-      secao: null, pontos: [], fotos: [],
+      secao: null, prancha: { inverter: false }, medicoesAuto: {}, pontosArquivo: '', pontos: [], fotos: [],
       criadoEm: agora, atualizadoEm: agora,
     };
   }
   /* Completa registros antigos com campos que surgirem em fases futuras (compatibilidade). */
   function normalizar(r) {
     const b = novoLevantamento();
-    return {
+    const l = {
       ...b, ...r,
       caracteristicas: { ...b.caracteristicas, ...(r.caracteristicas || {}) },
       medicoes: { ...b.medicoes, ...(r.medicoes || {}) },
+      prancha: { ...b.prancha, ...(r.prancha || {}) }, medicoesAuto: { ...(r.medicoesAuto || {}) },
       pontos: r.pontos || [], fotos: r.fotos || [],
     };
+    if (!String(l.equipe || '').trim()) l.equipe = 'GFA';
+    // Formatos antigos (versões anteriores) viram os 3 formatos atuais.
+    const c = l.caracteristicas;
+    if (c.formato === 'Quadrada') { c.formato = 'Retangular'; if (c.altura == null) c.altura = c.largura; }
+    else if (c.formato === 'Aduela simples') c.formato = 'Retangular';
+    else if (c.formato === 'Aduela dupla') { c.formato = 'Retangular'; if (!(c.celulas > 1)) c.celulas = 2; }
+    else if (c.formato === 'Trapezoidal') c.formato = 'Personalizada';
+    return BU.GPS.completarUTM(l);
   }
 
   /* =========================================================
@@ -136,7 +146,7 @@
     cur: null, etapa: 1, persistido: false,
     dirty: false, rev: 0, timer: null, saveState: 'salvo',
     hashAtual: '#/', ignorar: false,
-    filtro: 'todos', limite: 60, ultimoResp: null,
+    filtro: 'todos', limite: 60, ultimoResp: null, resp: [], ultimaZona: null,
   };
 
   /* Ordem de trabalho: em andamento, depois os a vistoriar (na ordem do km), depois os concluídos. */
@@ -151,6 +161,28 @@
     if (l.responsavel) return;
     try { if (S.ultimoResp == null) S.ultimoResp = (await DB.cfgObter('ultimoResponsavel')) || ''; } catch (e) { S.ultimoResp = ''; }
     if (S.ultimoResp) l.responsavel = S.ultimoResp;
+  }
+
+  /* Lista de responsáveis: nomes ficam cadastrados neste aparelho e aparecem num menu. */
+  async function carregarResp() { try { const v = await DB.cfgObter('responsaveis'); if (Array.isArray(v)) S.resp = v; } catch (e) { /* segue vazio */ } }
+  async function lembrarResp(nome) {
+    nome = String(nome || '').trim();
+    if (!nome || S.resp.includes(nome)) return;
+    S.resp = [...S.resp, nome].sort((a, b) => a.localeCompare(b, 'pt'));
+    try { await DB.cfgSalvar('responsaveis', S.resp); } catch (e) { /* não crítico */ }
+  }
+  async function removerResp(nome) {
+    S.resp = S.resp.filter(x => x !== nome);
+    try { await DB.cfgSalvar('responsaveis', S.resp); } catch (e) { /* não crítico */ }
+  }
+  async function novoResp() {
+    const nome = await UI.pedir('Novo responsável', { ph: 'Nome completo' });
+    if (S.cur) { if (nome) { await lembrarResp(nome); S.cur.responsavel = nome; marcarSujo(); } renderWizard(); }
+  }
+
+  async function prefillZona(l) {
+    try { if (S.ultimaZona == null) S.ultimaZona = (await DB.cfgObter('ultimaZona')) || ''; } catch (e) { S.ultimaZona = ''; }
+    if (S.ultimaZona) l.zona = S.ultimaZona;
   }
 
   /* =========================================================
@@ -168,11 +200,11 @@
     if (!String(l.codigo || '').trim()) P.push({ n: 'erro', t: 'Código do levantamento não preenchido', e: 1 });
     if (!l.data) P.push({ n: 'erro', t: 'Data não preenchida', e: 1 });
     if (!String(l.responsavel || '').trim()) P.push({ n: 'erro', t: 'Responsável não preenchido', e: 1 });
-    if (l.latitude == null || l.longitude == null) P.push({ n: 'aviso', t: 'GPS não capturado (coordenadas não informadas)', e: 2 });
-    else if (l.coordOrigem === 'cadastro') P.push({ n: 'aviso', t: 'Coordenadas vêm do cadastro: confirme com o GPS no local', e: 2 });
+    if (!BU.GPS.utmDe(l)) P.push({ n: 'aviso', t: 'Coordenadas UTM (RTK) não informadas', e: 2 });
+    else if (l.coordOrigem === 'cadastro') P.push({ n: 'aviso', t: 'Coordenadas vêm do cadastro: confirme com o RTK no local', e: 2 });
     if (!l.caracteristicas.tipo) P.push({ n: 'aviso', t: 'Tipo de bueiro não informado', e: 3 });
     if (l.medicoes.cotaEntrada == null) P.push({ n: 'aviso', t: 'Cota de entrada não preenchida', e: 4 });
-    if (!l.secao || !l.secao.salvoEm) P.push({ n: 'aviso', t: 'Seção ainda não desenhada', e: 5 });
+    if (!BU.Prancha.croquiPronto(l)) P.push({ n: 'aviso', t: 'Croqui ainda não gerado (importe os pontos do RTK ou informe as dimensões)', e: 5 });
     if (!l.pontos.length) P.push({ n: 'aviso', t: 'Nenhum ponto cadastrado', e: 6 });
     if (!l.fotos.length) P.push({ n: 'aviso', t: 'Nenhuma foto adicionada', e: 7 });
     return P;
@@ -224,6 +256,7 @@
       S.persistido = true;
       const resp = String(S.cur.responsavel || '').trim();
       if (resp && resp !== S.ultimoResp) { S.ultimoResp = resp; DB.cfgSalvar('ultimoResponsavel', resp).catch(() => {}); }
+      lembrarResp(resp);
       if (S.rev === rev) { S.dirty = false; setSaveState('salvo'); }
       else { setSaveState('pendente'); clearTimeout(S.timer); S.timer = setTimeout(() => salvarAtual(), 300); }
       return true;
@@ -273,8 +306,7 @@
   function resumoTecnico(l) {
     const c = l.caracteristicas, N = U.numTxt;
     const dim = c.diametro != null ? `Ø ${N(c.diametro)} m` : (c.largura != null && c.altura != null ? `${N(c.largura)} × ${N(c.altura)} m` : '');
-    const n = (c.linhas > 1) ? `${c.linhas} linhas` : '';
-    return [c.tipo, c.material, n, dim].filter(Boolean).join(' · ');
+    return [c.tipo, c.material, dim].filter(Boolean).join(' · ');
   }
   function cartaoLista(l) {
     const local = [l.km && 'km ' + l.km, l.municipio ? l.municipio + (l.estado ? '/' + l.estado : '') : '', !l.km && l.estrada].filter(Boolean).join(' · ') || 'Local não informado';
@@ -326,8 +358,12 @@
     const v = U.getPath(S.cur, c.p), id = 'f-' + c.p.replace(/\./g, '-'), t = c.t || 'text';
     const lab = `<label for="${id}">${esc(c.label)}${c.req ? ' <span class="req" title="Obrigatório">*</span>' : ''}</label>`;
     let ctl;
-    if (t === 'select') {
-      ctl = `<select id="${id}" data-p="${c.p}"><option value="">—</option>${c.opts.map(o => `<option value="${esc(o)}"${o === v ? ' selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
+    if (t === 'resp') {
+      const nomes = [...new Set([...S.resp, ...(v ? [v] : [])])];
+      ctl = `<select id="${id}" data-p="${c.p}"><option value="">— escolha o responsável —</option>${nomes.map(o => `<option value="${esc(o)}"${o === v ? ' selected' : ''}>${esc(o)}</option>`).join('')}<option value="__novo__">+ Novo responsável…</option></select>`
+        + (v && S.resp.includes(v) ? `<button type="button" class="btn sm linkbtn" data-a="resp-remover" data-nome="${esc(v)}">Remover “${esc(v)}” da lista</button>` : '');
+    } else if (t === 'select') {
+      ctl = `<select id="${id}" data-p="${c.p}">${c.sem ? '' : '<option value="">—</option>'}${c.opts.map(o => `<option value="${esc(o)}"${String(o) === String(v) ? ' selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
     } else if (t === 'textarea') {
       ctl = `<textarea id="${id}" data-p="${c.p}" rows="3">${esc(v || '')}</textarea>`;
     } else if (t === 'num' || t === 'int') {
@@ -361,16 +397,17 @@
     const l = S.cur, c = l.caracteristicas, m = l.medicoes, N = U.numTxt;
     const dim = [c.diametro != null && `Ø ${N(c.diametro)} m`, c.largura != null && `L ${N(c.largura)} m`, c.altura != null && `A ${N(c.altura)} m`, c.comprimento != null && `C ${N(c.comprimento)} m`].filter(Boolean).join(' · ');
     const P = pendencias(l);
-    const coord = (l.latitude != null && l.longitude != null) ? `${N(l.latitude)}, ${N(l.longitude)}${l.precisaoGps != null ? ` (±${N(l.precisaoGps)} m)` : ''}` : '';
+    const u = BU.GPS.utmDe(l);
+    const coord = u ? `E ${BU.GPS.fmtM(u.E, 3)} · N ${BU.GPS.fmtM(u.N, 3)} · ${BU.GPS.rotuloUTM(u)}` : '';
     return `
       <div class="card"><h3>Identificação</h3>
         ${linha('Código', l.codigo)}${linha('Local', [l.estrada, l.municipio ? l.municipio + (l.estado ? '/' + l.estado : '') : ''].filter(Boolean).join(' · '))}
         ${linha('Data e hora', [U.dataBR(l.data), l.hora].filter(Boolean).join(' '))}${linha('Responsável', l.responsavel)}${linha('Equipe', l.equipe)}</div>
-      <div class="card"><h3>Localização</h3>${linha('Coordenadas', coord)}${linha('Altitude', l.altitude != null ? N(l.altitude) + ' m' : '')}</div>
+      <div class="card"><h3>Localização</h3>${linha('Coordenadas', coord)}${linha('Altitude (Z)', l.altitude != null ? N(l.altitude) + ' m' : '')}</div>
       <div class="card"><h3>Bueiro</h3>
         ${linha('Tipo / formato', [c.tipo, c.formato].filter(Boolean).join(' / '))}${linha('Dimensões', dim)}${linha('Material', c.material)}
         ${linha('Conservação', c.conservacao)}${linha('Cota entrada / saída', (m.cotaEntrada != null || m.cotaSaida != null) ? `${N(m.cotaEntrada) || '—'} / ${N(m.cotaSaida) || '—'}` : '')}
-        ${BU.Secao.miniatura(l)}</div>
+        ${BU.Prancha.miniatura(l)}</div>
       <div class="card"><h3>Registros</h3>${linha('Pontos', String(l.pontos.length))}${linha('Fotos', String(l.fotos.length))}</div>
       <div class="card"><h3>Pendências <span class="chip ${P.length ? 'rascunho' : 'concluido'}">${P.length || 'nenhuma'}</span></h3>
         ${P.length ? P.map(p => `<div class="pend ${p.n}"><span>${p.n === 'erro' ? '⛔' : '⚠️'} ${esc(p.t)}</span><button type="button" class="btn sm" data-etapa="${p.e}">Ir</button></div>`).join('') : '<p class="muted">Tudo preenchido.</p>'}
@@ -381,10 +418,11 @@
 
   function renderWizard() {
     const l = S.cur, n = S.etapa, et = ETAPAS[n - 1];
+    if (BU.Prancha.sincronizarMedicoes(l)) marcarSujo(); // cotas, comprimento e declividade vêm dos pontos do TXT
     let corpo;
-    if (n === 2) corpo = BU.GPS.cartaoHTML(l) + `<div class="card"><h3>Coordenadas (graus decimais)</h3>${camposHTML(CAMPOS[2])}</div>`;
+    if (n === 2) corpo = `<div class="card"><h3>Coordenadas UTM (SIRGAS 2000)</h3>${camposHTML(CAMPOS[2])}<p class="muted small">Este = E · Norte = N · Altitude = Z (cota). Metros.</p></div>` + BU.GPS.cartaoHTML(l);
     else if (CAMPOS[n]) corpo = `<div class="card">${camposHTML(CAMPOS[n])}</div>` + (n === 1 ? cadastroHTML(l) : '');
-    else if (n === 5) corpo = BU.Secao.etapaHTML(l);
+    else if (n === 5) corpo = BU.Prancha.etapaHTML(l) + BU.Secao.etapaHTML(l);
     else if (n === 6) corpo = BU.Pontos.etapaHTML(l);
     else if (n === 7) corpo = BU.Fotos.etapaHTML(l);
     else corpo = revisaoHTML();
@@ -414,15 +452,20 @@
   function aoEditar(e) {
     const el = e.target;
     if (!S.cur || !el.dataset || !el.dataset.p) return;
+    if (el.dataset.p === 'responsavel' && el.value === '__novo__') { if (e.type === 'change') novoResp(); return; }
     const t = el.dataset.t;
     let val = el.value;
     if (t === 'num' || t === 'int') {
       const r = validarNumero(el); mostrarErro(el, r.erro); val = r.val;
     }
     U.setPath(S.cur, el.dataset.p, val);
-    if (el.dataset.p === 'latitude' || el.dataset.p === 'longitude') S.cur.coordOrigem = 'manual';
+    if (['leste', 'norte', 'zona', 'hemisferio'].includes(el.dataset.p)) {
+      S.cur.coordOrigem = 'manual'; BU.GPS.atualizarLatLon(S.cur);
+      if (el.dataset.p === 'zona' && val) { S.ultimaZona = val; DB.cfgSalvar('ultimaZona', val).catch(() => {}); }
+    }
+    if (el.dataset.p.startsWith('medicoes.') && S.cur.medicoesAuto) delete S.cur.medicoesAuto[el.dataset.p.slice(9)]; // o que o usuário digita vale mais que o calculado
     marcarSujo();
-    if (S.etapa === 5) { if (el.dataset.p === 'caracteristicas.formato') { if (e.type === 'change') renderWizard(); } else BU.Secao.redesenhar(); }
+    if (S.etapa === 5) { if (el.dataset.p === 'caracteristicas.formato') { if (e.type === 'change') renderWizard(); } else { BU.Secao.redesenhar(); BU.Prancha.redesenhar(); } }
     if (['codigo', 'estrada', 'municipio'].includes(el.dataset.p)) {
       $('#r-cod').textContent = S.cur.codigo || 'Novo levantamento'; $('#r-sub').textContent = resumoTxt();
     }
@@ -473,6 +516,8 @@
     else if (a === 'duplicar') duplicar(id);
     else if (a === 'excluir') excluir(id);
     else if (a === 'backup') backup();
+    else if (a === 'resp-remover') { if (await UI.confirmar(`Tirar “${t.dataset.nome}” da lista de responsáveis? Os levantamentos já feitos não mudam.`, { titulo: 'Remover da lista', ok: 'Remover' })) { await removerResp(t.dataset.nome); renderWizard(); } }
+    else if (a === 'coord-pontos') { if (BU.Prancha.usarCentroComoCoordenada(S.cur)) { marcarSujo(); renderWizard(); UI.toast('Coordenadas preenchidas com o centro do bueiro'); } else UI.toast('Não foi possível calcular o centro com os pontos atuais', 'aviso'); }
     else if (a === 'importar-home') $('#home-file').click();
     else if (a === 'importar-kmz') $('#kmz-file').click();
     else if (a === 'filtro') { S.filtro = t.dataset.v; S.limite = 60; viewLista(); }
@@ -499,7 +544,7 @@
 
     const m = h.match(/^#\/lev\/([^/]+)\/(\d)$/);
     if (h === '#/novo') {
-      S.cur = novoLevantamento(); await prefillResponsavel(S.cur); S.persistido = false; S.dirty = false; S.saveState = 'salvo';
+      S.cur = novoLevantamento(); await prefillResponsavel(S.cur); await prefillZona(S.cur); S.persistido = false; S.dirty = false; S.saveState = 'salvo';
       location.replace(`#/lev/${S.cur.id}/1`); return;
     }
     if (m) {
@@ -550,7 +595,7 @@
     atualizarConexao();
     window.addEventListener('online', atualizarConexao); window.addEventListener('offline', atualizarConexao);
     window.addEventListener('hashchange', rotear);
-    await BU.Pontos.iniciar();
+    await BU.Pontos.iniciar(); await carregarResp(); await BU.Fotos.iniciar();
     $('#restore-file').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) BU.Export.restaurar(f); });
     registrarPWA();
     $('#kmz-file').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) BU.KMZ.importar(f); });
@@ -562,7 +607,7 @@
   }
   /* Interface usada pelos módulos gps.js, points.js, section-drawing.js e photos.js */
   window.BU.App = {
-    cur: () => S.cur, marcarSujo, salvarAtual, campoHTML, novo: novoLevantamento, normalizar, pendencias, CAMPOS, OPCOES, UFS, verLista,
+    cur: () => S.cur, S, irEtapa: n => { if (S.cur) irEtapa(n); }, prefillNovo: async l => { await prefillResponsavel(l); await prefillZona(l); }, marcarSujo, salvarAtual, campoHTML, novo: novoLevantamento, normalizar, pendencias, CAMPOS, OPCOES, UFS, verLista,
     irParaLista: () => { location.hash = '#/lista'; if (S.hashAtual === '#/lista') rotear(); },
     renderEtapa: () => { if (S.cur) renderWizard(); },
   };

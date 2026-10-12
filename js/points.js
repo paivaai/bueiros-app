@@ -27,7 +27,6 @@
     const t = String(v == null ? '' : v).trim().replace(/\s/g, '').replace(',', '.');
     return /^[-+]?\d+(\.\d+)?$/.test(t) ? t.replace(/^\+/, '') : null;
   }
-  function fusoDe(l) { return l.fuso || (l.longitude != null ? Math.floor((l.longitude + 180) / 6) + 1 : 23); }
   function proximoId(l) {
     const ns = l.pontos.map(p => parseInt(p.id, 10)).filter(n => !isNaN(n));
     return ns.length ? String(Math.max(...ns) + 1) : '';
@@ -82,7 +81,7 @@
       if (!ok) return;
       l.pontos = [];
     }
-    l.pontos.push(...r.ok);
+    l.pontos.push(...r.ok); l.pontosArquivo = file.name;
     await lembrarCodigos(r.ok.map(p => p.codigo));
     App.marcarSujo(); App.renderEtapa();
     const dup = duplicados(l).size;
@@ -97,7 +96,8 @@
     const ac = await UI.escolher('Importar ' + file.name, resumoHTML(r, '<p>Será criado um novo levantamento com estes pontos.</p>'), [
       { k: 'novo', label: 'Criar levantamento com os pontos', cls: 'primary' }, { k: 'x', label: 'Cancelar' }]);
     if (ac !== 'novo') return;
-    const l = BU.App.novo(); l.pontos = r.ok; l.codigo = '';
+    const l = BU.App.novo(); l.pontos = r.ok; l.pontosArquivo = file.name; l.codigo = '';
+    try { await BU.App.prefillNovo(l); } catch (e) { /* segue sem preencher */ }
     await lembrarCodigos(r.ok.map(p => p.codigo));
     try { await DB.salvar(l); } catch (e) { UI.toast('Erro ao salvar: ' + e.message, 'erro'); return; }
     location.hash = `#/lev/${l.id}/6`;
@@ -162,12 +162,10 @@
         ${campo('x', 'X (Norte) *', d.x, 'inputmode="decimal"')}
         ${campo('y', 'Y (Leste) *', d.y, 'inputmode="decimal"')}
         ${campo('z', 'Z (cota) *', d.z, 'inputmode="decimal"')}
-        <div class="f half"><label for="pf-fuso">Fuso UTM (S)</label><select id="pf-fuso" data-pt-fuso>${[18, 19, 20, 21, 22, 23, 24, 25].map(z => `<option value="${z}"${z === fusoDe(l) ? ' selected' : ''}>${z}</option>`).join('')}</select></div>
         <div class="f"><label for="pf-obs">Observação</label><input id="pf-obs" type="text" data-pf="obs" value="${esc(d.obs)}"></div>
       </div>
       <div id="pt-erro" class="err" role="alert" hidden></div>
-      <button type="button" class="btn" data-pt="gps">Preencher X/Y pelo GPS</button>
-      <p class="muted small">Converte o GPS para UTM SIRGAS 2000 no fuso escolhido. A altitude do GPS é aproximada: prefira a cota do RTK.</p>
+      <p class="muted small">Coordenadas UTM do RTK: X = Norte, Y = Este, Z = cota.</p>
       <div class="row"><button type="button" class="btn" data-pt="cancelar">Cancelar</button><button type="button" class="btn primary" data-pt="salvar">Salvar ponto</button></div></div>`;
   }
 
@@ -188,6 +186,7 @@
         </div>
         <input type="file" id="pt-file" accept=".txt,.csv,.dat,.xyz,text/*" hidden>
       </div>
+      ${l.pontos.length ? `<div class="card"><b>Planta e perfil</b><p class="muted small">${BU.Prancha.temDados(l) ? 'Gerados com estes pontos.' : 'Ainda não foi possível montar o eixo com estes pontos.'}</p><button type="button" class="btn" data-pt="ver-croqui">Ver planta, perfil e quadro</button></div>` : ''}
       ${P.edit ? editorHTML(l) : ''}
       <div id="pt-lista" class="lista-pt">${listaHTML(l)}</div>`;
   }
@@ -236,17 +235,7 @@
     else if (a === 'compartilhar') compartilhar(l);
     else if (a === 'ordem') { P.ordem = { cad: 'asc', asc: 'desc', desc: 'cad' }[P.ordem]; App.renderEtapa(); }
     else if (a === 'mais') { P.limite += 150; App.renderEtapa(); }
-    else if (a === 'gps') {
-      const st = b; st.disabled = true; erroEditor('');
-      try {
-        const r = await BU.GPS.capturar(), fuso = +document.getElementById('pf-fuso').value || fusoDe(l);
-        const u = BU.GPS.paraUTM(r.lat, r.lon, fuso);
-        Object.assign(P.edit.draft, { x: u.norte.toFixed(4), y: u.leste.toFixed(4) });
-        if (r.alt != null && !P.edit.draft.z) P.edit.draft.z = r.alt.toFixed(3);
-        if (!l.fuso) l.fuso = fuso;
-        App.renderEtapa(); if (r.acc > 15) UI.toast(`Precisão ruim (±${Math.round(r.acc)} m)`, 'aviso');
-      } catch (err) { st.disabled = false; erroEditor(BU.GPS.msgErro(err)); }
-    }
+    else if (a === 'ver-croqui') App.irEtapa(5);
   });
 
   function aoMudar(e) {
@@ -255,7 +244,6 @@
       P.edit.draft[el.dataset.pf] = el.value;
       if (el.dataset.pf === 'codigo' && e.type === 'change') App.renderEtapa(); // mostra/oculta o campo "novo código"
     } else if ('ptFiltro' in el.dataset) { P.filtro = el.value; App.renderEtapa(); }
-    else if ('ptFuso' in el.dataset) { l.fuso = +el.value; App.marcarSujo(); }
     else if (el.id === 'pt-file' && el.files && el.files[0]) { const f = el.files[0]; el.value = ''; importarNoAtual(f); }
   }
   document.addEventListener('input', aoMudar);
