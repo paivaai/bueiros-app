@@ -5,7 +5,7 @@ const VERSAO = 'v5';
 const CACHE = 'bueiros-' + VERSAO;
 const ARQUIVOS = [
   './', 'index.html', 'offline.html', 'manifest.webmanifest', 'css/styles.css',
-  'js/ui.js', 'js/db.js', 'js/gps.js', 'js/points.js', 'js/section-drawing.js', 'js/prancha.js', 'js/photos.js', 'js/export.js', 'js/kmz.js', 'js/app.js',
+  'js/ui.js', 'js/codigo.js', 'js/db.js', 'js/gps.js', 'js/points.js', 'js/section-drawing.js', 'js/prancha.js', 'js/photos.js', 'js/patologias.js', 'js/export.js', 'js/kmz.js', 'js/app.js',
   'assets/logo-gfa.png', 'assets/icon-192.png', 'assets/icon-512.png', 'assets/icon-maskable-512.png',
 ];
 

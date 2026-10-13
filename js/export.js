@@ -3,7 +3,7 @@
   'use strict';
   const BU = window.BU, U = BU.U, UI = BU.UI, DB = BU.DB, esc = U.esc;
 
-  const CATEG = { entrada: 'Entrada', saida: 'Saída', secao: 'Seção', erosao: 'Erosão', obstrucao: 'Obstrução', outro: 'Outro' };
+  const CATEG = { entrada: 'Entrada', saida: 'Saída', secao: 'Seção', erosao: 'Erosão', obstrucao: 'Obstrução', patologia: 'Patologia', outro: 'Outro' };
   const blobParaDataURL = b => new Promise((ok, er) => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.onerror = () => er(fr.error); fr.readAsDataURL(b); });
   function dataURLParaBlob(u) {
     const [cab, b64] = u.split(','), mime = (/data:([^;]+)/.exec(cab) || [])[1] || 'image/jpeg', bin = atob(b64), a = new Uint8Array(bin.length);
@@ -55,7 +55,7 @@
     const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
     const linhas = [['Grupo', 'Campo', 'Valor']];
     secoes(l).forEach(s => s.itens.forEach(([k, v]) => linhas.push([s.grupo, k, v])));
-    linhas.push(['Registros', 'Pontos', l.pontos.length], ['Registros', 'Fotos', l.fotos.length], ['Registros', 'Seção salva', l.secao && l.secao.salvoEm ? 'Sim' : 'Não']);
+    linhas.push(['Registros', 'Pontos', l.pontos.length], ['Registros', 'Fotos', l.fotos.length], ['Registros', 'Patologias', l.semPatologias ? 'sem patologias aparentes' : (l.patologias || []).length], ['Registros', 'Seção salva', l.secao && l.secao.salvoEm ? 'Sim' : 'Não']);
     return new Blob(['\uFEFF' + linhas.map(r => r.map(q).join(';')).join('\r\n') + '\r\n'], { type: 'text/csv;charset=utf-8' });
   }
   function gerarRelatorio(l, fotos) {
@@ -65,7 +65,13 @@
     const croqui = (l.secao || BU.Secao.gerarSVG && l.caracteristicas.formato) ? `<section class="fig"><h2>Seção transversal do bueiro (croqui)</h2>${BU.Secao.gerarSVG(l)}</section>` : '';
     const logo = BU.Prancha.logo ? `<img class="logo" src="${BU.Prancha.logo}" alt="">` : '';
     const pts = l.pontos.length ? `<section><h2>Pontos topográficos (${l.pontos.length})</h2><table class="grade"><thead><tr><th>ID</th><th>X (Norte)</th><th>Y (Leste)</th><th>Z</th><th>Código</th><th>Obs.</th></tr></thead><tbody>${l.pontos.map(p => `<tr><td>${esc(p.id)}</td><td>${esc(p.x)}</td><td>${esc(p.y)}</td><td>${esc(p.z)}</td><td>${esc(p.codigo)}</td><td>${esc(p.obs)}</td></tr>`).join('')}</tbody></table></section>` : '';
-    const fts = fotos.length ? `<section><h2>Fotos (${fotos.length})</h2><div class="fotos">${fotos.map(f => `<figure><img src="${f.dataUrl}" alt=""><figcaption><b>${esc(CATEG[f.meta.categoria] || 'Sem categoria')}</b>${f.meta.legenda ? ' — ' + esc(f.meta.legenda) : ''}<br><small>${esc(U.dataHoraBR(f.meta.dataHora))}</small></figcaption></figure>`).join('')}</div></section>` : '';
+    const fig = f => `<figure><img src="${f.dataUrl}" alt=""><figcaption><b>${esc(CATEG[f.meta.categoria] || 'Sem categoria')}</b>${f.meta.legenda ? ' — ' + esc(f.meta.legenda) : ''}<br><small>${esc(U.dataHoraBR(f.meta.dataHora))}</small></figcaption></figure>`;
+    const grupo = (tit, lista) => lista.length ? `<section><h2>${tit} (${lista.length})</h2><div class="fotos">${lista.map(fig).join('')}</div></section>` : '';
+    const pats = (l.patologias || []).length ? `<section><h2>Patologias (${l.patologias.length})</h2>${l.patologias.map((p, i) => {
+      const fs = fotos.filter(f => f.meta.ctx === 'pat:' + p.id);
+      return `<table class="kv"><tr><th>${i + 1}. ${esc(p.tipo || 'Sem tipo')}</th><td>${esc([p.local, p.gravidade && 'gravidade ' + p.gravidade.toLowerCase()].filter(Boolean).join(' · '))}${p.obs ? '<br><small>' + esc(p.obs) + '</small>' : ''}</td></tr></table>${fs.length ? `<div class="fotos">${fs.map(fig).join('')}</div>` : ''}`;
+    }).join('')}</section>` : (l.semPatologias ? '<section><h2>Patologias</h2><p>Sem patologias aparentes.</p></section>' : '');
+    const fts = grupo('Fotos da seção', fotos.filter(f => f.meta.ctx === 'secao')) + pats + grupo('Fotos gerais', fotos.filter(f => !f.meta.ctx));
     const pe = pend.length ? `<section><h2>Pendências</h2><ul>${pend.map(p => `<li>${esc(p.t)}</li>`).join('')}</ul></section>` : '';
     const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Relatório ${esc(l.codigo || 'bueiro')}</title><style>
 body{font:14px/1.45 Arial,Helvetica,sans-serif;color:#16201A;margin:0;padding:16px;max-width:820px;margin-inline:auto}

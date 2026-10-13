@@ -21,17 +21,17 @@
 
   const ETAPAS = [
     { n: 1, nome: 'Identificação' }, { n: 2, nome: 'Localização' }, { n: 3, nome: 'Características' }, { n: 4, nome: 'Medições' },
-    { n: 5, nome: 'Seção' }, { n: 6, nome: 'Pontos' }, { n: 7, nome: 'Fotos' }, { n: 8, nome: 'Revisão' },
+    { n: 5, nome: 'Seção' }, { n: 6, nome: 'Pontos' }, { n: 7, nome: 'Patologias' }, { n: 8, nome: 'Fotos' }, { n: 9, nome: 'Revisão' },
   ];
 
   /* Cada campo: p = caminho dentro do levantamento; t = tipo; half = ocupa meia largura. */
   const CAMPOS = {
     1: [
-      { p: 'codigo', label: 'Código do levantamento', req: true, ph: 'ex.: BU-001' },
+      { p: 'codigo', label: 'Código do levantamento', req: true, ph: 'ex.: RJ-000 km 170+470', t: 'codigo' },
       { p: 'estrada', label: 'Nome ou número da estrada', ph: 'ex.: BR-101' },
       { p: 'municipio', label: 'Município' },
       { p: 'estado', label: 'Estado', t: 'select', opts: UFS, half: true },
-      { p: 'km', label: 'Km', ph: '001+470', half: true },
+      { p: 'km', label: 'Km + metros', ph: '170+470', half: true },
       { p: 'ambiente', label: 'Ambiente', t: 'select', opts: OPCOES.ambiente, half: true },
       { p: 'sentido', label: 'Sentido do km', t: 'select', opts: OPCOES.sentido, half: true },
       { p: 'pistaGe', label: 'Pista (sentido geográfico)', t: 'select', opts: OPCOES.pista, half: true },
@@ -114,7 +114,7 @@
         profMontante: null, profJusante: null, comprimentoBueiro: null, declividade: null, cotaEntrada: null, cotaSaida: null,
         nivelAgua: null, vazaoEstimada: null, observacoes: '',
       },
-      secao: null, prancha: { inverter: false }, medicoesAuto: {}, pontosArquivo: '', pontos: [], fotos: [],
+      secao: null, prancha: { inverter: false }, medicoesAuto: {}, pontosArquivo: '', pontos: [], fotos: [], patologias: [], semPatologias: false,
       criadoEm: agora, atualizadoEm: agora,
     };
   }
@@ -126,7 +126,7 @@
       caracteristicas: { ...b.caracteristicas, ...(r.caracteristicas || {}) },
       medicoes: { ...b.medicoes, ...(r.medicoes || {}) },
       prancha: { ...b.prancha, ...(r.prancha || {}) }, medicoesAuto: { ...(r.medicoesAuto || {}) },
-      pontos: r.pontos || [], fotos: r.fotos || [],
+      pontos: r.pontos || [], fotos: r.fotos || [], patologias: r.patologias || [],
     };
     if (!String(l.equipe || '').trim()) l.equipe = 'GFA';
     // Formatos antigos (versões anteriores) viram os 3 formatos atuais.
@@ -206,7 +206,12 @@
     if (l.medicoes.cotaEntrada == null) P.push({ n: 'aviso', t: 'Cota de entrada não preenchida', e: 4 });
     if (!BU.Prancha.croquiPronto(l)) P.push({ n: 'aviso', t: 'Croqui ainda não gerado (importe os pontos do RTK ou informe as dimensões)', e: 5 });
     if (!l.pontos.length) P.push({ n: 'aviso', t: 'Nenhum ponto cadastrado', e: 6 });
-    if (!l.fotos.length) P.push({ n: 'aviso', t: 'Nenhuma foto adicionada', e: 7 });
+    if (!l.semPatologias && !l.patologias.length) P.push({ n: 'aviso', t: 'Patologias não registradas (adicione ou marque “sem patologias”)', e: 7 });
+    for (const p of l.patologias) {
+      if (!l.semPatologias && !l.fotos.some(f => f.ctx === 'pat:' + p.id)) { P.push({ n: 'aviso', t: `Patologia “${p.tipo || 'sem tipo'}”${p.local ? ' (' + p.local.split(' (')[0].toLowerCase() + ')' : ''} sem foto`, e: 7 }); break; }
+    }
+    if (!l.fotos.some(f => f.ctx === 'secao')) P.push({ n: 'aviso', t: 'Nenhuma foto da seção', e: 5 });
+    if (!l.fotos.length) P.push({ n: 'aviso', t: 'Nenhuma foto adicionada', e: 8 });
     return P;
   }
 
@@ -362,6 +367,8 @@
       const nomes = [...new Set([...S.resp, ...(v ? [v] : [])])];
       ctl = `<select id="${id}" data-p="${c.p}"><option value="">— escolha o responsável —</option>${nomes.map(o => `<option value="${esc(o)}"${o === v ? ' selected' : ''}>${esc(o)}</option>`).join('')}<option value="__novo__">+ Novo responsável…</option></select>`
         + (v && S.resp.includes(v) ? `<button type="button" class="btn sm linkbtn" data-a="resp-remover" data-nome="${esc(v)}">Remover “${esc(v)}” da lista</button>` : '');
+    } else if (t === 'codigo') {
+      ctl = `<div class="row" style="gap:6px"><input id="${id}" type="text" autocomplete="off" data-p="${c.p}" value="${esc(v || '')}" placeholder="${esc(c.ph || '')}" style="flex:1"><button type="button" class="btn sm" data-a="gerar-codigo" title="Monta o código com a rodovia e o km">Gerar pelo km</button></div>`;
     } else if (t === 'select') {
       ctl = `<select id="${id}" data-p="${c.p}">${c.sem ? '' : '<option value="">—</option>'}${c.opts.map(o => `<option value="${esc(o)}"${String(o) === String(v) ? ' selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
     } else if (t === 'textarea') {
@@ -408,7 +415,7 @@
         ${linha('Tipo / formato', [c.tipo, c.formato].filter(Boolean).join(' / '))}${linha('Dimensões', dim)}${linha('Material', c.material)}
         ${linha('Conservação', c.conservacao)}${linha('Cota entrada / saída', (m.cotaEntrada != null || m.cotaSaida != null) ? `${N(m.cotaEntrada) || '—'} / ${N(m.cotaSaida) || '—'}` : '')}
         ${BU.Prancha.miniatura(l)}</div>
-      <div class="card"><h3>Registros</h3>${linha('Pontos', String(l.pontos.length))}${linha('Fotos', String(l.fotos.length))}</div>
+      <div class="card"><h3>Registros</h3>${linha('Pontos', String(l.pontos.length))}${linha('Patologias', l.semPatologias ? 'sem patologias aparentes' : String(l.patologias.length))}${linha('Fotos', `${l.fotos.length} (seção ${l.fotos.filter(f => f.ctx === 'secao').length} · patologias ${l.fotos.filter(f => (f.ctx || '').startsWith('pat:')).length})`)}</div>
       <div class="card"><h3>Pendências <span class="chip ${P.length ? 'rascunho' : 'concluido'}">${P.length || 'nenhuma'}</span></h3>
         ${P.length ? P.map(p => `<div class="pend ${p.n}"><span>${p.n === 'erro' ? '⛔' : '⚠️'} ${esc(p.t)}</span><button type="button" class="btn sm" data-etapa="${p.e}">Ir</button></div>`).join('') : '<p class="muted">Tudo preenchido.</p>'}
         <p class="muted small">Pendências são avisos: você pode salvar mesmo assim.</p></div>
@@ -422,11 +429,12 @@
     let corpo;
     if (n === 2) corpo = `<div class="card"><h3>Coordenadas UTM (SIRGAS 2000)</h3>${camposHTML(CAMPOS[2])}<p class="muted small">Este = E · Norte = N · Altitude = Z (cota). Metros.</p></div>` + BU.GPS.cartaoHTML(l);
     else if (CAMPOS[n]) corpo = `<div class="card">${camposHTML(CAMPOS[n])}</div>` + (n === 1 ? cadastroHTML(l) : '');
-    else if (n === 5) corpo = BU.Prancha.etapaHTML(l) + BU.Secao.etapaHTML(l);
+    else if (n === 5) corpo = BU.Prancha.etapaHTML(l) + BU.Secao.etapaHTML(l) + BU.Fotos.blocoHTML(l, 'secao', 'Fotos da seção', { entradas: true });
     else if (n === 6) corpo = BU.Pontos.etapaHTML(l);
-    else if (n === 7) corpo = BU.Fotos.etapaHTML(l);
+    else if (n === 7) corpo = BU.Patologias.etapaHTML(l);
+    else if (n === 8) corpo = BU.Fotos.etapaHTML(l);
     else corpo = revisaoHTML();
-    if (n !== 7) BU.Fotos.limpar();
+    if (![5, 7, 8].includes(n)) BU.Fotos.limpar();
 
     $('#view').innerHTML = `
       <section class="page wiz">
@@ -435,13 +443,13 @@
           <span id="save-state" class="chip save ${S.saveState}">${SAVE_TXT[S.saveState]}</span>
         </div>
         <nav class="steps" aria-label="Etapas">${ETAPAS.map(e => `<button type="button" class="seg${e.n === n ? ' atual' : ''}${e.n < n ? ' feito' : ''}" data-etapa="${e.n}" aria-label="Etapa ${e.n}: ${e.nome}"${e.n === n ? ' aria-current="step"' : ''}><span></span></button>`).join('')}</nav>
-        <div class="step-title"><span>Etapa ${n} de 8</span><h1>${esc(et.nome)}</h1></div>
+        <div class="step-title"><span>Etapa ${n} de 9</span><h1>${esc(et.nome)}</h1></div>
         ${corpo}
       </section>`;
 
-    if (n === 7) BU.Fotos.aposRender();
+    if ([5, 7, 8].includes(n)) BU.Fotos.aposRender();
     const bar = $('#actionbar'); bar.hidden = false;
-    bar.innerHTML = n < 8
+    bar.innerHTML = n < 9
       ? `<button type="button" class="btn" data-a="voltar">‹ Voltar</button><button type="button" class="btn" data-a="salvar">Salvar</button><button type="button" class="btn primary" data-a="proximo">Próximo ›</button>`
       : `<button type="button" class="btn" data-a="voltar">‹ Voltar</button><button type="button" class="btn primary grow" data-a="concluir">Salvar levantamento</button>`;
   }
@@ -528,6 +536,11 @@
     else if (a === 'proximo') irEtapa(S.etapa + 1);
     else if (a === 'salvar') { if (await salvarAtual({ forcar: true })) UI.toast('Salvo'); }
     else if (a === 'concluir') concluir();
+    else if (a === 'gerar-codigo' && S.cur) {
+      const c = BU.Codigo.codigo(S.cur.estrada, S.cur.km);
+      if (!c) { UI.toast('Preencha a rodovia (Nome ou número da estrada) e o km (ex.: 170+470).', 'aviso'); return; }
+      S.cur.codigo = c; marcarSujo(); renderWizard(); UI.toast('Código gerado');
+    }
   });
   document.addEventListener('input', e => { if (e.target.id === 'busca') { S.q = e.target.value; S.limite = 60; $('#itens').innerHTML = itensLista(); } });
 
@@ -548,7 +561,7 @@
       location.replace(`#/lev/${S.cur.id}/1`); return;
     }
     if (m) {
-      const id = m[1], n = Math.min(8, Math.max(1, +m[2]));
+      const id = m[1], n = Math.min(9, Math.max(1, +m[2]));
       if (!S.cur || S.cur.id !== id) {
         const r = await DB.obter(id);
         if (!r) { UI.toast('Levantamento não encontrado', 'erro'); location.replace('#/lista'); return; }
