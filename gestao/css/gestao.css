@@ -16,7 +16,7 @@ a { color: var(--accent); }
 :focus-visible { outline: 3px solid #F0B400; outline-offset: 2px; }
 
 /* topo */
-.topo { position: sticky; top: 0; z-index: 30; background: #fff; border-bottom: 4px solid var(--marca); display: flex; align-items: center; gap: 14px; padding: 8px 20px; min-height: 60px; flex-wrap: wrap; }
+.topo { position: sticky; top: 0; z-index: 1200; background: #fff; border-bottom: 4px solid var(--marca); display: flex; align-items: center; gap: 14px; padding: 8px 20px; min-height: 60px; flex-wrap: wrap; }
 .topo img { height: 38px; display: block; }
 .topo .tit { font-weight: 700; } .topo .sub { font-size: 12px; color: var(--muted); display: block; font-weight: 400; }
 .topo .esp { flex: 1; }
@@ -76,7 +76,7 @@ tbody tr { cursor: pointer; } tbody tr:hover, tbody tr.sel { background: var(--a
 
 /* login */
 .login { max-width: 400px; margin: 8vh auto; display: flex; flex-direction: column; gap: 14px; } .login img { height: 64px; align-self: center; }
-.toast { position: fixed; right: 16px; bottom: 16px; background: #16181B; color: #fff; padding: 12px 16px; border-radius: 10px; z-index: 99; max-width: 340px; box-shadow: 0 6px 24px rgba(0,0,0,.25); } .toast a { color: #FFB59A; font-weight: 700; }
+.toast { z-index: 2000 !important; position: fixed; right: 16px; bottom: 16px; background: #16181B; color: #fff; padding: 12px 16px; border-radius: 10px; z-index: 99; max-width: 340px; box-shadow: 0 6px 24px rgba(0,0,0,.25); } .toast a { color: #FFB59A; font-weight: 700; }
 
 /* planejamento */
 .plan { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(320px, 1fr); gap: 16px; align-items: start; } @media (max-width: 1000px) { .plan { grid-template-columns: 1fr; } }
@@ -87,3 +87,7 @@ tbody tr { cursor: pointer; } tbody tr:hover, tbody tr.sel { background: var(--a
 .pl-km span { display: block; white-space: nowrap; text-align: center; font-size: 11px; font-weight: 700; color: #fff; background: rgba(22,24,27,.82); border-radius: 9px; padding: 0 6px; }
 .pl-cod { width: 100%; min-width: 150px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
 .card.plan-cta { border-color: var(--marca); background: var(--accent-soft); }
+
+/* o mapa (Leaflet usa z-index até 1000) não pode passar por cima do cabeçalho ao rolar a página */
+#pl-mapa, #mapa { position: relative; z-index: 0; isolation: isolate; }
+.pl-gmaps a { display: block; background: rgba(255,255,255,.95); padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: 700; text-decoration: none; box-shadow: 0 1px 4px rgba(0,0,0,.4); }

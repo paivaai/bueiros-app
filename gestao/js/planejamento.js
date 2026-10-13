@@ -227,12 +227,21 @@
     if (!tem) { el.innerHTML = '<div class="aviso" style="margin:16px"><b>Não foi possível carregar o mapa.</b> Verifique a internet. Você ainda pode adicionar pontos pela coordenada e salvar.</div>'; return; }
     const L = (P.L = window.L);
     if (P.mapa) { try { P.mapa.remove(); } catch (e) { /* já removido */ } }
-    const m = (P.mapa = L.map(el, { zoomControl: true }));
-    const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Imagens © Esri, Maxar, Earthstar Geographics' });
-    const osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' });
-    sat.addTo(m); L.control.layers({ 'Satélite': sat, 'Mapa': osm }, null, { position: 'topright' }).addTo(m);
+    const m = (P.mapa = L.map(el, { zoomControl: true, maxZoom: 22 }));
+    // zoom além do que a imagem tem (maxNativeZoom) só amplia o último nível; por isso há 2 satélites e o atalho para o Google
+    const esri = 'Imagens © Esri, Maxar, Earthstar Geographics';
+    const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 22, maxNativeZoom: 19, attribution: esri });
+    const clar = L.tileLayer('https://clarity.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 22, maxNativeZoom: 19, attribution: esri + ' (Clarity)' });
+    const osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 22, maxNativeZoom: 19, attribution: '© OpenStreetMap' });
+    sat.addTo(m); L.control.layers({ 'Satélite (Esri)': sat, 'Satélite nítido (Esri Clarity)': clar, 'Mapa (OSM)': osm }, null, { position: 'topright' }).addTo(m);
+    // atalho: abre o mesmo ponto no Google Maps em satélite (a imagem do Google costuma ser a mais recente e nítida)
+    const G = L.control({ position: 'bottomleft' });
+    G.onAdd = () => { const d = L.DomUtil.create('div', 'pl-gmaps'); d.innerHTML = '<a target="_blank" rel="noopener">Abrir no Google Maps (satélite)</a>'; L.DomEvent.disableClickPropagation(d); return d; };
+    G.addTo(m);
+    const atualizaG = () => { const c = m.getCenter(), a = el.querySelector('.pl-gmaps a'); if (a) a.href = `https://www.google.com/maps/@${c.lat.toFixed(6)},${c.lng.toFixed(6)},${Math.max(60, Math.round(40000000 / Math.pow(2, m.getZoom())))}m/data=!3m1!1e3`; };
+    m.on('moveend', atualizaG);
     P.cam = { eixo: L.layerGroup().addTo(m), km: L.layerGroup().addTo(m), pins: L.layerGroup().addTo(m) };
-    m.setView([-15.8, -47.9], 4); ajustarMapa(); desenhar();
+    m.setView([-15.8, -47.9], 4); ajustarMapa(); desenhar(); atualizaG();
     m.on('click', ev => {
       const la = ev.latlng.lat, lo = ev.latlng.lng;
       if (P.modo === 'pin') { const p = novoPin(la, lo); P.sel = p.id; desenhar(); atualizarLista(); }
