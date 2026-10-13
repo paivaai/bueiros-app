@@ -24,6 +24,7 @@
       { id: 'u-bia', nome: 'Bia Nunes', email: 'bia@gfa.demo', papel: 'campo', ativo: true },
     ];
     const campo = usuarios.filter(u => u.papel === 'campo');
+    const membrosDe = { 'p-1': ['u-arthur', 'u-marina', 'u-joao', 'u-carlos', 'u-bia'], 'p-2': ['u-arthur', 'u-marina'] };
     const projetos = [
       { id: 'p-1', nome: 'BGROTA – Fora Melhoria 03', rodovia: 'BR-101', descricao: 'Cadastro de bueiros (exemplo)', fuso: '23', hemisferio: 'S', ativo: true },
       { id: 'p-2', nome: 'Duplicação km 120–160', rodovia: 'BR-116', descricao: 'Projeto de exemplo, ainda sem levantamentos', fuso: '23', hemisferio: 'S', ativo: true },
@@ -102,7 +103,7 @@
       async sair() { D.usuarioAtual = null; this.assinarParar(); },
       perfil() { return D.usuarioAtual; },
       async projetos() {
-        return projetos.map(p => ({ ...p, resumo: resumo(bueiros.filter(b => b.projeto_id === p.id)) }));
+        return projetos.filter(p => p.ativo).map(p => ({ ...p, resumo: resumo(bueiros.filter(b => b.projeto_id === p.id)) }));
       },
       async bueiros(projetoId) { return bueiros.filter(b => b.projeto_id === projetoId).map(({ dados, ...r }) => ({ ...r })); },
       async bueiro(id) { const b = bueiros.find(x => x.id === id); return b ? JSON.parse(JSON.stringify(b)) : null; },
@@ -114,6 +115,19 @@
         return cats.map((c, i) => ({ id: id + 'f' + i, categoria: c, legenda: c, url: placeholderFoto(c, b.codigo) }));
       },
       async usuarios() { return usuarios.map(u => ({ ...u })); },
+      async membros(projetoId) { return (membrosDe[projetoId] || []).slice(); },
+      async criarProjeto(d) {
+        if (!String(d.nome || '').trim()) throw new Error('Informe o nome do projeto.');
+        const id = 'p-' + Date.now();
+        projetos.push({ id, nome: d.nome.trim(), rodovia: d.rodovia || '', descricao: d.descricao || '', fuso: d.fuso || '23', hemisferio: d.hemisferio || 'S', ativo: true });
+        membrosDe[id] = Array.from(new Set([D.usuarioAtual.id].concat(d.membros || []))); return id;
+      },
+      async editarProjeto(id, d) {
+        const p = projetos.find(x => x.id === id); if (!p) throw new Error('Projeto não encontrado.');
+        if (!String(d.nome || '').trim()) throw new Error('Informe o nome do projeto.');
+        Object.assign(p, { nome: d.nome.trim(), rodovia: d.rodovia || '', descricao: d.descricao || '', fuso: d.fuso, hemisferio: d.hemisferio, ativo: d.ativo !== false });
+      },
+      async definirMembros(id, ids) { membrosDe[id] = Array.from(new Set([D.usuarioAtual.id].concat(ids || []))); return membrosDe[id].length; },
       async revisar(id, aprovar, comentario) {
         const b = bueiros.find(x => x.id === id);
         if (!b || !['concluido', 'devolvido', 'aprovado'].includes(b.status)) throw new Error('Só dá para revisar bueiro concluído.');
@@ -229,6 +243,15 @@
         return out;
       },
       async usuarios() { const { data, error } = await sb.from('perfis').select('id,nome,email,papel,ativo').order('nome'); erro(error); return data; },
+      async membros(projetoId) { const { data, error } = await sb.from('projeto_membros').select('usuario_id').eq('projeto_id', projetoId); erro(error); return (data || []).map(r => r.usuario_id); },
+      async criarProjeto(d) {
+        const { data, error } = await sb.rpc('criar_projeto', { p_nome: d.nome, p_rodovia: d.rodovia || null, p_descricao: d.descricao || null, p_fuso: d.fuso || '23', p_hemisferio: d.hemisferio || 'S', p_membros: d.membros || [] });
+        erro(error); return data;
+      },
+      async editarProjeto(id, d) {
+        const { error } = await sb.rpc('editar_projeto', { p_projeto: id, p_nome: d.nome, p_rodovia: d.rodovia || null, p_descricao: d.descricao || null, p_fuso: d.fuso, p_hemisferio: d.hemisferio, p_ativo: d.ativo !== false }); erro(error);
+      },
+      async definirMembros(id, ids) { const { data, error } = await sb.rpc('definir_membros_projeto', { p_projeto: id, p_usuarios: ids || [] }); erro(error); return data; },
       async revisar(id, aprovar, comentario) { const { error } = await sb.rpc('revisar_bueiro', { p_id: id, p_aprovar: aprovar, p_comentario: comentario || null }); erro(error); },
       async atribuir(ids, usuarioId) { const { data, error } = await sb.rpc('atribuir_bueiros', { p_ids: ids, p_usuario: usuarioId || null }); erro(error); return data; },
       async convidar(email, nome, papel) {
