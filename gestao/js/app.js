@@ -47,12 +47,12 @@
   function pagina(aba, corpo) { raiz.innerHTML = topo(aba) + `<main>${corpo}</main>`; }
 
   /* ---------------------------------------------------------------- login */
-  function telaLogin(msg) {
+  function telaLogin(msg, email) {
     raiz.innerHTML = `<form class="login card" id="f-login" autocomplete="on">
       <img src="logo-gfa.png" alt="GFA Engenharia"><h1 style="text-align:center">Gestão de Bueiros</h1>
       ${D.modo === 'demo' ? '<div class="aviso"><b>Modo demonstração.</b> Dados fictícios. Entre com <b>arthur@gfa.demo</b> e a senha <b>demo</b>, ou use o botão abaixo.</div>' : ''}
       ${msg ? `<div class="erro" role="alert">${esc(msg)}</div>` : ''}
-      <label class="f">E-mail<input type="email" name="email" required autocomplete="username" value="${D.modo === 'demo' ? 'arthur@gfa.demo' : ''}"></label>
+      <label class="f">E-mail<input type="email" name="email" required autocomplete="username" value="${esc(email || (D.modo === 'demo' ? 'arthur@gfa.demo' : ''))}"></label>
       <label class="f">Senha<input type="password" name="senha" required autocomplete="current-password" value="${D.modo === 'demo' ? 'demo' : ''}"></label>
       <button class="btn pri" type="submit">Entrar</button>
       <p class="small muted" style="margin:0">Acesso só para administradores e gestores. A equipe de campo usa o aplicativo do celular.</p></form>`;
@@ -309,7 +309,7 @@
     const f = ev.target;
     if (f.id === 'f-login') {
       try { S.perfil = await D.entrar(f.email.value, f.senha.value); S.usuarios = await D.usuarios(); rotear(); }
-      catch (e) { telaLogin(e.message || String(e)); }
+      catch (e) { telaLogin(e.message || String(e), f.email.value); }
     } else if (f.id === 'f-conv') {
       const m = document.getElementById('conv-msg');
       try { await D.convidar(f.email.value, f.nome.value, f.papel.value); m.innerHTML = '<span style="color:var(--st-aprovado);font-weight:700">Convite cadastrado.</span>'; setTimeout(viewEquipe, 700); }

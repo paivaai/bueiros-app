@@ -179,7 +179,7 @@
       return new Promise((ok, er) => {
         if (window.supabase && window.supabase.createClient) return ok();
         const s = document.createElement('script');
-        s.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js';
+        s.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.115.0/dist/umd/supabase.js';
         s.onload = () => ok(); s.onerror = () => er(new Error('Não foi possível carregar a biblioteca do Supabase (sem internet?).'));
         document.head.appendChild(s);
       });
@@ -247,6 +247,7 @@
     return D;
   }
 
-  const usaServidor = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
+  const forcarDemo = /[?&]demo=1\b/.test(location.search);
+  const usaServidor = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY) && !forcarDemo;
   window.Dados = { STATUS, resumo, usaServidor, criar: () => (usaServidor ? criarSupabase() : criarDemo()) };
 })();
