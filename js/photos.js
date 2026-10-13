@@ -5,7 +5,8 @@
   const BU = window.BU, U = BU.U, UI = BU.UI, DB = BU.DB, esc = U.esc;
 
   const MAX = 1600, QUALIDADE = 0.82;
-  const CATEGORIAS = [['', '— classificar —'], ['entrada', 'Entrada'], ['saida', 'Saída'], ['secao', 'Seção'], ['erosao', 'Erosão'], ['obstrucao', 'Obstrução'], ['outro', 'Outro']];
+  const CATEGORIAS = [['', '— classificar —'], ['entrada', 'Entrada'], ['saida', 'Saída'], ['secao', 'Seção'], ['erosao', 'Erosão'], ['obstrucao', 'Obstrução'], ['patologia', 'Patologia'], ['outro', 'Outro']];
+  let ctxPend = ''; // contexto da próxima foto: '' = geral, 'secao', 'pat:<id da patologia>'
   const urls = new Map(); // id -> blob URL (miniaturas)
 
   /* ---------- marca d'água (logo da empresa) e coordenadas UTM ---------- */
@@ -81,7 +82,8 @@
     return { blob, w, h };
   }
 
-  async function adicionar(files, daCamera) {
+  async function adicionar(files, daCamera, ctx) {
+    ctx = ctx || '';
     const App = BU.App, l = App.cur(), st = document.getElementById('fo-status'); if (!l) return;
     let n = 0;
     if (CFG.ativo && !BU.GPS.utmDe(l)) UI.toast('Coordenadas UTM não informadas (Etapa 2): as fotos ficam só com a logo.', 'aviso');
@@ -91,7 +93,7 @@
         const quando = (!daCamera && f.lastModified) ? new Date(f.lastModified) : new Date();
         const r = await reduzir(f, l, quando), id = U.uid();
         await DB.salvarFoto({ id, levantamentoId: l.id, tipo: 'image/jpeg', blob: r.blob, criadoEm: U.agoraISO() });
-        l.fotos.push({ id, categoria: '', legenda: '', dataHora: quando.toISOString(), w: r.w, h: r.h, bytes: r.blob.size });
+        l.fotos.push({ id, categoria: ctx === 'secao' ? 'secao' : ctx.startsWith('pat:') ? 'patologia' : '', ctx, legenda: '', dataHora: quando.toISOString(), w: r.w, h: r.h, bytes: r.blob.size });
         App.marcarSujo();
       } catch (e) {
         UI.toast('Erro na foto: ' + (e && e.message || e) + (e && e.name === 'QuotaExceededError' ? ' (armazenamento cheio)' : ''), 'erro');
@@ -145,39 +147,50 @@
       cv.getContext('2d').drawImage(v, 0, 0);
       const blob = await new Promise(r => cv.toBlob(r, 'image/jpeg', 0.92));
       fecharCamera();
-      if (blob) adicionar([new File([blob], 'camera.jpg', { type: 'image/jpeg' })], true);
+      if (blob) adicionar([new File([blob], 'camera.jpg', { type: 'image/jpeg' })], true, ctxPend);
       else UI.toast('Não foi possível capturar a imagem', 'erro');
     }
   });
 
-  function cartao(f, i) {
+  function cartao(f, i, compacto) {
     return `<article class="card foto" data-id="${esc(f.id)}">
       <img class="thumb" data-foid="${esc(f.id)}" alt="Foto ${i + 1}" width="${f.w || 160}" height="${f.h || 120}">
       <div class="foto-corpo">
-        <select data-fo="cat" aria-label="Categoria">${CATEGORIAS.map(([v, t]) => `<option value="${v}"${v === f.categoria ? ' selected' : ''}>${t}</option>`).join('')}</select>
+        ${compacto ? '' : `<select data-fo="cat" aria-label="Categoria">${CATEGORIAS.map(([v, t]) => `<option value="${v}"${v === f.categoria ? ' selected' : ''}>${t}</option>`).join('')}</select>`}
         <input type="text" data-fo="leg" value="${esc(f.legenda)}" placeholder="Legenda" aria-label="Legenda">
         <div class="muted small">${esc(U.dataHoraBR(f.dataHora))} · ${Math.round((f.bytes || 0) / 1024)} KB</div>
         <div class="row"><button type="button" class="btn sm" data-fo="ver">Ampliar</button><button type="button" class="btn sm" data-fo="baixar">Baixar</button><button type="button" class="btn sm danger" data-fo="excluir">Excluir</button></div>
       </div></article>`;
   }
 
-  function etapaHTML(l) {
-    const App = BU.App;
-    const u = BU.GPS.utmDe(l);
-    return `<div class="card"><b>${l.fotos.length} foto(s)</b>
-        <div class="row" style="margin-top:10px"><button type="button" class="btn primary" data-fo="camera">📷 Tirar foto</button><button type="button" class="btn" data-fo="galeria">🖼️ Galeria</button></div>
-        <button type="button" class="btn sm" data-fo="camera-ao-vivo" style="margin-top:8px;width:100%">Usar câmera ao vivo (webcam)</button>
-        <input type="file" id="fo-cam" accept="image/*" capture="environment" hidden>
+  /* Entradas de arquivo (câmera e galeria) e a linha de status: uma vez por etapa que tem fotos. */
+  function entradasHTML() {
+    return `<input type="file" id="fo-cam" accept="image/*" capture="environment" hidden>
         <input type="file" id="fo-gal" accept="image/*" multiple hidden>
-        <div id="fo-status" class="gps-status" role="status"></div>
-        <p class="muted small">As fotos são reduzidas para no máximo 1600 px e ficam só neste aparelho.</p></div>
+        <div id="fo-status" class="gps-status" role="status"></div>`;
+  }
+  /* Bloco de fotos de um contexto: '' (gerais), 'secao' ou 'pat:<id>'. Botões + miniaturas. */
+  function blocoHTML(l, ctx, titulo, opc) {
+    opc = opc || {}; ctx = ctx || '';
+    const lista = l.fotos.filter(f => (f.ctx || '') === ctx);
+    const ao = window.matchMedia && matchMedia('(pointer: coarse)').matches;
+    return `<div class="card foto-bloco" data-ctxbloco="${esc(ctx)}"><div class="linha-t"><b>${esc(titulo || 'Fotos')}</b> <span class="muted small">${lista.length} foto(s)</span></div>
+        <div class="row" style="margin-top:8px"><button type="button" class="btn primary" data-fo="camera" data-ctx="${esc(ctx)}">📷 Tirar foto</button><button type="button" class="btn" data-fo="galeria" data-ctx="${esc(ctx)}">🖼️ Galeria</button>${ao ? '' : `<button type="button" class="btn sm" data-fo="camera-ao-vivo" data-ctx="${esc(ctx)}">Webcam</button>`}</div>
+        ${opc.entradas ? entradasHTML() : ''}
+        ${lista.length ? `<div class="lista-pt">${lista.map((f, i) => cartao(f, i, true)).join('')}</div>` : ''}</div>`;
+  }
+
+  function etapaHTML(l) {
+    const u = BU.GPS.utmDe(l);
+    const nSec = l.fotos.filter(f => f.ctx === 'secao').length, nPat = l.fotos.filter(f => (f.ctx || '').startsWith('pat:')).length;
+    return blocoHTML(l, '', 'Fotos gerais do bueiro', { entradas: true })
+      + `<p class="muted small" style="margin:0 4px">As fotos são reduzidas para no máximo 1600 px e ficam só neste aparelho. Fotos da seção (${nSec}) e das patologias (${nPat}) são tiradas nas etapas Seção e Patologias.</p>
       <div class="card marca"><h3>Marca d'água e coordenadas</h3>
         <label class="chk"><input type="checkbox" data-fm="ativo"${CFG.ativo ? ' checked' : ''}> Estampar a logo e as coordenadas UTM nas fotos novas</label>
         <div class="logo-linha">${CFG.logo ? `<img class="logo-prev" src="${esc(CFG.logo)}" alt="Logo da empresa">` : '<span class="muted small">Nenhuma logo enviada.</span>'}
           <button type="button" class="btn sm" data-fm="logo">${CFG.logo ? 'Trocar logo' : 'Enviar logo'}</button>${CFG.logo ? '<button type="button" class="btn sm danger" data-fm="logo-remover">Remover</button>' : ''}</div>
         <input type="file" id="fo-logo" accept="image/*" hidden>
-        <p class="muted small">${u ? `Coordenadas da Etapa 2: E ${esc(BU.GPS.fmtM(u.E, 3))} · N ${esc(BU.GPS.fmtM(u.N, 3))} · ${esc(BU.GPS.rotuloUTM(u))}.` : '<b>Coordenadas UTM ainda não informadas na Etapa 2:</b> as fotos saem só com a logo.'} A marca fica gravada na foto e vale só para as fotos tiradas depois.</p></div>
-      <div id="fo-lista" class="lista-pt">${l.fotos.map(cartao).join('') || '<div class="card vazio">Nenhuma foto adicionada.</div>'}</div>`;
+        <p class="muted small">${u ? `Coordenadas da Etapa 2: E ${esc(BU.GPS.fmtM(u.E, 3))} · N ${esc(BU.GPS.fmtM(u.N, 3))} · ${esc(BU.GPS.rotuloUTM(u))}.` : '<b>Coordenadas UTM ainda não informadas na Etapa 2:</b> as fotos saem só com a logo.'} A marca fica gravada na foto e vale só para as fotos tiradas depois.</p></div>`;
   }
 
   async function aposRender() {
@@ -202,6 +215,7 @@
     const b = e.target.closest('[data-fo]'); if (!b || b.tagName === 'SELECT' || b.tagName === 'INPUT') return;
     const App = BU.App, l = App.cur(); if (!l) return;
     const a = b.dataset.fo, card = b.closest('[data-id]'), f = card ? l.fotos.find(x => x.id === card.dataset.id) : null;
+    if (['camera', 'galeria', 'camera-ao-vivo'].includes(a)) ctxPend = b.dataset.ctx || '';
     if (a === 'camera') {
       // celular: abre o app de câmera do aparelho (melhor qualidade); computador: câmera ao vivo no app
       if (window.matchMedia && matchMedia('(pointer: coarse)').matches) document.getElementById('fo-cam').click(); else abrirCamera();
@@ -229,7 +243,7 @@
       lerLogo(f).then(async d => { CFG.logo = d; await salvarCfg(); BU.App.renderEtapa(); UI.toast('Logo guardada'); }).catch(err => UI.toast('Não foi possível ler a logo: ' + (err && err.message || err), 'erro'));
       return;
     }
-    if (el.id === 'fo-cam' || el.id === 'fo-gal') { const fs = [...(el.files || [])]; el.value = ''; if (fs.length) adicionar(fs, el.id === 'fo-cam'); return; }
+    if (el.id === 'fo-cam' || el.id === 'fo-gal') { const fs = [...(el.files || [])]; el.value = ''; if (fs.length) adicionar(fs, el.id === 'fo-cam', ctxPend); return; }
     if (!el.dataset.fo) return;
     const f = l.fotos.find(x => x.id === (el.closest('[data-id]') || {}).dataset?.id); if (!f) return;
     if (el.dataset.fo === 'cat') f.categoria = el.value; else if (el.dataset.fo === 'leg') f.legenda = el.value; else return;
@@ -238,5 +252,5 @@
   document.addEventListener('input', aoMudar);
   document.addEventListener('change', aoMudar);
 
-  BU.Fotos = { iniciar, etapaHTML, aposRender, limpar };
+  BU.Fotos = { iniciar, etapaHTML, blocoHTML, entradasHTML, aposRender, limpar };
 })();

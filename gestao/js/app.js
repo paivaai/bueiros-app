@@ -44,7 +44,7 @@
       </header>
       <nav class="abas" aria-label="Seções">
         ${aba('#/', 'Projetos', 'projetos')}
-        ${p ? aba(`#/p/${p.id}`, 'Visão geral', 'geral') + aba(`#/p/${p.id}/bueiros`, 'Bueiros (mapa e tabela)', 'bueiros') : ''}
+        ${p ? aba(`#/p/${p.id}`, 'Visão geral', 'geral') + aba(`#/p/${p.id}/planejamento`, 'Planejamento', 'planejamento') + aba(`#/p/${p.id}/bueiros`, 'Bueiros (mapa e tabela)', 'bueiros') : ''}
         ${aba('#/equipe', 'Equipe e acessos', 'equipe')}
       </nav>`;
   }
@@ -115,6 +115,7 @@
         <div class="card kpi alerta"><b>${r.concluido}</b><span>aguardando a sua revisão</span></div>
         <div class="card kpi"><b style="color:var(--st-devolvido)">${r.devolvido}</b><span>devolvidos ao campo</span></div>
       </div>
+      ${podeCriar() ? `<div class="card plan-cta"><div class="linha"><div><h3>Planejamento do levantamento</h3><span class="small">Importe o KMZ do Google Earth, marque os bueiros no mapa, divida a rodovia em km e nomeie cada bueiro (ex.: RJ-000 km 170+470). Eles chegam ao campo como “A vistoriar”.</span></div><span class="esp"></span><a class="btn pri" href="#/p/${S.projeto.id}/planejamento" style="text-decoration:none;display:inline-flex;align-items:center">Planejar bueiros</a></div></div>` : ''}
       <div class="card"><h3>Andamento</h3><div style="margin-top:10px">${barra(r)}${legenda(r)}</div></div>
       <div class="grid g2">
         <div class="card"><div class="linha"><h3>Fila de revisão</h3><span class="esp"></span><span class="muted small">mais antigos primeiro</span></div>
@@ -227,6 +228,7 @@
           <dt>Conservação</dt><dd>${esc(c.conservacao || '—')}</dd><dt>Assoreamento</dt><dd>${esc(c.assoreamento || '—')}</dd></dl>
           ${d.observacoes ? `<p class="small" style="margin-bottom:0"><b>Observações:</b> ${esc(d.observacoes)}</p>` : ''}</div>
       </div>
+      ${(Array.isArray(d.patologias) && d.patologias.length) || d.semPatologias ? `<div class="card"><h3>Patologias</h3>${d.semPatologias ? '<p class="muted" style="margin:8px 0 0">Sem patologias aparentes.</p>' : `<div class="tab-wrap" style="margin-top:10px;max-height:none"><table><thead><tr><th>Tipo</th><th>Onde</th><th>Gravidade</th><th>Observação</th></tr></thead><tbody>${d.patologias.map(p => `<tr style="cursor:default"><td><b>${esc(p.tipo || '—')}</b></td><td>${esc(p.local || '—')}</td><td>${esc(p.gravidade || '—')}</td><td style="white-space:normal">${esc(p.obs || '')}</td></tr>`).join('')}</tbody></table></div>`}</div>` : ''}
       <div class="card revisao${revisavel ? '' : ' fim'}"><h3>Revisão</h3>
         ${b.comentario_revisao ? `<p class="small" style="margin:8px 0"><b>Último comentário:</b> ${esc(b.comentario_revisao)}</p>` : ''}
         ${revisavel ? `<label class="f" style="margin-top:8px">Comentário (obrigatório para devolver)<textarea id="r-com" placeholder="Ex.: faltou a foto da boca de jusante"></textarea></label>
@@ -239,7 +241,7 @@
   function TXT_ACAO(h) {
     const dt = h.detalhe || {};
     if (h.acao === 'status') return `Status: ${ROT[dt.de] || dt.de || '—'} → ${ROT[dt.para] || dt.para || '—'}`;
-    return ({ criado: 'Criado', editado: 'Editado', aprovado: 'Aprovado', devolvido: 'Devolvido ao campo', atribuido: 'Atribuído' + (dt.para ? ' a ' + nomeDe(dt.para) : ' (removido)'), importacao: 'Cadastro importado' })[h.acao] || h.acao;
+    return ({ criado: 'Criado', editado: 'Editado', aprovado: 'Aprovado', devolvido: 'Devolvido ao campo', atribuido: 'Atribuído' + (dt.para ? ' a ' + nomeDe(dt.para) : ' (removido)'), importacao: 'Cadastro importado', planejado: 'Planejado pelo escritório', planejamento: 'Planejamento atualizado' })[h.acao] || h.acao;
   }
 
   /* ---------------------------------------------------------------- criar / editar projeto */
@@ -290,7 +292,7 @@
       if (h === '#/' || h === '#') return await viewProjetos();
       if (h === '#/equipe') return await viewEquipe();
       if (h === '#/novo') { if (!podeCriar()) return viewProjetos(); S.projeto = null; if (S.parar) { S.parar(); S.parar = null; } return await viewProjetoForm(null); }
-      if ((m = h.match(/^#\/p\/([^/]+)(?:\/(bueiros|editar|b\/([^/]+)))?$/))) {
+      if ((m = h.match(/^#\/p\/([^/]+)(?:\/(bueiros|editar|planejamento|b\/([^/]+)))?$/))) {
         if (!S.projetos.length) await carregarProjetos();
         if (!S.projeto || S.projeto.id !== m[1]) { if (!(await carregarProjeto(m[1]))) return viewProjetos(); assinar(); }
         else S.bueiros = await D.bueiros(m[1]);
@@ -299,6 +301,7 @@
         if (m[2] !== 'bueiros') S.membros = await D.membros(m[1]);
         if (n !== rotaN) return;
         if (m[2] === 'editar') return await viewProjetoForm(m[1]);
+        if (m[2] === 'planejamento') { if (!podeCriar()) return viewGeral(); return await window.Planejamento.view({ S, D, pagina, toast, chip, COR, carregarLeaflet }); }
         return m[2] === 'bueiros' ? viewBueiros() : viewGeral();
       }
       location.hash = '#/';

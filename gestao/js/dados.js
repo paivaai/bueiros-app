@@ -2,7 +2,8 @@
      Demo      → dados fictícios em memória (nada é gravado em servidor);
      Supabase  → dados reais (login, RLS, funções salvar/revisar/atribuir do servidor/02_funcoes.sql).
    Interface: iniciar, entrar, sair, perfil, projetos, bueiros, bueiro, historico, fotos, usuarios,
-              revisar, atribuir, convidar, assinar.  Expõe window.Dados. */
+              revisar, atribuir, convidar, assinar, membros, criarProjeto, editarProjeto, definirMembros,
+              eixo, salvarEixo, salvarPlanejados, removerPlanejados (planejamento).  Expõe window.Dados. */
 (function () {
   'use strict';
   const CFG = window.GESTAO_CONFIG || {};
@@ -78,6 +79,7 @@
     bueiros[0].atribuido_a = 'u-joao'; bueiros[0].responsavel_nome = 'João Pereira';
     { const b0 = bueiros[0], d0 = b0.dados; b0.leste = d0.leste; b0.norte = d0.norte; b0.latitude = +base.lat.toFixed(7); b0.longitude = +base.lon.toFixed(7); d0.km = b0.km; }
 
+    const eixos = {};
     const hist = {};
     bueiros.forEach(b => {
       const h = [{ id: b.id + 'h0', acao: 'criado', usuario_nome: 'Marina Souza', em: iso(agora - 96 * H), detalhe: { status: 'a_vistoriar' } }];
@@ -128,6 +130,34 @@
         Object.assign(p, { nome: d.nome.trim(), rodovia: d.rodovia || '', descricao: d.descricao || '', fuso: d.fuso, hemisferio: d.hemisferio, ativo: d.ativo !== false });
       },
       async definirMembros(id, ids) { membrosDe[id] = Array.from(new Set([D.usuarioAtual.id].concat(ids || []))); return membrosDe[id].length; },
+      async eixo(projetoId) { return eixos[projetoId] ? JSON.parse(JSON.stringify(eixos[projetoId])) : null; },
+      async salvarEixo(projetoId, e) { eixos[projetoId] = JSON.parse(JSON.stringify(e)); },
+      async salvarPlanejados(projetoId, lista) {
+        let novos = 0, alterados = 0, bloqueados = 0;
+        const cods = new Set(bueiros.filter(b => b.projeto_id === projetoId).map(b => b.codigo.toLowerCase()));
+        lista.forEach(it => {
+          const cod = String(it.codigo || '').trim(); if (!cod) throw new Error('todo bueiro precisa de um código (nome)');
+          const ex = bueiros.find(b => b.id === it.id && b.projeto_id === projetoId);
+          if (ex) {
+            if (ex.status !== 'a_vistoriar') { bloqueados++; return; }
+            if (cod.toLowerCase() !== ex.codigo.toLowerCase() && cods.has(cod.toLowerCase())) throw new Error(`já existe outro bueiro com o código "${cod}"`);
+            Object.assign(ex, { codigo: cod, km: it.km || null, latitude: it.latitude, longitude: it.longitude, leste: it.leste, norte: it.norte, zona: it.zona, versao: ex.versao + 1, atualizado_em: iso(Date.now()) });
+            ex.dados = Object.assign(ex.dados || {}, it.dados || {}, { codigo: cod, km: it.km }); alterados++;
+          } else {
+            if (cods.has(cod.toLowerCase())) throw new Error(`já existe um bueiro com o código "${cod}"`);
+            const id = it.id || 'b-' + Date.now() + '-' + novos;
+            bueiros.push({ id, projeto_id: projetoId, codigo: cod, cadastro_id: null, km: it.km || null, status: 'a_vistoriar', atribuido_a: null, responsavel_nome: null, latitude: it.latitude, longitude: it.longitude, leste: it.leste, norte: it.norte, zona: it.zona,
+              atualizado_em: iso(Date.now()), versao: 1, revisado_por: null, comentario_revisao: null, dados: Object.assign({ id, codigo: cod, km: it.km, status: 'a_vistoriar' }, it.dados || {}) });
+            hist[id] = [{ id: id + 'h0', acao: 'planejado', usuario_nome: D.usuarioAtual.nome, em: iso(Date.now()), detalhe: {} }]; cods.add(cod.toLowerCase()); novos++;
+          }
+        });
+        return { novos, alterados, bloqueados };
+      },
+      async removerPlanejados(projetoId, ids) {
+        let n = 0;
+        ids.forEach(id => { const i = bueiros.findIndex(b => b.id === id && b.projeto_id === projetoId && b.status === 'a_vistoriar' && !(b.dados && b.dados.responsavel)); if (i >= 0) { bueiros.splice(i, 1); n++; } });
+        return n;
+      },
       async revisar(id, aprovar, comentario) {
         const b = bueiros.find(x => x.id === id);
         if (!b || !['concluido', 'devolvido', 'aprovado'].includes(b.status)) throw new Error('Só dá para revisar bueiro concluído.');
@@ -251,6 +281,10 @@
       async editarProjeto(id, d) {
         const { error } = await sb.rpc('editar_projeto', { p_projeto: id, p_nome: d.nome, p_rodovia: d.rodovia || null, p_descricao: d.descricao || null, p_fuso: d.fuso, p_hemisferio: d.hemisferio, p_ativo: d.ativo !== false }); erro(error);
       },
+      async eixo(projetoId) { const { data, error } = await sb.from('projetos').select('eixo').eq('id', projetoId).maybeSingle(); if (error) return null; return data ? data.eixo : null; }, // sem o script 08 a coluna não existe: segue sem eixo
+      async salvarEixo(projetoId, e) { const { error } = await sb.rpc('salvar_eixo', { p_projeto: projetoId, p_eixo: e }); erro(error); },
+      async salvarPlanejados(projetoId, lista) { const { data, error } = await sb.rpc('salvar_planejados', { p_projeto: projetoId, p_lista: lista }); erro(error); return data; },
+      async removerPlanejados(projetoId, ids) { const { data, error } = await sb.rpc('remover_planejados', { p_projeto: projetoId, p_ids: ids }); erro(error); return data; },
       async definirMembros(id, ids) { const { data, error } = await sb.rpc('definir_membros_projeto', { p_projeto: id, p_usuarios: ids || [] }); erro(error); return data; },
       async revisar(id, aprovar, comentario) { const { error } = await sb.rpc('revisar_bueiro', { p_id: id, p_aprovar: aprovar, p_comentario: comentario || null }); erro(error); },
       async atribuir(ids, usuarioId) { const { data, error } = await sb.rpc('atribuir_bueiros', { p_ids: ids, p_usuario: usuarioId || null }); erro(error); return data; },
