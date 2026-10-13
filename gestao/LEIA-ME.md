@@ -3,11 +3,11 @@
 Acompanha os levantamentos de campo, revisa (aprova/devolve), atribui bueiros e gerencia acessos.
 Endereço depois do deploy: `https://paivaai.github.io/bueiros-app/gestao/`
 
-## Modo demonstração (padrão)
-Com `js/config.js` vazio o painel usa dados fictícios (36 bueiros, equipe de exemplo, atualização "ao vivo" simulada). Nada é gravado em servidor.
+## Modo demonstração
+Com `?demo=1` no fim do endereço (`.../gestao/?demo=1`) o painel usa dados fictícios (36 bueiros, equipe de exemplo, atualização "ao vivo" simulada). Nada é gravado em servidor.
 Login: `arthur@gfa.demo` / `demo`.
 
-## Ligar ao Supabase (dados reais)
+## Supabase (dados reais) — já configurado em `js/config.js`
 1. Crie o projeto e rode os SQL de `servidor/` (veja `servidor/LEIA-ME.md`).
 2. Em `js/config.js` preencha `SUPABASE_URL` e `SUPABASE_ANON_KEY` (Project Settings → API → *anon public*). **Nunca** a `service_role`.
 3. Entre com o e-mail do primeiro administrador (convite do script 05).
