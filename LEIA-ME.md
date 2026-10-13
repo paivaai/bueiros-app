@@ -44,3 +44,16 @@ Só no celular (IndexedDB do Chrome). Não há servidor. **Limpar os dados do Ch
 - Importar o mesmo arquivo de novo não duplica (os já existentes são ignorados).
 - **Não suba o KMZ para o GitHub público** (dados do cliente). Envie o arquivo ao celular por WhatsApp/Drive e importe pelo app.
 - Ao atualizar, mantenha `VERSAO = 'v3'` (ou maior) no service-worker.js.
+
+## 8. Revisão GFA (versão v4)
+- **Responsável:** menu com os nomes já usados neste aparelho; "+ Novo responsável…" adiciona. **Empresa/equipe** já vem como GFA.
+- **Coordenadas:** GPS do celular desativado. Etapa 2 usa **UTM (Este, Norte, Fuso, Hemisfério, Altitude Z)**. No botão "Usar o centro do bueiro" o app preenche com o centro entre GI MONT e GI JUS.
+- **Características:** sem o campo "Linhas"; formatos só Circular, Retangular e Personalizada.
+- **Planta, perfil e quadro de dados (Etapa 5):** gerados ao importar o TXT do RTK. Códigos reconhecidos: `GI MONT`, `GI JUS` (ou pares `OAC-GTZ`), `CB1…`/`OAC-ALA` (contorno), `EP`/`BD`/`BE`/`TER-ASF` (pista), `TN`/`TAL`/`TER-CA`/`TER-PA` (terreno), `RN`. Sem GI, o eixo é estimado e o app avisa.
+- **Medições:** comprimento, declividade e cotas de entrada/saída vêm dos pontos (o que você digitar tem prioridade).
+- **Fotos:** envie a logo na Etapa 7; as fotos novas saem com a logo e as coordenadas UTM da Etapa 2 estampadas.
+- **Importar KMZ:** se o trecho cruza dois fusos UTM, o app pergunta qual fuso usar.
+- **Atualizar:** suba todos os arquivos (há um novo, `js/prancha.js`) e mantenha `VERSAO = 'v4'`.
+
+## 9. Identidade visual GFA (v5)
+Logo da GFA na barra superior, nos ícones do app, na tela sem conexão, no relatório e na prancha. Nas fotos, a logo da GFA é o padrão até alguém enviar outra (Etapa Fotos → Trocar logo). Cor principal: laranja da marca. O arquivo da logo é `assets/logo-gfa.png`. Ao subir para o GitHub, suba tudo (a VERSAO do service worker agora é v5).

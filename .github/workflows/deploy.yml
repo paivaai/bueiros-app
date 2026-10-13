@@ -1,0 +1,59 @@
+# Publica o app no GitHub Pages a cada push na branch main.
+# - confere a sintaxe dos scripts antes de publicar;
+# - carimba automaticamente a VERSAO do service worker com o código do commit (não precisa mais aumentar v5 -> v6 à mão);
+# - NÃO publica servidor/ nem a documentação (só o app de campo e, quando existir, o painel gestao/).
+name: Publicar app
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Conferir sintaxe dos scripts
+        run: |
+          for f in js/*.js service-worker.js $(ls gestao/*.js gestao/js/*.js 2>/dev/null); do
+            node --check "$f" || exit 1
+          done
+          python3 -m json.tool manifest.webmanifest > /dev/null
+
+      - name: Montar a pasta publicada
+        run: |
+          mkdir _site
+          cp -r index.html offline.html manifest.webmanifest service-worker.js css js assets _site/
+          [ -d gestao ] && cp -r gestao _site/gestao || true
+          # versão do service worker = commit (celulares percebem a atualização sozinhos)
+          sed -i "s/^const VERSAO = '.*';/const VERSAO = '${GITHUB_SHA::7}';/" _site/service-worker.js
+          grep -n "^const VERSAO" _site/service-worker.js
+          # todo arquivo listado no cache precisa existir
+          node -e "
+            const s=require('fs').readFileSync('_site/service-worker.js','utf8');
+            const m=s.match(/ARQUIVOS = \[([\s\S]*?)\];/)[1];
+            const fs=require('fs'); let falta=0;
+            for (const x of m.match(/'[^']+'/g)) { const p=x.slice(1,-1); if (p==='./') continue; if(!fs.existsSync('_site/'+p)){console.error('FALTA: '+p); falta++;} }
+            process.exit(falta?1:0);"
+          touch _site/.nojekyll
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deploy
+        uses: actions/deploy-pages@v4

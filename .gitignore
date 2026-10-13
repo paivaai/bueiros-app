@@ -1,0 +1,7 @@
+# dados reais e segredos NUNCA entram no repositório (o GitHub Pages é público)
+*.kmz
+*.kml
+.env
+.env.*
+*service_role*
+*.zip

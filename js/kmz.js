@@ -173,7 +173,7 @@
     l.km = km; l.ambiente = mapOpt(a.ambiente, O.ambiente); l.sentido = mapOpt(a.sentido, O.sentido); l.pistaGe = mapOpt(a.pistaGe, O.pista); l.lado = mapOpt(a.lado, O.lado);
 
     const geo = coordOk(f.lat, f.lon) ? [f.lat, f.lon] : coordOk(a._lat, a._lon) ? [a._lat, a._lon] : null;
-    if (geo) { l.latitude = +geo[0].toFixed(7); l.longitude = +geo[1].toFixed(7); l.coordOrigem = 'cadastro'; }
+    if (geo) { l.latitude = +geo[0].toFixed(7); l.longitude = +geo[1].toFixed(7); l.coordOrigem = 'cadastro'; BU.GPS.completarUTM(l); }
 
     // tipo, forma e material pela sigla (ex.: BSTC = bueiro simples tubular de concreto)
     const sg = String(a.sigla || '').toUpperCase().match(/B([SDTQ])([TCLA])([CMPVA])/);
@@ -182,7 +182,7 @@
     else { const t = a.descricao || a.sigla; forma = formaPorTexto(t); linhas = linhasPorTexto(t); material = materialPorTexto(t); }
     forma = formaPorTexto(a.forma) || forma;
     c.tipo = forma === 'tubular' ? 'Tubular' : forma === 'celular' ? 'Celular' : forma ? 'Outro' : '';
-    c.material = material; c.linhas = linhas; if (forma === 'celular') c.celulas = linhas;
+    c.material = material; if (forma === 'celular') c.celulas = linhas;
 
     const dM = dimFix(a.dimMont), dJ = dimFix(a.dimJus), sM = parseBxH(a.secMont), sJ = parseBxH(a.secJus), notas = [];
     if (forma === 'tubular') {
@@ -190,11 +190,11 @@
       if (dM) { m.larguraEntrada = dM; m.alturaEntrada = dM; }
       if (dJ) { m.larguraSaida = dJ; m.alturaSaida = dJ; }
       if (dM && dJ && dM !== dJ) notas.push(`Diâmetro de jusante no cadastro: ${U.numTxt(dJ)} m.`);
+      if (linhas > 1) notas.push(`Cadastro informa ${linhas} linhas (tubos).`);
     } else if (forma === 'celular') {
       if (sM) { c.largura = sM[0]; c.altura = sM[1]; m.larguraEntrada = sM[0]; m.alturaEntrada = sM[1]; }
       if (sJ) { m.larguraSaida = sJ[0]; m.alturaSaida = sJ[1]; }
-      c.formato = linhas === 2 ? 'Aduela dupla' : (sM && sM[0] === sM[1] ? 'Quadrada' : 'Retangular');
-      if (linhas > 2) notas.push(`Cadastro informa ${linhas} células; o croqui mostra uma só.`);
+      c.formato = 'Retangular'; // o croqui usa Células (largura de cada célula × altura)
     } else if (forma) c.formato = 'Personalizada';
     c.conservacao = mapConservacao(a.estado);
     c.necessita = a.necessita;
@@ -237,8 +237,16 @@
         ${ignoradas ? `<li>${ignoradas} feição(ões) que não são pontos foram ignoradas</li>` : ''}</ul>
         <p class="muted small">Cada ponto vira um levantamento <b>A vistoriar</b>, já com os dados do cadastro. Nada é enviado a servidor.</p>`;
       if (!novos.length) { await UI.escolher('Nada novo', resumo, [{ k: 'x', label: 'Fechar' }]); return; }
-      const ac = await UI.escolher('Importar cadastro', resumo, [{ k: 'ok', label: `Importar ${novos.length} bueiro(s)`, cls: 'primary' }, { k: 'x', label: 'Cancelar' }]);
-      if (ac !== 'ok') return;
+      // Um trecho pode cruzar dois fusos UTM: deixa escolher o fuso do projeto (o mesmo do RTK) ou manter o fuso de cada ponto.
+      const zc = {}; novos.forEach(r => { if (r.zona && r.latitude != null) zc[r.zona] = (zc[r.zona] || 0) + 1; });
+      const zonas = Object.keys(zc).sort((x, y) => zc[y] - zc[x]);
+      const botoes = zonas.length > 1
+        ? [...zonas.map((z, i) => ({ k: 'z' + z, label: `Importar no fuso ${z}S (${zc[z]} ponto(s) nesse fuso)`, cls: i === 0 ? 'primary' : '' })), { k: 'nat', label: 'Cada ponto no seu próprio fuso' }, { k: 'x', label: 'Cancelar' }]
+        : [{ k: 'nat', label: `Importar ${novos.length} bueiro(s)`, cls: 'primary' }, { k: 'x', label: 'Cancelar' }];
+      const aviso = zonas.length > 1 ? `<p class="muted small"><b>Atenção:</b> o trecho cruza dois fusos UTM (${zonas.map(z => z + 'S').join(' e ')}). Escolha o mesmo fuso que o RTK da equipe usa, para as coordenadas do cadastro e do levantamento ficarem na mesma base.</p>` : '';
+      const ac = await UI.escolher('Importar cadastro', resumo + aviso, botoes);
+      if (!ac || ac === 'x') return;
+      if (/^z\d+$/.test(ac)) novos.forEach(r => { if (r.latitude != null) { const u = BU.GPS.paraUTM(r.latitude, r.longitude, +ac.slice(1)); r.zona = String(u.zona); r.hemisferio = u.hem; r.leste = +u.leste.toFixed(3); r.norte = +u.norte.toFixed(3); } });
       await DB.salvarVarios(novos);
       UI.toast(`${novos.length} bueiro(s) importado(s)`);
       BU.App.verLista('a_vistoriar');

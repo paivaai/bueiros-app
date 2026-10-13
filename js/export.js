@@ -34,10 +34,11 @@
         if (c.h) { fecha(); grupo = nomes[n] + ' — ' + c.h; continue; }
         const v = valorTxt(l, c); if (v) itens.push([c.label, v]);
       }
-      if (n === 2 && l.gpsCapturadoEm) itens.push(['GPS capturado em', U.dataHoraBR(l.gpsCapturadoEm)]);
-      if (n === 2 && l.latitude != null && l.longitude != null) {
-        const u = BU.GPS.paraUTM(l.latitude, l.longitude, l.fuso || undefined);
-        itens.push([`UTM ${u.zona}${l.latitude < 0 ? 'S' : 'N'} (SIRGAS 2000)`, `N ${u.norte.toFixed(3)} · E ${u.leste.toFixed(3)}`]);
+      if (n === 2) {
+        const ori = { cadastro: 'Do cadastro (confirmar com o RTK)', manual: 'Digitadas', rtk: 'Centro do bueiro (pontos do RTK)', gps: 'GPS do aparelho (versão antiga)' }[l.coordOrigem];
+        if (ori) itens.push(['Origem das coordenadas', ori]);
+        if (BU.GPS.utmDe(l)) itens.push(['Referencial', BU.GPS.rotuloUTM(BU.GPS.utmDe(l))]);
+        if (l.latitude != null && l.longitude != null) itens.push(['Latitude / Longitude (derivadas)', `${U.numTxt(l.latitude)} / ${U.numTxt(l.longitude)}`]);
       }
       fecha();
     }
@@ -60,24 +61,27 @@
   function gerarRelatorio(l, fotos) {
     const pend = BU.App.pendencias(l);
     const sec = secoes(l).map(s => `<section><h2>${esc(s.grupo)}</h2><table class="kv">${s.itens.map(([k, v]) => `<tr><th>${esc(k)}</th><td>${esc(v).replace(/\n/g, '<br>')}</td></tr>`).join('')}</table></section>`).join('');
-    const croqui = (l.secao || BU.Secao.gerarSVG && l.caracteristicas.formato) ? `<section class="fig"><h2>Seção do bueiro (croqui)</h2>${BU.Secao.gerarSVG(l)}</section>` : '';
+    const prancha = BU.Prancha.temDados(l) ? `<section class="folha"><h2>Planta, perfil longitudinal e quadro de dados</h2>${BU.Prancha.gerarSVG(l)}</section>` : '';
+    const croqui = (l.secao || BU.Secao.gerarSVG && l.caracteristicas.formato) ? `<section class="fig"><h2>Seção transversal do bueiro (croqui)</h2>${BU.Secao.gerarSVG(l)}</section>` : '';
+    const logo = BU.Prancha.logo ? `<img class="logo" src="${BU.Prancha.logo}" alt="">` : '';
     const pts = l.pontos.length ? `<section><h2>Pontos topográficos (${l.pontos.length})</h2><table class="grade"><thead><tr><th>ID</th><th>X (Norte)</th><th>Y (Leste)</th><th>Z</th><th>Código</th><th>Obs.</th></tr></thead><tbody>${l.pontos.map(p => `<tr><td>${esc(p.id)}</td><td>${esc(p.x)}</td><td>${esc(p.y)}</td><td>${esc(p.z)}</td><td>${esc(p.codigo)}</td><td>${esc(p.obs)}</td></tr>`).join('')}</tbody></table></section>` : '';
     const fts = fotos.length ? `<section><h2>Fotos (${fotos.length})</h2><div class="fotos">${fotos.map(f => `<figure><img src="${f.dataUrl}" alt=""><figcaption><b>${esc(CATEG[f.meta.categoria] || 'Sem categoria')}</b>${f.meta.legenda ? ' — ' + esc(f.meta.legenda) : ''}<br><small>${esc(U.dataHoraBR(f.meta.dataHora))}</small></figcaption></figure>`).join('')}</div></section>` : '';
     const pe = pend.length ? `<section><h2>Pendências</h2><ul>${pend.map(p => `<li>${esc(p.t)}</li>`).join('')}</ul></section>` : '';
     const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Relatório ${esc(l.codigo || 'bueiro')}</title><style>
 body{font:14px/1.45 Arial,Helvetica,sans-serif;color:#16201A;margin:0;padding:16px;max-width:820px;margin-inline:auto}
-header{border-bottom:3px solid #0D6A44;padding-bottom:8px;margin-bottom:12px}h1{margin:0;font-size:22px;color:#0D6A44}.sub{color:#56635A}
-h2{font-size:16px;margin:18px 0 6px;color:#0D6A44;border-bottom:1px solid #CBD4CC;padding-bottom:3px}
+header{border-bottom:3px solid #C2410C;padding-bottom:8px;margin-bottom:12px}h1{margin:0;font-size:22px;color:#C2410C}.sub{color:#56635A}
+h2{font-size:16px;margin:18px 0 6px;color:#C2410C;border-bottom:1px solid #CBD4CC;padding-bottom:3px}
 table{width:100%;border-collapse:collapse}.kv th{text-align:left;width:42%;color:#56635A;font-weight:600;padding:4px 8px 4px 0;vertical-align:top}.kv td{padding:4px 0;font-weight:600}
 .kv tr{border-bottom:1px dashed #CBD4CC}.grade th,.grade td{border:1px solid #CBD4CC;padding:4px 6px;text-align:left;font-size:13px}.grade th{background:#E6EBE5}
 .fig svg{width:100%;max-width:560px;height:auto;display:block;margin:auto;border:1px solid #CBD4CC}
+.folha svg{width:100%;height:auto;display:block;border:1px solid #CBD4CC}.folha{page:folha;break-before:page;break-after:page}.logo{float:left;max-height:46px;max-width:140px;margin:0 12px 6px 0}
 .fotos{display:grid;grid-template-columns:1fr 1fr;gap:10px}figure{margin:0;break-inside:avoid;border:1px solid #CBD4CC;border-radius:6px;overflow:hidden}figure img{width:100%;display:block}figcaption{padding:6px 8px;font-size:13px}
 section{break-inside:avoid-page}footer{margin-top:24px;color:#56635A;font-size:12px;border-top:1px solid #CBD4CC;padding-top:6px}
-.btn{position:sticky;top:8px;float:right;background:#0D6A44;color:#fff;border:0;border-radius:8px;padding:10px 14px;font-size:15px;font-weight:700}
-@media print{.btn{display:none}body{padding:0}@page{margin:14mm}}</style></head><body>
+.btn{position:sticky;top:8px;float:right;background:#C2410C;color:#fff;border:0;border-radius:8px;padding:10px 14px;font-size:15px;font-weight:700}
+@media print{.btn{display:none}body{padding:0}@page{margin:14mm}@page folha{size:A3 landscape;margin:8mm}.folha h2{display:none}}</style></head><body>
 <button class="btn" onclick="window.print()">Imprimir / salvar PDF</button>
-<header><h1>Relatório de levantamento de bueiro</h1><div class="sub"><b>${esc(l.codigo || 'Sem código')}</b>${l.estrada ? ' · ' + esc(l.estrada) : ''}${l.municipio ? ' · ' + esc(l.municipio) + (l.estado ? '/' + esc(l.estado) : '') : ''}<br>${esc(U.dataBR(l.data))} ${esc(l.hora || '')} · ${esc(l.responsavel || '')}</div></header>
-${sec}${croqui}${pts}${fts}${pe}
+<header>${logo}<h1>Relatório de levantamento de bueiro</h1><div class="sub"><b>${esc(l.codigo || 'Sem código')}</b>${l.estrada ? ' · ' + esc(l.estrada) : ''}${l.municipio ? ' · ' + esc(l.municipio) + (l.estado ? '/' + esc(l.estado) : '') : ''}<br>${esc(U.dataBR(l.data))} ${esc(l.hora || '')} · ${esc(l.responsavel || '')}</div></header>
+${sec}${croqui}${prancha}${pts}${fts}${pe}
 <footer>Gerado em ${esc(quando())} · Cadastro de Bueiros · ${l.pontos.length} ponto(s) · ${fotos.length} foto(s)</footer></body></html>`;
     return new Blob([html], { type: 'text/html;charset=utf-8' });
   }
@@ -124,16 +128,16 @@ ${sec}${croqui}${pts}${fts}${pe}
       <button type="button" class="btn" data-ex="json">Exportar JSON</button>
       <button type="button" class="btn" data-ex="csv">Exportar CSV</button>
       <button type="button" class="btn" data-ex="txt">Exportar TXT (pontos)</button>
-      <button type="button" class="btn" data-ex="croqui">Imagem do croqui</button>
+      <button type="button" class="btn" data-ex="croqui">Imagem da prancha</button>
       <button type="button" class="btn" data-ex="compartilhar">Compartilhar arquivo</button></div>
-      <p class="muted small">O relatório reúne tudo, com croqui, pontos e fotos. Abra e use “Imprimir / salvar PDF”. O JSON inclui as fotos e serve de backup.</p></div>`;
+      <p class="muted small">O relatório reúne tudo, com planta, perfil, quadro de dados, pontos e fotos. Abra e use “Imprimir / salvar PDF”. O JSON inclui as fotos e serve de backup.</p></div>`;
   }
   document.addEventListener('click', e => {
     const b = e.target.closest('[data-ex]'); if (!b) return;
     const l = BU.App.cur(); if (!l) return;
     const a = b.dataset.ex;
     if (a === 'compartilhar') compartilhar(l);
-    else if (a === 'croqui') BU.Secao.exportarPNG(l);
+    else if (a === 'croqui') { if (BU.Prancha.temDados(l)) BU.Prancha.exportarPNG(l); else BU.Secao.exportarPNG(l); }
     else executar(a, l);
   });
 
