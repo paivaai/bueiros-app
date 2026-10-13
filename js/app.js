@@ -49,6 +49,17 @@
       { p: 'hemisferio', label: 'Hemisfério', t: 'select', opts: ['S', 'N'], half: true, sem: true },
       { p: 'altitude', label: 'Altitude (Z)', t: 'num', unit: 'm', neg: true, ph: '15,904' },
     ],
+    '2b': [
+      { p: 'rtk.solucao', label: 'Solução do RTK', t: 'select', opts: ['Fixa', 'Flutuante', 'DGPS', 'Autônoma'] },
+      { p: 'rtk.precisaoH', label: 'Precisão horizontal', t: 'num', unit: 'm', min: 0, ph: '0,015' },
+      { p: 'rtk.precisaoV', label: 'Precisão vertical', t: 'num', unit: 'm', min: 0, ph: '0,025' },
+      { p: 'rtk.satelites', label: 'Satélites', t: 'int', min: 0 },
+      { p: 'rtk.tipoAltitude', label: 'Tipo da altitude (Z)', t: 'select', opts: ['Elipsoidal', 'Ortométrica'], half: true },
+      { p: 'rtk.geoide', label: 'Modelo geoidal', ph: 'ex.: MAPGEO2015', half: true },
+      { p: 'rtk.alturaAntena', label: 'Altura da antena', t: 'num', unit: 'm', min: 0 },
+      { p: 'rtk.base', label: 'Base / correção', ph: 'ex.: base própria, RBMC-RJNI, NTRIP' },
+      { p: 'rtk.receptor', label: 'Receptor', ph: 'ex.: Emlid RS3' },
+    ],
     3: [
       { h: 'Tipo e geometria' },
       { p: 'caracteristicas.tipo', label: 'Tipo de bueiro', t: 'select', opts: ['Tubular', 'Celular', 'Aduela', 'Galeria', 'Outro'] },
@@ -104,6 +115,8 @@
       responsavel: '', equipe: 'GFA', observacoes: '',
       leste: null, norte: null, zona: '23', hemisferio: 'S', altitude: null,
       latitude: null, longitude: null, // só para o botão Navegar (derivadas do UTM)
+      rtk: { solucao: '', precisaoH: null, precisaoV: null, satelites: null, base: '', receptor: '', alturaAntena: null, tipoAltitude: '', geoide: '' },
+      naoLocalizado: null, planejado: null,
       caracteristicas: {
         tipo: '', formato: '', celulas: null, material: '', diametro: null, largura: null, altura: null, comprimento: null, espessura: null, larguraTopo: null,
         situacaoEstrutural: '', conservacao: '', erosao: '', assoreamento: '', obstrucao: '', agua: '', vegetacao: '',
@@ -124,7 +137,7 @@
     const l = {
       ...b, ...r,
       caracteristicas: { ...b.caracteristicas, ...(r.caracteristicas || {}) },
-      medicoes: { ...b.medicoes, ...(r.medicoes || {}) },
+      medicoes: { ...b.medicoes, ...(r.medicoes || {}) }, rtk: { ...b.rtk, ...(r.rtk || {}) },
       prancha: { ...b.prancha, ...(r.prancha || {}) }, medicoesAuto: { ...(r.medicoesAuto || {}) },
       pontos: r.pontos || [], fotos: r.fotos || [], patologias: r.patologias || [],
     };
@@ -146,7 +159,7 @@
     cur: null, etapa: 1, persistido: false,
     dirty: false, rev: 0, timer: null, saveState: 'salvo',
     hashAtual: '#/', ignorar: false,
-    filtro: 'todos', limite: 60, ultimoResp: null, resp: [], ultimaZona: null,
+    filtro: 'todos', limite: 60, ultimoResp: null, resp: [], ultimaZona: null, eixo: null, ultimoRtk: null,
   };
 
   /* Ordem de trabalho: em andamento, depois os a vistoriar (na ordem do km), depois os concluídos. */
@@ -180,6 +193,21 @@
     if (S.cur) { if (nome) { await lembrarResp(nome); S.cur.responsavel = nome; marcarSujo(); } renderWizard(); }
   }
 
+  const RTK_PADRAO = ['base', 'receptor', 'alturaAntena', 'tipoAltitude', 'geoide'];
+  async function prefillRtk(l) {
+    try { if (S.ultimoRtk == null) S.ultimoRtk = (await DB.cfgObter('ultimoRtk')) || {}; } catch (e) { S.ultimoRtk = {}; }
+    for (const k of RTK_PADRAO) if ((l.rtk[k] == null || l.rtk[k] === '') && S.ultimoRtk[k] != null && S.ultimoRtk[k] !== '') l.rtk[k] = S.ultimoRtk[k];
+  }
+  function lembrarRtk(l) {
+    const v = {}; for (const k of RTK_PADRAO) v[k] = l.rtk[k];
+    if (JSON.stringify(v) === JSON.stringify(S.ultimoRtk) || !RTK_PADRAO.some(k => v[k] != null && v[k] !== '')) return;
+    S.ultimoRtk = v; DB.cfgSalvar('ultimoRtk', v).catch(() => {});
+  }
+  const conferenciasHTML = (l, etapa) => {
+    const c = BU.Conf.analisar(l, S.eixo).filter(x => x.e === etapa);
+    return c.length ? `<div class="card"><h3>Conferências automáticas</h3>${c.map(x => `<div class="pend ${x.n}"><span>${x.n === 'erro' ? '⛔' : '⚠️'} ${esc(x.t)}</span></div>`).join('')}</div>` : '';
+  };
+
   async function prefillZona(l) {
     try { if (S.ultimaZona == null) S.ultimaZona = (await DB.cfgObter('ultimaZona')) || ''; } catch (e) { S.ultimaZona = ''; }
     if (S.ultimaZona) l.zona = S.ultimaZona;
@@ -212,6 +240,7 @@
     }
     if (!l.fotos.some(f => f.ctx === 'secao')) P.push({ n: 'aviso', t: 'Nenhuma foto da seção', e: 5 });
     if (!l.fotos.length) P.push({ n: 'aviso', t: 'Nenhuma foto adicionada', e: 8 });
+    for (const c of BU.Conf.analisar(l, S.eixo)) P.push({ n: c.n, t: c.t, e: c.e });
     return P;
   }
 
@@ -261,7 +290,7 @@
       S.persistido = true;
       const resp = String(S.cur.responsavel || '').trim();
       if (resp && resp !== S.ultimoResp) { S.ultimoResp = resp; DB.cfgSalvar('ultimoResponsavel', resp).catch(() => {}); }
-      lembrarResp(resp);
+      lembrarResp(resp); lembrarRtk(S.cur);
       if (BU.Sync) BU.Sync.agendar();
       if (S.rev === rev) { S.dirty = false; setSaveState('salvo'); }
       else { setSaveState('pendente'); clearTimeout(S.timer); S.timer = setTimeout(() => salvarAtual(), 300); }
@@ -297,6 +326,7 @@
           <button type="button" class="btn big primary" data-go="#/novo">+ Novo levantamento</button>
           <button type="button" class="btn big" data-a="continuar" ${alvo ? `data-id="${esc(alvo.id)}"` : 'disabled'}>${proximo ? 'Próximo bueiro a vistoriar' : 'Continuar levantamento'}
             <small>${alvo ? esc(alvo.codigo || 'Sem código') : 'nenhum levantamento ainda'}</small></button>
+          <button type="button" class="btn big" data-go="#/mapa">Mapa <small>bueiros, eixo e minha posição</small></button>
           <button type="button" class="btn big" data-go="#/lista">Projetos salvos</button>
           <button type="button" class="btn big" data-a="importar-kmz">Importar cadastro (KMZ/KML) <small>carrega os bueiros do arquivo do cadastro</small></button>
           <button type="button" class="btn big" data-a="importar-home">Importar arquivo TXT <small>cria um levantamento com os pontos do RTK</small></button>
@@ -330,7 +360,7 @@
       <div class="row">
         <button type="button" class="btn primary" data-a="abrir">${av ? 'Vistoriar' : 'Abrir'}</button>${nav}
       </div>
-      <div class="row"><button type="button" class="btn sm" data-a="duplicar">Duplicar</button><button type="button" class="btn sm danger" data-a="excluir">Excluir</button></div></article>`;
+      <div class="row">${['a_vistoriar', 'rascunho', 'devolvido'].includes(l.status) ? '<button type="button" class="btn sm" data-a="nao-localizado">Não localizei</button>' : ''}<button type="button" class="btn sm" data-a="duplicar">Duplicar</button><button type="button" class="btn sm danger" data-a="excluir">Excluir</button></div></article>`;
   }
   function listaFiltrada() {
     const q = S.q.trim().toLowerCase();
@@ -431,7 +461,8 @@
     const l = S.cur, n = S.etapa, et = ETAPAS[n - 1];
     if (BU.Prancha.sincronizarMedicoes(l)) marcarSujo(); // cotas, comprimento e declividade vêm dos pontos do TXT
     let corpo;
-    if (n === 2) corpo = `<div class="card"><h3>Coordenadas UTM (SIRGAS 2000)</h3>${camposHTML(CAMPOS[2])}<p class="muted small">Este = E · Norte = N · Altitude = Z (cota). Metros.</p></div>` + BU.GPS.cartaoHTML(l);
+    if (n === 2) corpo = `<div class="card"><h3>Coordenadas UTM (SIRGAS 2000)</h3>${camposHTML(CAMPOS[2])}<p class="muted small">Este = E · Norte = N · Altitude = Z (cota). Metros.</p></div>` + BU.GPS.cartaoHTML(l)
+      + `<div class="card"><h3>Qualidade do RTK</h3>${camposHTML(CAMPOS['2b'])}<p class="muted small">Preencha com o que o coletor mostrou no ponto. Base, receptor, altura da antena e tipo de altitude ficam como padrão para o próximo bueiro.</p></div>` + conferenciasHTML(l, 2);
     else if (CAMPOS[n]) corpo = `<div class="card">${camposHTML(CAMPOS[n])}</div>` + (n === 1 ? cadastroHTML(l) : '');
     else if (n === 5) corpo = BU.Prancha.etapaHTML(l) + BU.Secao.etapaHTML(l) + BU.Fotos.blocoHTML(l, 'secao', 'Fotos da seção', { entradas: true });
     else if (n === 6) corpo = BU.Pontos.etapaHTML(l);
@@ -447,6 +478,7 @@
           <span id="save-state" class="chip save ${S.saveState}">${SAVE_TXT[S.saveState]}</span>
         </div>
         ${l.status === 'devolvido' ? `<div class="card devolvido"><b>↩ Devolvido pelo escritório</b><p>${esc(l.comentarioRevisao || 'Sem comentário.')}</p><p class="muted small">Corrija e salve de novo: ele volta para revisão.</p></div>` : ''}
+        ${l.status === 'nao_localizado' ? `<div class="card naoloc"><b>Não localizado</b><p>${esc((l.naoLocalizado && l.naoLocalizado.motivo) || '')}${l.naoLocalizado && l.naoLocalizado.obs ? ' — ' + esc(l.naoLocalizado.obs) : ''}</p><button type="button" class="btn sm" data-a="reabrir-vistoria">Voltar a vistoriar</button></div>` : (['a_vistoriar', 'rascunho', 'devolvido'].includes(l.status) && (n === 1 || n === 9) ? `<button type="button" class="btn linkbtn" data-a="nao-localizado" data-id="${esc(l.id)}">Não consegui localizar este bueiro</button>` : '')}
         ${l.status === 'aprovado' ? '<div class="card aprovado"><b>✔ Aprovado pelo escritório</b><p class="muted small">Não é mais enviado ao servidor. Alterações ficam só neste aparelho.</p></div>' : ''}
         <nav class="steps" aria-label="Etapas">${ETAPAS.map(e => `<button type="button" class="seg${e.n === n ? ' atual' : ''}${e.n < n ? ' feito' : ''}" data-etapa="${e.n}" aria-label="Etapa ${e.n}: ${e.nome}"${e.n === n ? ' aria-current="step"' : ''}><span></span></button>`).join('')}</nav>
         <div class="step-title"><span>Etapa ${n} de 9</span><h1>${esc(et.nome)}</h1></div>
@@ -509,7 +541,59 @@
     S.lista = await DB.listar(); viewLista(); UI.toast('Levantamento excluído');
   }
   const backup = () => BU.Export.backupTudo();
+
+  /* ---------- bueiro não localizado ---------- */
+  const MOTIVOS_NL = ['Não existe no local', 'Soterrado ou coberto', 'Sem acesso ao local', 'Posição planejada errada', 'Outro'];
+  function posicaoAgora() {
+    return new Promise(ok => {
+      if (!navigator.geolocation) return ok(null);
+      navigator.geolocation.getCurrentPosition(p => ok({ latitude: p.coords.latitude, longitude: p.coords.longitude, precisao: p.coords.accuracy }), () => ok(null), { enableHighAccuracy: true, timeout: 7000, maximumAge: 15000 });
+    });
+  }
+  function pedirNaoLocalizado(l) {
+    return new Promise(resolve => {
+      const back = $('#modal'), nl = l.naoLocalizado || {};
+      back.innerHTML = `<div class="modal" role="dialog" aria-modal="true"><h2>Bueiro não localizado</h2>
+        <p class="muted small">${esc(l.codigo || 'Sem código')}. O escritório vai revisar este registro.</p>
+        <div class="f"><label for="nl-m">Motivo <span class="req">*</span></label><select id="nl-m"><option value="">— escolha —</option>${MOTIVOS_NL.map(m => `<option${m === nl.motivo ? ' selected' : ''}>${esc(m)}</option>`).join('')}</select></div>
+        <div class="f"><label for="nl-o">Observação</label><textarea id="nl-o" rows="3">${esc(nl.obs || '')}</textarea></div>
+        <div class="err" id="nl-e" role="alert" hidden></div>
+        <div class="row"><button type="button" class="btn" data-m="n">Cancelar</button><button type="button" class="btn primary" data-m="s">Marcar não localizado</button></div></div>`;
+      back.hidden = false;
+      const fim = r => { back.hidden = true; back.innerHTML = ''; resolve(r); };
+      back.onclick = e => {
+        const b = e.target.closest('[data-m]');
+        if (b && b.dataset.m === 'n') return fim(null);
+        if (b && b.dataset.m === 's') {
+          const m = $('#nl-m').value, o = $('#nl-o').value.trim(), er = $('#nl-e');
+          if (!m) { er.textContent = 'Escolha o motivo.'; er.hidden = false; return; }
+          if (m === 'Outro' && !o) { er.textContent = 'Descreva o motivo na observação.'; er.hidden = false; return; }
+          fim({ motivo: m, obs: o });
+        } else if (e.target === back) fim(null);
+      };
+    });
+  }
+  async function marcarNaoLocalizado(id) {
+    const emEdicao = S.cur && S.cur.id === id, l = emEdicao ? S.cur : (await DB.obter(id)) && normalizar(await DB.obter(id));
+    if (!l) return;
+    const r = await pedirNaoLocalizado(l); if (!r) return;
+    const pos = await posicaoAgora();
+    l.naoLocalizado = { ...r, em: U.agoraISO(), gps: pos };
+    l.status = 'nao_localizado';
+    if (!l.data) { l.data = U.hojeISO(); l.hora = U.horaAgora(); }
+    await prefillResponsavel(l);
+    if (emEdicao) { marcarSujo(); await salvarAtual({ forcar: true }); }
+    else { l.atualizadoEm = U.agoraISO(); await DB.salvar(l); }
+    if (BU.Sync) BU.Sync.agendar();
+    UI.toast('Marcado como não localizado. Se quiser, anexe uma foto do local.');
+    location.hash = `#/lev/${id}/8`; if (S.hashAtual === `#/lev/${id}/8`) rotear();
+  }
+  async function reabrirVistoria() {
+    if (!S.cur) return; S.cur.status = 'rascunho'; S.cur.naoLocalizado = null; S.dirty = true; S.rev++;
+    await salvarAtual({ forcar: true }); renderWizard(); UI.toast('Voltou para vistoria');
+  }
   async function concluir() {
+    if (S.cur.status === 'nao_localizado') { S.dirty = true; S.rev++; if (await salvarAtual({ forcar: true })) { UI.toast('Salvo'); location.hash = '#/lista'; } return; }
     const falt = obrigatoriosFaltando(S.cur);
     if (falt.length) {
       const ok = await UI.confirmar(`Faltam campos obrigatórios (${falt.join(', ')}). Salvar como rascunho?`, { titulo: 'Campos obrigatórios', ok: 'Salvar rascunho' });
@@ -526,7 +610,9 @@
     if (t.dataset.go) { location.hash = t.dataset.go; return; }
     if (t.dataset.etapa) { if (S.cur) irEtapa(+t.dataset.etapa); return; }
     const a = t.dataset.a, id = t.dataset.id || (t.closest('[data-id]') || {}).dataset?.id;
-    if (a === 'continuar' || a === 'abrir') location.hash = `#/lev/${id}/1`;
+    if (a === 'nao-localizado') marcarNaoLocalizado(id);
+    else if (a === 'reabrir-vistoria') reabrirVistoria();
+    else if (a === 'continuar' || a === 'abrir') location.hash = `#/lev/${id}/1`;
     else if (a === 'duplicar') duplicar(id);
     else if (a === 'excluir') excluir(id);
     else if (a === 'backup') backup();
@@ -559,11 +645,12 @@
     // Sempre grava o que estiver pendente antes de trocar de tela.
     if (S.cur && S.dirty && !(await salvarAtual())) { S.ignorar = true; location.hash = S.hashAtual; return; }
     window.scrollTo(0, 0);
+    if (BU.Mapa) BU.Mapa.parar();
     const bar = $('#actionbar');
 
     const m = h.match(/^#\/lev\/([^/]+)\/(\d)$/);
     if (h === '#/novo') {
-      S.cur = novoLevantamento(); await prefillResponsavel(S.cur); await prefillZona(S.cur); BU.Sync.prefillNovo(S.cur); S.persistido = false; S.dirty = false; S.saveState = 'salvo';
+      S.cur = novoLevantamento(); await prefillResponsavel(S.cur); await prefillZona(S.cur); await prefillRtk(S.cur); BU.Sync.prefillNovo(S.cur); S.persistido = false; S.dirty = false; S.saveState = 'salvo';
       location.replace(`#/lev/${S.cur.id}/1`); return;
     }
     if (m) {
@@ -575,13 +662,16 @@
         // Bueiro vindo do cadastro: data, hora e responsável entram na hora de vistoriar (só gravam quando você editar ou salvar).
         if (!S.cur.data) { S.cur.data = U.hojeISO(); S.cur.hora = U.horaAgora(); }
         await prefillResponsavel(S.cur);
+        if (['a_vistoriar', 'rascunho'].includes(S.cur.status) && !S.cur.rtk.solucao) await prefillRtk(S.cur);
       }
+      try { S.eixo = await BU.Sync.eixoAtivo(); } catch (e) { S.eixo = null; }
       S.etapa = n; renderWizard(); S.hashAtual = h; return;
     }
     // Telas fora do formulário
     S.cur = null; bar.hidden = true; bar.innerHTML = '';
     S.lista = await DB.listar();
-    if (h === '#/sync') await BU.Sync.view();
+    if (h === '#/mapa') await BU.Mapa.view(S.lista);
+    else if (h === '#/sync') await BU.Sync.view();
     else { await BU.Sync.recarregar(); if (h === '#/lista') viewLista(); else viewHome(); }
     S.hashAtual = h;
   }

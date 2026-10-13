@@ -212,7 +212,8 @@
       const recs = [], info = new Map();
       for (const b of r.data) {
         const d = b.dados || {};
-        const rec = BU.App.normalizar({ ...d, id: b.id, status: b.status, codigo: d.codigo || b.codigo, km: d.km || b.km || '', comentarioRevisao: b.comentario_revisao || '',
+        const plan = d.planejado || (b.status === 'a_vistoriar' && (d.latitude != null ? d.latitude : b.latitude) != null ? { latitude: d.latitude != null ? d.latitude : b.latitude, longitude: d.longitude != null ? d.longitude : b.longitude } : undefined);
+        const rec = BU.App.normalizar({ ...d, planejado: plan, id: b.id, status: b.status, codigo: d.codigo || b.codigo, km: d.km || b.km || '', comentarioRevisao: b.comentario_revisao || '',
           latitude: d.latitude != null ? d.latitude : b.latitude, longitude: d.longitude != null ? d.longitude : b.longitude,
           leste: d.leste != null ? d.leste : b.leste, norte: d.norte != null ? d.norte : b.norte, zona: d.zona || b.zona || '23',
           atualizadoEm: b.atualizado_em, criadoEm: d.criadoEm || b.criado_em });

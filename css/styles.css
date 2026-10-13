@@ -206,3 +206,20 @@ details.cad summary { cursor: pointer; min-height: 44px; display: flex; align-it
 .card.devolvido { border-left: 6px solid var(--danger); }
 .card.aprovado { border-left: 6px solid var(--accent); }
 @media (max-width: 440px) { .t small { display: none; } .conn { padding: 3px 8px; font-size: 12px; } }
+
+/* ---- mapa de campo ---- */
+.mapa-campo { height: 56vh; min-height: 320px; border-radius: 12px; border: 2px solid #ccc; overflow: hidden; background: #dfe7e0; }
+.mapa-campo.sem-fundo { background: #eef2ee repeating-linear-gradient(0deg, transparent 0 39px, #d5ddd5 39px 40px), repeating-linear-gradient(90deg, transparent 0 39px, #d5ddd5 39px 40px); }
+.mapa-barra { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.mapa-leg { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; margin: 8px 0; }
+.mapa-leg i { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; }
+.mk-wrap { background: none; border: 0; }
+.mk { display: block; width: 18px; height: 18px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.45), 0 1px 4px rgba(0,0,0,.4); margin: 2px; }
+.mk-grande { width: 26px; height: 26px; }
+.mk-pop .row { margin-top: 8px; gap: 6px; }
+.prox { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid #ddd; }
+.prox > div:first-child { flex: 1; min-width: 0; }
+.prox-d { text-align: right; min-width: 64px; } .prox-d span { display: block; font-size: 12px; color: var(--muted); }
+.mapa-km { background: #FFF4E0; border-color: #FF8A00; }
+.card.naoloc { border-left: 6px solid #7B4FC4; }
+.linkbtn { background: none; border: 0; text-decoration: underline; color: var(--muted); padding: 6px 0; }
