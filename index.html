@@ -19,7 +19,7 @@
         <img class="brand-logo" src="assets/logo-gfa.png" alt="GFA Engenharia">
         <span class="t"><b>Cadastro de Bueiros</b><small>Levantamento de campo</small></span>
       </a>
-      <span id="conn" class="conn" role="status">—</span>
+      <span class="topo-status"><a id="sinc" class="conn sinc off" href="#/sync" role="status">Entrar</a><span id="conn" class="conn" role="status">—</span></span>
     </header>
     <div id="aviso-update" class="banner update" role="status" hidden>
       Nova versão disponível. <button type="button" id="btn-update" class="btn sm">Atualizar agora</button>
@@ -38,6 +38,8 @@
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
   <!-- Scripts clássicos (sem módulos ES) para funcionar também abrindo o arquivo direto, sem servidor. -->
+  <script src="js/vendor/supabase.js"></script>
+  <script src="js/config.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/codigo.js"></script>
   <script src="js/db.js"></script>
@@ -49,6 +51,7 @@
   <script src="js/patologias.js"></script>
   <script src="js/export.js"></script>
   <script src="js/kmz.js"></script>
+  <script src="js/sync.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
