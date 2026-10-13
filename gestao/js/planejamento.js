@@ -9,8 +9,10 @@
   const P = { projId: null, pins: [], removidos: new Set(), eixo: { rodovia: '', kmIni: 0, pts: [] }, eixoSujo: false, modo: 'ver', sel: null, mapa: null, L: null, cam: {}, imp: null, cache: null, ctx: null };
   const ED = 'a_vistoriar';                                   // só dá para editar/mover quem ainda não foi vistoriado
   const sujo = () => P.eixoSujo || P.pins.some(p => p.dirty || p.novo) || P.removidos.size > 0;
-  const zona = () => parseInt(P.ctx.S.projeto.fuso, 10) || 23;
-  const hemi = () => P.ctx.S.projeto.hemisferio || 'S';
+  /* O fuso UTM NÃO é fixo: vem da localização de cada ponto (meridiano central mais próximo). O fuso do projeto só serve de padrão sem coordenadas. */
+  const zonaDe = lo => Math.floor((lo + 180) / 6) + 1;
+  const zona = () => (P.eixo.pts.length ? zonaDe(P.eixo.pts[0][1]) : (parseInt(P.ctx.S.projeto.fuso, 10) || 23)); // fuso do eixo (usado nas distâncias ao longo dele)
+  const hemi = () => (P.eixo.pts.length ? (P.eixo.pts[0][0] < 0 ? 'S' : 'N') : (P.ctx.S.projeto.hemisferio || 'S'));
   const utm = (la, lo) => BU.GPS.paraUTM(la, lo, zona());
   const coordOk = (la, lo) => isFinite(la) && isFinite(lo) && Math.abs(la) <= 90 && Math.abs(lo) <= 180 && !(la === 0 && lo === 0);
 
@@ -119,8 +121,8 @@
     try {
       if (P.removidos.size) await D.removerPlanejados(S.projeto.id, [...P.removidos]);
       if (mexidos.length) {
-        const lista = mexidos.map(p => { const u = utm(p.lat, p.lon); return { id: p.id, codigo: p.codigo.trim(), km: p.km || '', latitude: p.lat, longitude: p.lon, leste: +u.leste.toFixed(3), norte: +u.norte.toFixed(3), zona: String(zona()),
-          dados: { estrada: (P.eixo.rodovia || S.projeto.rodovia || '').trim(), hemisferio: hemi(), coordOrigem: 'cadastro', origem: 'planejamento', observacoes: p.obs || '' } }; });
+        const lista = mexidos.map(p => { const u = BU.GPS.paraUTM(p.lat, p.lon, zonaDe(p.lon)); return { id: p.id, codigo: p.codigo.trim(), km: p.km || '', latitude: p.lat, longitude: p.lon, leste: +u.leste.toFixed(3), norte: +u.norte.toFixed(3), zona: String(u.zona),
+          dados: { estrada: (P.eixo.rodovia || S.projeto.rodovia || '').trim(), hemisferio: u.hem, coordOrigem: 'cadastro', origem: 'planejamento', observacoes: p.obs || '' } }; });
         const r = await D.salvarPlanejados(S.projeto.id, lista);
         if (r && r.bloqueados) toast(`${r.bloqueados} ponto(s) já vistoriados não foram alterados.`);
       }
@@ -178,6 +180,10 @@
       <div class="card" style="position:sticky;bottom:8px;border-color:var(--marca)"><div class="linha" style="flex-wrap:wrap"><button class="btn pri" data-pl="salvar" ${sujo() ? '' : 'disabled'}>Salvar planejamento</button>
         <button class="btn sm" data-pl="kml">Baixar KML (para o app de campo)</button></div>
         <p class="small muted" style="margin:6px 0 0" id="pl-estado">${sujo() ? '<b style="color:var(--st-devolvido)">Alterações ainda não salvas.</b>' : 'Tudo salvo.'}</p></div>`;
+  }
+  function fusoTxt() {
+    const z = new Set(P.pins.map(p => zonaDe(p.lon) + (p.lat < 0 ? 'S' : 'N'))); P.eixo.pts.forEach(q => z.add(zonaDe(q[1]) + (q[0] < 0 ? 'S' : 'N')));
+    return z.size ? `Fuso UTM pela localização: ${[...z].sort().join(' e ')} (cada bueiro recebe E/N no fuso onde está)` : 'O fuso UTM é definido pela localização dos pontos (cada bueiro no seu fuso)';
   }
   const contagem = () => `${P.pins.filter(editavel).length} a vistoriar · ${P.pins.length} no total`;
   function kmsHTML() {
@@ -246,6 +252,7 @@
   function atualizarLista() {
     const t = SEL('pl-lista'); if (t) t.innerHTML = linhasLista();
     const c = SEL('pl-cont'); if (c) c.textContent = contagem();
+    const fz = SEL('pl-fuso'); if (fz) fz.textContent = fusoTxt();
     const kk = SEL('pl-kms'); if (kk) kk.innerHTML = kmsHTML();
     const s = SEL('pl-estado'); if (s) s.innerHTML = sujo() ? '<b style="color:var(--st-devolvido)">Alterações ainda não salvas.</b>' : 'Tudo salvo.';
     const b = document.querySelector('[data-pl="salvar"]'); if (b) b.disabled = !sujo();
@@ -268,7 +275,7 @@
         if (temEixo()) P.pins.forEach(p => { p.off = projetar(p.lat, p.lon).off; });
       }
     }
-    pagina('planejamento', `<div class="linha"><h1>Planejamento do levantamento</h1><span class="esp"></span><span class="muted small">Fuso UTM do projeto: ${zona()}${hemi()} (as coordenadas E/N de cada bueiro saem neste fuso)</span></div>
+    pagina('planejamento', `<div class="linha"><h1>Planejamento do levantamento</h1><span class="esp"></span><span class="muted small" id="pl-fuso">${fusoTxt()}</span></div>
       <div class="plan"><div class="card" style="padding:0;overflow:hidden"><div id="pl-mapa" role="application" aria-label="Mapa do planejamento"></div></div><div id="pl-lateral" class="plan-lat">${painelLateral()}</div></div>`);
     await montarMapa();
   }
