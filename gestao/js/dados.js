@@ -109,6 +109,7 @@
       },
       async bueiros(projetoId) { return bueiros.filter(b => b.projeto_id === projetoId).map(({ dados, ...r }) => ({ ...r })); },
       async bueiro(id) { const b = bueiros.find(x => x.id === id); return b ? JSON.parse(JSON.stringify(b)) : null; },
+      async bueirosCompletos(projetoId, ids) { const s = ids ? new Set(ids) : null; return JSON.parse(JSON.stringify(bueiros.filter(b => b.projeto_id === projetoId && (!s || s.has(b.id))))); },
       async historico(id) { return hist[id] || []; },
       async fotos(id) {
         const b = bueiros.find(x => x.id === id);
@@ -160,7 +161,7 @@
       },
       async revisar(id, aprovar, comentario) {
         const b = bueiros.find(x => x.id === id);
-        if (!b || !['concluido', 'devolvido', 'aprovado'].includes(b.status)) throw new Error('Só dá para revisar bueiro concluído.');
+        if (!b || !['concluido', 'nao_localizado', 'devolvido', 'aprovado'].includes(b.status)) throw new Error('Só dá para revisar bueiro concluído ou não localizado.');
         if (!aprovar && !String(comentario || '').trim()) throw new Error('Explique o que precisa ser corrigido.');
         b.status = aprovar ? 'aprovado' : 'devolvido'; b.revisado_por = D.usuarioAtual.id; b.comentario_revisao = aprovar ? null : comentario.trim();
         b.versao++; b.atualizado_em = iso(Date.now());
@@ -257,6 +258,11 @@
       },
       async bueiros(projetoId) { const { data, error } = await sb.from('bueiros').select(COLS).eq('projeto_id', projetoId).order('codigo'); erro(error); return data; },
       async bueiro(id) { const { data, error } = await sb.from('bueiros').select(COLS + ',dados').eq('id', id).maybeSingle(); erro(error); return data; },
+      async bueirosCompletos(projetoId, ids) {
+        const out = [], lista = ids || (await this.bueiros(projetoId)).map(b => b.id);
+        for (let i = 0; i < lista.length; i += 60) { const { data, error } = await sb.from('bueiros').select(COLS + ',dados').in('id', lista.slice(i, i + 60)); erro(error); out.push(...data); }
+        return out;
+      },
       async historico(id) {
         const { data, error } = await sb.from('historico').select('id,acao,detalhe,em,usuario_id').eq('bueiro_id', id).order('em', { ascending: false }).limit(100); erro(error);
         const { data: us } = await sb.from('perfis').select('id,nome');

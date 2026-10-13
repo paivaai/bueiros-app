@@ -53,3 +53,8 @@ automaticamente; o gestor só enxerga projetos onde é membro, o admin vê todos
 Cria a coluna `projetos.eixo` e as funções `salvar_eixo`, `salvar_planejados` e `remover_planejados`.
 Com elas, admin e gestor importam KMZ/KML, marcam bueiros no mapa e salvam o planejamento: cada ponto vira um
 bueiro "A vistoriar". Quem já foi vistoriado nunca é alterado nem removido pelo planejamento.
+
+## 10 — Campo operacional (rodar UMA vez, depois do 08; sozinho)
+
+Cria a situação `nao_localizado`, a coluna `fotos.ctx`, atualiza `v_andamento` e as funções `salvar_bueiro`, `revisar_bueiro` e `atribuir_bueiros`.
+**Gestor também grava levantamento e envia fotos** (quem usa o painel e vai a campo). O campo não define aprovado/devolvido; o escritório revisa bueiros concluídos **e não localizados**.

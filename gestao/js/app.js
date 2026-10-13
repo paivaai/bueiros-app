@@ -6,9 +6,9 @@
   const raiz = document.getElementById('raiz');
   const D = window.Dados.criar();
 
-  const ROT = { a_vistoriar: 'A vistoriar', rascunho: 'Em andamento', concluido: 'Aguardando revisão', devolvido: 'Devolvido', aprovado: 'Aprovado' };
-  const ORDEM = ['aprovado', 'concluido', 'devolvido', 'rascunho', 'a_vistoriar'];
-  const COR = { a_vistoriar: '#6B7280', rascunho: '#9A6700', concluido: '#1F5FBF', devolvido: '#B42318', aprovado: '#1B7F4B' };
+  const ROT = { a_vistoriar: 'A vistoriar', rascunho: 'Em andamento', concluido: 'Aguardando revisão', devolvido: 'Devolvido', aprovado: 'Aprovado', nao_localizado: 'Não localizado' };
+  const ORDEM = ['aprovado', 'concluido', 'nao_localizado', 'devolvido', 'rascunho', 'a_vistoriar'];
+  const COR = { a_vistoriar: '#6B7280', rascunho: '#9A6700', concluido: '#1F5FBF', devolvido: '#B42318', aprovado: '#1B7F4B', nao_localizado: '#7B4FC4' };
   const chip = s => `<span class="chip" style="--c:${COR[s] || '#555'}">${esc(ROT[s] || s)}</span>`;
   const quando = iso => {
     if (!iso) return '—';
@@ -145,7 +145,7 @@
     const lista = filtrados(), f = S.filtro, campo = S.usuarios.filter(u => u.papel === 'campo');
     const foco = document.activeElement && document.activeElement.id === 'f-q';
     pagina('bueiros', `<div class="linha"><h1>Bueiros</h1><span class="esp"></span>
-        <button class="btn" data-a="csv">Exportar CSV</button></div>
+        <button class="btn pri" data-a="exportar">Exportar…</button></div>
       <div class="card filtros">
         <label class="f">Buscar<input type="search" id="f-q" placeholder="código, km, responsável" value="${esc(f.q)}"></label>
         <label class="f">Situação<select id="f-st"><option value="">Todas</option>${ORDEM.map(k => `<option value="${k}"${f.st === k ? ' selected' : ''}>${ROT[k]}</option>`).join('')}</select></label>
@@ -205,14 +205,14 @@
 
   /* ---------------------------------------------------------------- detalhe */
   async function viewDetalhe(id) {
-    const [b, hist, fotos] = await Promise.all([D.bueiro(id), D.historico(id), D.fotos(id)]);
+    const [b, hist, fotos, eixo] = await Promise.all([D.bueiro(id), D.historico(id), D.fotos(id), D.eixo(S.projeto.id).catch(() => null)]);
     if (!b) { pagina('bueiros', '<div class="erro">Bueiro não encontrado.</div>'); return; }
     const d = b.dados || {}, c = d.caracteristicas || {}, campo = S.usuarios.filter(u => u.papel === 'campo');
     let prancha = '';
     if (BU.Prancha && Array.isArray(d.pontos) && d.pontos.length) {
       try { BU.Prancha.sincronizarMedicoes(d); prancha = BU.Prancha.gerarSVG(d, { foco: 'tudo' }); } catch (e) { prancha = ''; }
     }
-    const revisavel = ['concluido'].includes(b.status);
+    const revisavel = ['concluido', 'nao_localizado'].includes(b.status);
     const volta = `#/p/${S.projeto.id}/bueiros`;
     pagina('bueiros', `<div class="crumb"><a href="${volta}">← Bueiros</a></div>
       <div class="linha"><h1>${esc(b.codigo)}</h1>${chip(b.status)}<span class="esp"></span><span class="muted small">versão ${esc(b.versao)} · atualizado ${quando(b.atualizado_em)}</span></div>
@@ -220,6 +220,7 @@
         <div class="card"><h3>Identificação</h3><dl class="kv" style="margin-top:10px">
           <dt>Km</dt><dd>${esc(b.km || '—')}</dd><dt>Rodovia / local</dt><dd>${esc([d.estrada, d.municipio, d.estado].filter(Boolean).join(' · ') || '—')}</dd>
           <dt>Coordenadas</dt><dd>${b.leste != null ? `E ${fmt(b.leste)} · N ${fmt(b.norte)}<br><span class="muted small">UTM ${esc(b.zona || '')}${esc(d.hemisferio || 'S')} · SIRGAS 2000</span>` : '—'}</dd>
+          <dt>RTK</dt><dd>${d.rtk && (d.rtk.solucao || d.rtk.precisaoH != null) ? esc([d.rtk.solucao, d.rtk.precisaoH != null ? 'H ' + String(d.rtk.precisaoH).replace('.', ',') + ' m' : '', d.rtk.precisaoV != null ? 'V ' + String(d.rtk.precisaoV).replace('.', ',') + ' m' : '', d.rtk.base, d.rtk.tipoAltitude ? 'altitude ' + d.rtk.tipoAltitude.toLowerCase() : ''].filter(Boolean).join(' · ')) : '—'}</dd>
           <dt>Responsável</dt><dd>${esc(b.responsavel_nome || '—')}</dd><dt>Atribuído a</dt><dd>${esc(nomeDe(b.atribuido_a))}</dd><dt>Cadastro</dt><dd>${esc(b.cadastro_id || '—')}</dd></dl>
           ${['a_vistoriar', 'rascunho', 'devolvido'].includes(b.status) ? `<div class="linha" style="margin-top:12px"><select id="d-atrib" style="max-width:220px"><option value="">Atribuir a…</option><option value="_nenhum">(remover)</option>${campo.map(u => `<option value="${u.id}"${b.atribuido_a === u.id ? ' selected' : ''}>${esc(u.nome)}</option>`).join('')}</select><button class="btn sm" data-a="atrib-um" data-id="${b.id}">Atribuir</button></div>` : ''}</div>
         <div class="card"><h3>Características</h3><dl class="kv" style="margin-top:10px">
@@ -228,6 +229,8 @@
           <dt>Conservação</dt><dd>${esc(c.conservacao || '—')}</dd><dt>Assoreamento</dt><dd>${esc(c.assoreamento || '—')}</dd></dl>
           ${d.observacoes ? `<p class="small" style="margin-bottom:0"><b>Observações:</b> ${esc(d.observacoes)}</p>` : ''}</div>
       </div>
+      ${d.naoLocalizado ? `<div class="card" style="border-left:6px solid #7B4FC4"><h3>Não localizado em campo</h3><p style="margin:8px 0 0"><b>${esc(d.naoLocalizado.motivo || '')}</b>${d.naoLocalizado.obs ? ' — ' + esc(d.naoLocalizado.obs) : ''}</p>${d.naoLocalizado.gps ? `<p class="muted small" style="margin:6px 0 0">Posição do GPS do celular: ${(+d.naoLocalizado.gps.latitude).toFixed(6)}, ${(+d.naoLocalizado.gps.longitude).toFixed(6)} · <a target="_blank" rel="noopener" href="https://www.google.com/maps?q=${d.naoLocalizado.gps.latitude},${d.naoLocalizado.gps.longitude}">Google Maps</a></p>` : ''}</div>` : ''}
+      ${(() => { const cf = BU.Conf ? BU.Conf.analisar({ ...d, status: b.status }, eixo) : []; return cf.length ? `<div class="card"><h3>Conferências automáticas</h3><ul style="margin:8px 0 0;padding-left:18px">${cf.map(k => `<li style="color:${k.n === 'erro' ? 'var(--st-devolvido)' : 'inherit'}">${esc(k.t)}</li>`).join('')}</ul></div>` : ''; })()}
       ${(Array.isArray(d.patologias) && d.patologias.length) || d.semPatologias ? `<div class="card"><h3>Patologias</h3>${d.semPatologias ? '<p class="muted" style="margin:8px 0 0">Sem patologias aparentes.</p>' : `<div class="tab-wrap" style="margin-top:10px;max-height:none"><table><thead><tr><th>Tipo</th><th>Onde</th><th>Gravidade</th><th>Observação</th></tr></thead><tbody>${d.patologias.map(p => `<tr style="cursor:default"><td><b>${esc(p.tipo || '—')}</b></td><td>${esc(p.local || '—')}</td><td>${esc(p.gravidade || '—')}</td><td style="white-space:normal">${esc(p.obs || '')}</td></tr>`).join('')}</tbody></table></div>`}</div>` : ''}
       <div class="card revisao${revisavel ? '' : ' fim'}"><h3>Revisão</h3>
         ${b.comentario_revisao ? `<p class="small" style="margin:8px 0"><b>Último comentário:</b> ${esc(b.comentario_revisao)}</p>` : ''}
@@ -317,6 +320,7 @@
       try {
         if (k === 'sair') { await D.sair(); S.perfil = null; S.projeto = null; S.usuarios = []; location.hash = '#/'; telaLogin(); }
         else if (k === 'csv') csv();
+        else if (k === 'exportar') { const eixo = await D.eixo(S.projeto.id).catch(() => null); window.Exportacao.abrir({ projeto: S.projeto, bueiros: S.bueiros, filtrados: filtrados(), nomeDe, D, eixo }); }
         else if (k === 'salvar-equipe') {
           const ids = [...document.querySelectorAll('[data-membro]')].filter(c => c.checked && !c.disabled).map(c => c.dataset.membro);
           await D.definirMembros(S.projeto.id, ids); S.membros = await D.membros(S.projeto.id); toast('Equipe salva.');

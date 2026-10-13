@@ -57,3 +57,13 @@ Só no celular (IndexedDB do Chrome). Não há servidor. **Limpar os dados do Ch
 
 ## 9. Identidade visual GFA (v5)
 Logo da GFA na barra superior, nos ícones do app, na tela sem conexão, no relatório e na prancha. Nas fotos, a logo da GFA é o padrão até alguém enviar outra (Etapa Fotos → Trocar logo). Cor principal: laranja da marca. O arquivo da logo é `assets/logo-gfa.png`. Ao subir para o GitHub, suba tudo (a VERSAO do service worker agora é v5).
+
+## 10. Login, sincronização, mapa e "não localizado" (versão v6/v7)
+- **Entrar:** Início → "Conta e projeto" (ou o botão "Entrar" no topo). Usuário (`filipe`) ou e-mail e a senha. Escolha o projeto; o app baixa os bueiros planejados no escritório.
+- **Sincronizar:** é automático (ao salvar, ao voltar a internet e a cada ~90 s) ou pelo botão "Sincronizar agora". O selo no topo mostra *Sincronizado*, *N a enviar* ou *com problema*. **Sem internet tudo continua funcionando**; o que foi feito vai quando a conexão voltar.
+- **Conflito:** se o escritório alterou o mesmo bueiro, aparece em "Precisam de atenção": *Manter o meu* ou *Usar o do escritório*.
+- **Devolvido:** o comentário do escritório aparece no cartão e no topo do formulário; corrija e salve de novo.
+- **Mapa:** Início → Mapa. Pontos por situação, eixo, sua posição (GPS), "você está no km…" e os bueiros mais próximos. O fundo (satélite/mapa) guarda o que você já viu e reabre sem internet; **não há download em lote**. "Sem fundo" mostra só os pontos.
+- **Não localizei:** botão no cartão do bueiro e na Etapa 1/9. Escolha o motivo; o app guarda a posição do GPS e envia para o escritório revisar. "Voltar a vistoriar" desfaz.
+- **Qualidade do RTK (Etapa 2):** solução (fixa/flutuante), precisão, base, receptor, altura da antena, tipo de altitude. Os dados da base/receptor/antena viram padrão do próximo bueiro. A Etapa 9 avisa quando algo foge do esperado.
+- **Atualizar:** suba todos os arquivos (novos: `js/vendor/`, `js/config.js`, `js/sync.js`, `js/mapa.js`, `js/conferencias.js`).
