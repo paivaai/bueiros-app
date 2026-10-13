@@ -191,3 +191,18 @@ details.cad summary { cursor: pointer; min-height: 44px; display: flex; align-it
 .marca .chk input { width: 22px; height: 22px; flex: none; margin-top: 1px; }
 .logo-linha { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
 .logo-prev { max-height: 48px; max-width: 150px; border: 1px solid #CBD4CC; border-radius: 6px; padding: 4px; background: #fff; }
+
+/* ---- sincronização ---- */
+.topo-status, .topbar .topo-status { margin-left: auto; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.conn.sinc { text-decoration: none; }
+.conn.sinc.on { color: var(--accent); }
+.conn.sinc.pend { background: var(--warn-bg); color: var(--warn); }
+.conn.sinc.erro { background: var(--err-bg); color: var(--danger); }
+.conn.sinc.ocupado { color: #0B3D91; }
+.conn.sinc.off { background: #fff; color: #444; border-color: #999; }
+.chip.devolvido { background: var(--err-bg); color: var(--danger); }
+.chip.aprovado { background: var(--accent-soft); color: var(--accent); }
+.chip.naoloc { background: #E9E4F4; color: #4B2E83; }
+.card.devolvido { border-left: 6px solid var(--danger); }
+.card.aprovado { border-left: 6px solid var(--accent); }
+@media (max-width: 440px) { .t small { display: none; } .conn { padding: 3px 8px; font-size: 12px; } }

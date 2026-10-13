@@ -16,7 +16,7 @@
     ambiente: ['Rural', 'Urbano'], sentido: ['Crescente', 'Decrescente'],
     pista: ['Norte', 'Sul', 'Leste', 'Oeste', 'Canteiro central'], lado: ['Direito', 'Esquerdo', 'Centro'],
   };
-  const STATUS = { a_vistoriar: ['A vistoriar', 'avistoriar'], rascunho: ['Rascunho', 'rascunho'], concluido: ['Concluído', 'concluido'] };
+  const STATUS = { a_vistoriar: ['A vistoriar', 'avistoriar'], rascunho: ['Rascunho', 'rascunho'], concluido: ['Concluído', 'concluido'], devolvido: ['Devolvido', 'devolvido'], aprovado: ['Aprovado', 'aprovado'], nao_localizado: ['Não localizado', 'naoloc'] };
   const BOCA = ['Boca simples', 'Com ala', 'Com muro de testa', 'Com caixa coletora', 'Sem proteção', 'Outro'];
 
   const ETAPAS = [
@@ -150,7 +150,7 @@
   };
 
   /* Ordem de trabalho: em andamento, depois os a vistoriar (na ordem do km), depois os concluídos. */
-  const ORD = { rascunho: 0, a_vistoriar: 1, concluido: 2 };
+  const ORD = { devolvido: 0, rascunho: 1, a_vistoriar: 2, nao_localizado: 3, concluido: 4, aprovado: 5 };
   function ordenar(lista) {
     const cmp = (a, b) => String(a.codigo || '').localeCompare(String(b.codigo || ''), 'pt', { numeric: true });
     return lista.slice().sort((a, b) => ((ORD[a.status] ?? 1) - (ORD[b.status] ?? 1))
@@ -244,7 +244,7 @@
     if (el) { el.textContent = SAVE_TXT[s]; el.className = 'chip save ' + s; }
   }
   function marcarSujo() {
-    if (S.cur && S.cur.status === 'a_vistoriar') S.cur.status = 'rascunho'; // começou a vistoria
+    if (S.cur && (S.cur.status === 'a_vistoriar' || S.cur.status === 'devolvido')) S.cur.status = 'rascunho'; // começou (ou refez) a vistoria
     S.dirty = true; S.rev++; setSaveState('pendente');
     clearTimeout(S.timer); S.timer = setTimeout(() => salvarAtual(), 700);
   }
@@ -262,6 +262,7 @@
       const resp = String(S.cur.responsavel || '').trim();
       if (resp && resp !== S.ultimoResp) { S.ultimoResp = resp; DB.cfgSalvar('ultimoResponsavel', resp).catch(() => {}); }
       lembrarResp(resp);
+      if (BU.Sync) BU.Sync.agendar();
       if (S.rev === rev) { S.dirty = false; setSaveState('salvo'); }
       else { setSaveState('pendente'); clearTimeout(S.timer); S.timer = setTimeout(() => salvarAtual(), 300); }
       return true;
@@ -291,6 +292,7 @@
             <div><b>${ultimaData ? esc(U.dataBR(ultimaData)) : '—'}</b><span>último levantamento</span></div>
           </div>
         </div>
+        ${BU.Sync.cartaoHome()}
         <div class="menu">
           <button type="button" class="btn big primary" data-go="#/novo">+ Novo levantamento</button>
           <button type="button" class="btn big" data-a="continuar" ${alvo ? `data-id="${esc(alvo.id)}"` : 'disabled'}>${proximo ? 'Próximo bueiro a vistoriar' : 'Continuar levantamento'}
@@ -320,6 +322,8 @@
       ? `<a class="btn" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${l.latitude},${l.longitude}&travelmode=driving">Navegar</a>` : '';
     return `<article class="card lev" data-id="${esc(l.id)}">
       <div class="lev-top"><b>${esc(l.codigo || 'Sem código')}</b><span class="chip ${cls}">${rot}</span></div>
+      ${BU.Sync.selo(l.id) ? `<div>${BU.Sync.selo(l.id)}</div>` : ''}
+      ${l.status === 'devolvido' && l.comentarioRevisao ? `<div class="pend aviso">↩ ${esc(l.comentarioRevisao)}</div>` : ''}
       <div>${esc(local)}</div>
       ${tec ? `<div class="muted small">${esc(tec)}</div>` : ''}
       <div class="muted small">${av ? esc(l.observacoes ? l.observacoes.split('\n')[0] : 'Ainda não vistoriado') : `${esc(U.dataBR(l.data))} · ${esc(l.responsavel || 'sem responsável')} · atualizado ${esc(U.dataHoraBR(l.atualizadoEm))}`}</div>
@@ -343,7 +347,7 @@
   }
   function viewLista() {
     const cont = { todos: S.lista.length }; for (const k in STATUS) cont[k] = S.lista.filter(x => x.status === k).length;
-    const chips = [['todos', 'Todos'], ['a_vistoriar', 'A vistoriar'], ['rascunho', 'Rascunho'], ['concluido', 'Concluído']]
+    const chips = [['todos', 'Todos'], ['a_vistoriar', 'A vistoriar'], ['rascunho', 'Rascunho'], ['concluido', 'Concluído'], ['devolvido', 'Devolvido'], ['nao_localizado', 'Não localizado'], ['aprovado', 'Aprovado']]
       .map(([k, t]) => `<button type="button" class="fchip" data-a="filtro" data-v="${k}" aria-pressed="${S.filtro === k}">${t} <span>${cont[k]}</span></button>`).join('');
     $('#view').innerHTML = `
       <section class="page">
@@ -442,6 +446,8 @@
           <div class="r-txt"><b id="r-cod">${esc(l.codigo || 'Novo levantamento')}</b><span id="r-sub">${esc(resumoTxt())}</span></div>
           <span id="save-state" class="chip save ${S.saveState}">${SAVE_TXT[S.saveState]}</span>
         </div>
+        ${l.status === 'devolvido' ? `<div class="card devolvido"><b>↩ Devolvido pelo escritório</b><p>${esc(l.comentarioRevisao || 'Sem comentário.')}</p><p class="muted small">Corrija e salve de novo: ele volta para revisão.</p></div>` : ''}
+        ${l.status === 'aprovado' ? '<div class="card aprovado"><b>✔ Aprovado pelo escritório</b><p class="muted small">Não é mais enviado ao servidor. Alterações ficam só neste aparelho.</p></div>' : ''}
         <nav class="steps" aria-label="Etapas">${ETAPAS.map(e => `<button type="button" class="seg${e.n === n ? ' atual' : ''}${e.n < n ? ' feito' : ''}" data-etapa="${e.n}" aria-label="Etapa ${e.n}: ${e.nome}"${e.n === n ? ' aria-current="step"' : ''}><span></span></button>`).join('')}</nav>
         <div class="step-title"><span>Etapa ${n} de 9</span><h1>${esc(et.nome)}</h1></div>
         ${corpo}
@@ -557,7 +563,7 @@
 
     const m = h.match(/^#\/lev\/([^/]+)\/(\d)$/);
     if (h === '#/novo') {
-      S.cur = novoLevantamento(); await prefillResponsavel(S.cur); await prefillZona(S.cur); S.persistido = false; S.dirty = false; S.saveState = 'salvo';
+      S.cur = novoLevantamento(); await prefillResponsavel(S.cur); await prefillZona(S.cur); BU.Sync.prefillNovo(S.cur); S.persistido = false; S.dirty = false; S.saveState = 'salvo';
       location.replace(`#/lev/${S.cur.id}/1`); return;
     }
     if (m) {
@@ -575,7 +581,8 @@
     // Telas fora do formulário
     S.cur = null; bar.hidden = true; bar.innerHTML = '';
     S.lista = await DB.listar();
-    if (h === '#/lista') viewLista(); else viewHome();
+    if (h === '#/sync') await BU.Sync.view();
+    else { await BU.Sync.recarregar(); if (h === '#/lista') viewLista(); else viewHome(); }
     S.hashAtual = h;
   }
 
@@ -608,7 +615,7 @@
     atualizarConexao();
     window.addEventListener('online', atualizarConexao); window.addEventListener('offline', atualizarConexao);
     window.addEventListener('hashchange', rotear);
-    await BU.Pontos.iniciar(); await carregarResp(); await BU.Fotos.iniciar();
+    await BU.Pontos.iniciar(); await carregarResp(); await BU.Fotos.iniciar(); await BU.Sync.iniciar();
     $('#restore-file').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) BU.Export.restaurar(f); });
     registrarPWA();
     $('#kmz-file').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) BU.KMZ.importar(f); });
@@ -623,6 +630,11 @@
     cur: () => S.cur, S, irEtapa: n => { if (S.cur) irEtapa(n); }, prefillNovo: async l => { await prefillResponsavel(l); await prefillZona(l); }, marcarSujo, salvarAtual, campoHTML, novo: novoLevantamento, normalizar, pendencias, CAMPOS, OPCOES, UFS, verLista,
     irParaLista: () => { location.hash = '#/lista'; if (S.hashAtual === '#/lista') rotear(); },
     renderEtapa: () => { if (S.cur) renderWizard(); },
+    refrescar: async () => {
+      if (S.cur) return;
+      S.lista = await DB.listar(); const h = S.hashAtual;
+      if (h === '#/lista') viewLista(); else if (h === '#/sync') BU.Sync.view(); else if (h === '#/' || h === '') viewHome();
+    },
   };
   iniciar();
 })();
