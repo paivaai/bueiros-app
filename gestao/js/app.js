@@ -19,6 +19,10 @@
   const fmt = (v, d = 3) => (BU.GPS && v != null && v !== '' ? BU.GPS.fmtM(Number(v), d) : (v == null ? '—' : String(v)));
 
   const S = { perfil: null, projetos: [], projeto: null, bueiros: [], usuarios: [], membros: [], filtro: { q: '', st: '', resp: '', ord: 'codigo', dir: 1 }, sel: new Set(), parar: null, mapa: null };
+  /* "felipe" -> felipe@gfa-campo.app (login por usuário, sem e-mail real); com @ fica como está */
+  const DOM = (window.GESTAO_CONFIG || {}).USUARIO_DOMINIO || 'gfa-campo.app';
+  const paraEmail = v => { v = String(v || '').trim().toLowerCase(); return v.includes('@') ? v : v.replace(/\s+/g, '') + '@' + DOM; };
+  const mostraUsuario = e => (String(e || '').endsWith('@' + DOM) ? String(e).slice(0, -(DOM.length + 1)) + ' (usuário)' : e);
   const nomeDe = id => { const u = S.usuarios.find(x => x.id === id); return u ? u.nome : '—'; };
 
   function toast(html, ms = 5000) {
@@ -52,7 +56,7 @@
       <img src="logo-gfa.png" alt="GFA Engenharia"><h1 style="text-align:center">Gestão de Bueiros</h1>
       ${D.modo === 'demo' ? '<div class="aviso"><b>Modo demonstração.</b> Dados fictícios. Entre com <b>arthur@gfa.demo</b> e a senha <b>demo</b>, ou use o botão abaixo.</div>' : ''}
       ${msg ? `<div class="erro" role="alert">${esc(msg)}</div>` : ''}
-      <label class="f">E-mail<input type="email" name="email" required autocomplete="username" value="${esc(email || (D.modo === 'demo' ? 'arthur@gfa.demo' : ''))}"></label>
+      <label class="f">E-mail ou usuário<input type="text" name="email" required autocomplete="username" autocapitalize="none" value="${esc(email || (D.modo === 'demo' ? 'arthur@gfa.demo' : ''))}"></label>
       <label class="f">Senha<input type="password" name="senha" required autocomplete="current-password" value="${D.modo === 'demo' ? 'demo' : ''}"></label>
       <button class="btn pri" type="submit">Entrar</button>
       <p class="small muted" style="margin:0">Acesso só para administradores e gestores. A equipe de campo usa o aplicativo do celular.</p></form>`;
@@ -267,12 +271,12 @@
     const admin = S.perfil.papel === 'admin';
     pagina('equipe', `<div class="linha"><h1>Equipe e acessos</h1></div>
       <div class="grid g2"><div class="card"><h3>Quem tem acesso</h3><div class="tab-wrap" style="margin-top:10px;max-height:none"><table><thead><tr><th>Nome</th><th>E-mail</th><th>Papel</th></tr></thead><tbody>
-        ${S.usuarios.map(u => `<tr style="cursor:default"><td><b>${esc(u.nome)}</b></td><td>${esc(u.email)}</td><td>${esc({ admin: 'Administrador', gestor: 'Gestor (escritório)', campo: 'Campo' }[u.papel])}${u.convite ? ' <span class="muted small">(convidado)</span>' : ''}</td></tr>`).join('')}</tbody></table></div></div>
+        ${S.usuarios.map(u => `<tr style="cursor:default"><td><b>${esc(u.nome)}</b></td><td>${esc(mostraUsuario(u.email))}</td><td>${esc({ admin: 'Administrador', gestor: 'Gestor (escritório)', campo: 'Campo' }[u.papel])}${u.convite ? ' <span class="muted small">(convidado)</span>' : ''}</td></tr>`).join('')}</tbody></table></div></div>
       <div class="card"><h3>Convidar pessoa</h3>${admin ? `<form id="f-conv" class="grid" style="margin-top:10px;gap:10px">
-        <label class="f">Nome<input type="text" name="nome" required></label><label class="f">E-mail<input type="email" name="email" required></label>
+        <label class="f">Nome<input type="text" name="nome" required></label><label class="f">E-mail ou usuário<input type="text" name="email" required autocapitalize="none" placeholder="ex.: felipe  (ou um e-mail)"></label>
         <label class="f">Papel<select name="papel"><option value="campo">Campo (usa o app do celular)</option><option value="gestor">Gestor (escritório: revisa e atribui)</option><option value="admin">Administrador</option></select></label>
         <button class="btn pri" type="submit">Cadastrar convite</button><div id="conv-msg" class="small"></div>
-        <p class="small muted" style="margin:0">A pessoa cria a conta com <b>esse e-mail</b> (no Supabase: Authentication → Add user) e entra já com o papel certo. Sem convite, a conta não enxerga nada.</p></form>` : '<p class="muted">Só o administrador convida pessoas.</p>'}</div></div>`);
+        <p class="small muted" style="margin:0">A pessoa cria a conta com <b>esse e-mail ou usuário</b> (no Supabase: Authentication → Add user; para usuário sem e-mail real, use <b>usuário@${DOM}</b> e marque Auto Confirm) e entra já com o papel certo. Sem convite, a conta não enxerga nada.</p></form>` : '<p class="muted">Só o administrador convida pessoas.</p>'}</div></div>`);
   }
 
   /* ---------------------------------------------------------------- roteamento */
@@ -350,7 +354,7 @@
     ev.preventDefault();
     const f = ev.target;
     if (f.id === 'f-login') {
-      try { S.perfil = await D.entrar(f.email.value, f.senha.value); S.usuarios = await D.usuarios(); rotear(); }
+      try { S.perfil = await D.entrar(paraEmail(f.email.value), f.senha.value); S.usuarios = await D.usuarios(); rotear(); }
       catch (e) { telaLogin(e.message || String(e), f.email.value); }
     } else if (f.id === 'f-proj') {
       const e = document.getElementById('proj-erro'), id = f.dataset.id, btn = f.querySelector('button[type=submit]'); btn.disabled = true;
@@ -361,7 +365,7 @@
       } catch (er) { e.innerHTML = `<div class="erro" role="alert">${esc(er.message || er)}</div>`; btn.disabled = false; }
     } else if (f.id === 'f-conv') {
       const m = document.getElementById('conv-msg');
-      try { await D.convidar(f.email.value, f.nome.value, f.papel.value); m.innerHTML = '<span style="color:var(--st-aprovado);font-weight:700">Convite cadastrado.</span>'; setTimeout(viewEquipe, 700); }
+      try { await D.convidar(paraEmail(f.email.value), f.nome.value, f.papel.value); m.innerHTML = '<span style="color:var(--st-aprovado);font-weight:700">Convite cadastrado.</span>'; setTimeout(viewEquipe, 700); }
       catch (e) { m.innerHTML = `<span class="erro" role="alert">${esc(e.message || e)}</span>`; }
     }
   });

@@ -4,5 +4,7 @@
    (Project Settings → API). A chave anon pode ficar no GitHub; NUNCA coloque a service_role. */
 window.GESTAO_CONFIG = {
   SUPABASE_URL: 'https://lvvjuwowymzuoeycdkgc.supabase.co',
+  // Login por USUÁRIO (sem e-mail real): "felipe" vira felipe@gfa-campo.app. Quem digita um e-mail com @ continua usando o e-mail.
+  USUARIO_DOMINIO: 'gfa-campo.app',
   SUPABASE_ANON_KEY: 'sb_publishable_fUIKBYhP8Lkqw5ip3f0v6g_TREno7Kg', // chave PUBLICÁVEL (pode ficar no GitHub). Nunca a secret/service_role.
 };
