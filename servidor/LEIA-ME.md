@@ -47,3 +47,9 @@ Depois do `instalar_tudo.sql` e do `05`, cole `07_criar_projetos.sql` no SQL Edi
 Habilita `criar_projeto`, `definir_membros_projeto` e `editar_projeto`:
 **admin e gestor** criam projetos pelo painel ("+ Novo projeto"); o criador entra na equipe
 automaticamente; o gestor só enxerga projetos onde é membro, o admin vê todos.
+
+## 08 — Planejamento (rodar UMA vez, depois do 07)
+
+Cria a coluna `projetos.eixo` e as funções `salvar_eixo`, `salvar_planejados` e `remover_planejados`.
+Com elas, admin e gestor importam KMZ/KML, marcam bueiros no mapa e salvam o planejamento: cada ponto vira um
+bueiro "A vistoriar". Quem já foi vistoriado nunca é alterado nem removido pelo planejamento.

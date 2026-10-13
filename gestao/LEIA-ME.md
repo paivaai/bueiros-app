@@ -20,3 +20,10 @@ Projetos · Visão geral (andamento, fila de revisão, produção por pessoa) ·
 - Testado em modo demonstração (navegador real). O modo Supabase foi escrito mas **ainda não foi testado contra um servidor real**.
 - O mapa usa Leaflet + OpenStreetMap (precisa de internet); sem isso mostra um mapa simples sem fundo.
 - Falta: importar cadastro (KMZ) pelo painel, relatório em lote, ligar o app de campo (login + sincronização).
+
+## Planejamento (aba "Planejamento")
+
+1. Informe a rodovia e o km do 1º ponto do eixo; trace o eixo no mapa (ou importe a linha de um KMZ). O painel divide a estrada em km.
+2. Importe o KMZ/KML do Google Earth (pontos viram bueiros a vistoriar) e/ou clique em "Marcar bueiro no mapa". Arraste o pino para ajustar.
+3. O nome sai do km: `RJ-000 km 170+470`. Dá para editar o nome na lista. "Salvar planejamento" grava no projeto (precisa do script `servidor/08_planejamento.sql`).
+4. "Baixar KML" gera um arquivo que o app de campo já importa (Início → Importar cadastro).
