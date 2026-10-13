@@ -40,3 +40,10 @@ Em **Project Settings → API** copie:
 ## 6. O que foi testado
 Os scripts 01–05 rodaram sem erro em PostgreSQL 16 com uma simulação do `auth` do Supabase. Testado: criação de perfil só por convite; isolamento entre organizações; gestor não grava levantamento; campo não aprova nem atribui; conflito de versão; devolver exige comentário; aprovado não é editado; histórico; andamento; acesso anônimo negado.
 **Não foi possível testar aqui:** o bucket de fotos, o tempo real e o PostGIS (existem só no Supabase). Eles serão conferidos na primeira conexão real.
+
+## 07 — Criar projetos pelo painel (rodar UMA vez, separado)
+
+Depois do `instalar_tudo.sql` e do `05`, cole `07_criar_projetos.sql` no SQL Editor e rode.
+Habilita `criar_projeto`, `definir_membros_projeto` e `editar_projeto`:
+**admin e gestor** criam projetos pelo painel ("+ Novo projeto"); o criador entra na equipe
+automaticamente; o gestor só enxerga projetos onde é membro, o admin vê todos.
