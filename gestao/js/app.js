@@ -18,7 +18,7 @@
   };
   const fmt = (v, d = 3) => (BU.GPS && v != null && v !== '' ? BU.GPS.fmtM(Number(v), d) : (v == null ? '—' : String(v)));
 
-  const S = { perfil: null, projetos: [], projeto: null, bueiros: [], usuarios: [], filtro: { q: '', st: '', resp: '', ord: 'codigo', dir: 1 }, sel: new Set(), parar: null, mapa: null };
+  const S = { perfil: null, projetos: [], projeto: null, bueiros: [], usuarios: [], membros: [], filtro: { q: '', st: '', resp: '', ord: 'codigo', dir: 1 }, sel: new Set(), parar: null, mapa: null };
   const nomeDe = id => { const u = S.usuarios.find(x => x.id === id); return u ? u.nome : '—'; };
 
   function toast(html, ms = 5000) {
@@ -77,6 +77,7 @@
   }
 
   /* ---------------------------------------------------------------- projetos */
+  const podeCriar = () => S.perfil && (S.perfil.papel === 'admin' || S.perfil.papel === 'gestor');
   function barra(r) {
     const t = r.total || 1;
     return `<div class="bar" role="img" aria-label="${ORDEM.map(k => `${ROT[k]}: ${r[k] || 0}`).join(', ')}">${ORDEM.map(k => `<span style="width:${(100 * (r[k] || 0)) / t}%;background:${COR[k]}"></span>`).join('')}</div>`;
@@ -86,7 +87,8 @@
   async function viewProjetos() {
     S.projeto = null; if (S.parar) { S.parar(); S.parar = null; }
     await carregarProjetos();
-    pagina('projetos', `<div class="linha"><h1>Projetos</h1></div>
+    pagina('projetos', `<div class="linha"><h1>Projetos</h1><span class="esp"></span>${podeCriar() ? '<a class="btn pri" href="#/novo" style="display:inline-flex;align-items:center;text-decoration:none">+ Novo projeto</a>' : ''}</div>
+      ${S.projetos.length ? '' : `<div class="card"><p style="margin:0">Você ainda não participa de nenhum projeto.${podeCriar() ? ' Clique em <b>+ Novo projeto</b> para começar.' : ''}</p></div>`}
       <div class="grid g2">${S.projetos.map(p => `<a class="card proj" href="#/p/${p.id}">
         <div><h2>${esc(p.nome)}</h2><span class="muted small">${esc(p.rodovia || '')} ${p.descricao ? '· ' + esc(p.descricao) : ''}</span></div>
         ${p.resumo.total ? barra(p.resumo) + legenda(p.resumo) : '<span class="muted">Nenhum bueiro cadastrado ainda.</span>'}
@@ -101,7 +103,8 @@
     S.bueiros.forEach(b => { if (b.responsavel_nome && (b.status === 'concluido' || b.status === 'aprovado')) por[b.responsavel_nome] = (por[b.responsavel_nome] || 0) + 1; });
     const ranking = Object.entries(por).sort((a, b) => b[1] - a[1]), max = ranking.length ? ranking[0][1] : 1;
     const recentes = S.bueiros.slice().sort((a, b) => b.atualizado_em.localeCompare(a.atualizado_em)).slice(0, 8);
-    pagina('geral', `<div class="linha"><h1>${esc(S.projeto.nome)}</h1><span class="esp"></span><span class="muted small">${D.modo === 'demo' ? 'Simulação ao vivo: a cada poucos segundos alguém do campo atualiza um bueiro.' : 'Atualiza sozinho quando o campo sincroniza.'}</span></div>
+    const pessoas = S.usuarios.filter(u => u.papel !== 'admin');
+    pagina('geral', `<div class="linha"><h1>${esc(S.projeto.nome)}</h1><a class="small" href="#/p/${S.projeto.id}/editar">Editar projeto</a><span class="esp"></span><span class="muted small">${D.modo === 'demo' ? 'Simulação ao vivo: a cada poucos segundos alguém do campo atualiza um bueiro.' : 'Atualiza sozinho quando o campo sincroniza.'}</span></div>
       <div class="grid g4">
         <div class="card kpi"><b>${r.total}</b><span>bueiros no projeto</span></div>
         <div class="card kpi"><b>${pc}%</b><span>aprovados (${r.aprovado} de ${r.total})</span></div>
@@ -115,6 +118,9 @@
         <div class="card"><h3>Produção por pessoa</h3>
           ${ranking.length ? `<div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">${ranking.map(([n, v]) => `<div><div class="linha small"><b>${esc(n)}</b><span class="esp"></span>${v} concluídos</div><div class="bar"><span style="width:${(100 * v) / max}%;background:var(--marca)"></span></div></div>`).join('')}</div>` : '<p class="muted">Ainda sem produção.</p>'}</div>
       </div>
+      <div class="card"><h3>Equipe do projeto</h3><p class="muted small" style="margin:4px 0 10px">Só quem está marcado enxerga este projeto (o administrador enxerga todos). A equipe de campo precisa estar marcada para ver e levantar os bueiros.</p>
+        <div id="equipe-proj" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:6px 14px">${pessoas.map(u => `<label style="display:flex;gap:8px;align-items:center"><input type="checkbox" data-membro="${u.id}"${S.membros.includes(u.id) || u.id === S.perfil.id ? ' checked' : ''}${u.id === S.perfil.id ? ' disabled' : ''}> ${esc(u.nome)} <span class="muted small">(${u.papel === 'campo' ? 'campo' : 'gestor'})</span></label>`).join('') || '<span class="muted">Nenhuma pessoa cadastrada.</span>'}</div>
+        <div class="linha" style="margin-top:12px"><button class="btn pri sm" data-a="salvar-equipe">Salvar equipe</button><span id="equipe-msg" class="small"></span></div></div>
       <div class="card"><h3>Últimas atualizações</h3><div class="tab-wrap" style="margin-top:10px;max-height:none"><table><thead><tr><th>Código</th><th>Km</th><th>Situação</th><th>Responsável</th><th>Quando</th></tr></thead><tbody>
         ${recentes.map(b => `<tr data-ir="${b.id}"><td><b>${esc(b.codigo)}</b></td><td>${esc(b.km || '—')}</td><td>${chip(b.status)}</td><td>${esc(b.responsavel_nome || '—')}</td><td>${quando(b.atualizado_em)}</td></tr>`).join('')}</tbody></table></div></div>`);
   }
@@ -232,6 +238,29 @@
     return ({ criado: 'Criado', editado: 'Editado', aprovado: 'Aprovado', devolvido: 'Devolvido ao campo', atribuido: 'Atribuído' + (dt.para ? ' a ' + nomeDe(dt.para) : ' (removido)'), importacao: 'Cadastro importado' })[h.acao] || h.acao;
   }
 
+  /* ---------------------------------------------------------------- criar / editar projeto */
+  async function viewProjetoForm(id) {
+    const p = id ? S.projetos.find(x => x.id === id) : { nome: '', rodovia: '', descricao: '', fuso: '23', hemisferio: 'S', ativo: true };
+    if (!p) return viewProjetos();
+    const mem = id ? S.membros : [];
+    const fusos = (BU.GPS && BU.GPS.ZONAS) || ['18', '19', '20', '21', '22', '23', '24', '25'];
+    const pessoas = S.usuarios.filter(u => u.papel !== 'admin');
+    pagina(id ? 'geral' : 'projetos', `<div class="crumb"><a href="${id ? '#/p/' + id : '#/'}">← Voltar</a></div>
+      <div class="linha"><h1>${id ? 'Editar projeto' : 'Novo projeto'}</h1></div>
+      <form id="f-proj" class="card grid" style="max-width:760px;gap:14px" data-id="${esc(id || '')}">
+        <label class="f">Nome do projeto *<input type="text" name="nome" required value="${esc(p.nome)}" placeholder="Ex.: Cadastro de bueiros BR-101 — Lote 2"></label>
+        <div class="grid g2"><label class="f">Rodovia<input type="text" name="rodovia" value="${esc(p.rodovia || '')}" placeholder="BR-101"></label>
+          <label class="f">Descrição<input type="text" name="descricao" value="${esc(p.descricao || '')}"></label></div>
+        <div class="grid g2"><label class="f">Fuso UTM padrão (SIRGAS 2000)<select name="fuso">${fusos.map(z => `<option value="${z}"${String(p.fuso) === z ? ' selected' : ''}>${z}</option>`).join('')}</select></label>
+          <label class="f">Hemisfério<select name="hemisferio"><option value="S"${p.hemisferio !== 'N' ? ' selected' : ''}>Sul</option><option value="N"${p.hemisferio === 'N' ? ' selected' : ''}>Norte</option></select></label></div>
+        <p class="muted small" style="margin:-6px 0 0">É só o valor sugerido ao campo. O fuso fica gravado em cada bueiro, junto com o Este e o Norte.</p>
+        ${id ? '' : `<fieldset style="border:1px solid var(--line);border-radius:8px;padding:12px"><legend style="font-weight:700;font-size:13px">Quem participa (além de você)</legend>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px 14px">${pessoas.filter(u => u.id !== S.perfil.id).map(u => `<label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="membro" value="${u.id}"> ${esc(u.nome)} <span class="muted small">(${u.papel === 'campo' ? 'campo' : 'gestor'})</span></label>`).join('') || '<span class="muted">Ninguém cadastrado ainda. O administrador cadastra os convites em Equipe e acessos.</span>'}</div></fieldset>`}
+        <div id="proj-erro"></div>
+        <div class="linha"><button class="btn pri" type="submit">${id ? 'Salvar alterações' : 'Criar projeto'}</button>${id ? '<button class="btn dev" type="button" data-a="arquivar">Arquivar projeto</button>' : ''}</div>
+      </form>`);
+  }
+
   /* ---------------------------------------------------------------- equipe */
   async function viewEquipe() {
     S.usuarios = await D.usuarios();
@@ -256,12 +285,16 @@
       let m;
       if (h === '#/' || h === '#') return await viewProjetos();
       if (h === '#/equipe') return await viewEquipe();
-      if ((m = h.match(/^#\/p\/([^/]+)(?:\/(bueiros|b\/([^/]+)))?$/))) {
+      if (h === '#/novo') { if (!podeCriar()) return viewProjetos(); S.projeto = null; if (S.parar) { S.parar(); S.parar = null; } return await viewProjetoForm(null); }
+      if ((m = h.match(/^#\/p\/([^/]+)(?:\/(bueiros|editar|b\/([^/]+)))?$/))) {
         if (!S.projetos.length) await carregarProjetos();
         if (!S.projeto || S.projeto.id !== m[1]) { if (!(await carregarProjeto(m[1]))) return viewProjetos(); assinar(); }
         else S.bueiros = await D.bueiros(m[1]);
         if (n !== rotaN) return;
         if (m[3]) return await viewDetalhe(m[3]);
+        if (m[2] !== 'bueiros') S.membros = await D.membros(m[1]);
+        if (n !== rotaN) return;
+        if (m[2] === 'editar') return await viewProjetoForm(m[1]);
         return m[2] === 'bueiros' ? viewBueiros() : viewGeral();
       }
       location.hash = '#/';
@@ -277,6 +310,15 @@
       try {
         if (k === 'sair') { await D.sair(); S.perfil = null; S.projeto = null; S.usuarios = []; location.hash = '#/'; telaLogin(); }
         else if (k === 'csv') csv();
+        else if (k === 'salvar-equipe') {
+          const ids = [...document.querySelectorAll('[data-membro]')].filter(c => c.checked && !c.disabled).map(c => c.dataset.membro);
+          await D.definirMembros(S.projeto.id, ids); S.membros = await D.membros(S.projeto.id); toast('Equipe salva.');
+        } else if (k === 'arquivar') {
+          if (!confirm('Arquivar este projeto? Ele some da lista (os dados continuam no servidor).')) return;
+          const id = document.getElementById('f-proj').dataset.id, p = S.projetos.find(x => x.id === id);
+          await D.editarProjeto(id, { nome: p.nome, rodovia: p.rodovia, descricao: p.descricao, fuso: p.fuso, hemisferio: p.hemisferio, ativo: false });
+          S.projeto = null; S.projetos = []; toast('Projeto arquivado.'); location.hash = '#/';
+        }
         else if (k === 'sel-todos') { filtrados().forEach(b => S.sel.add(b.id)); viewBueiros(); }
         else if (k === 'sel-nenhum') { S.sel.clear(); viewBueiros(); }
         else if (k === 'atribuir') {
@@ -310,6 +352,13 @@
     if (f.id === 'f-login') {
       try { S.perfil = await D.entrar(f.email.value, f.senha.value); S.usuarios = await D.usuarios(); rotear(); }
       catch (e) { telaLogin(e.message || String(e), f.email.value); }
+    } else if (f.id === 'f-proj') {
+      const e = document.getElementById('proj-erro'), id = f.dataset.id, btn = f.querySelector('button[type=submit]'); btn.disabled = true;
+      const d = { nome: f.nome.value, rodovia: f.rodovia.value, descricao: f.descricao.value, fuso: f.fuso.value, hemisferio: f.hemisferio.value, membros: [...f.querySelectorAll('[name=membro]:checked')].map(c => c.value) };
+      try {
+        if (id) { await D.editarProjeto(id, { ...d, ativo: true }); S.projetos = []; await carregarProjetos(); S.projeto = null; toast('Projeto atualizado.'); location.hash = '#/p/' + id; }
+        else { const novo = await D.criarProjeto(d); S.projetos = []; S.projeto = null; toast('Projeto criado.'); location.hash = '#/p/' + novo; }
+      } catch (er) { e.innerHTML = `<div class="erro" role="alert">${esc(er.message || er)}</div>`; btn.disabled = false; }
     } else if (f.id === 'f-conv') {
       const m = document.getElementById('conv-msg');
       try { await D.convidar(f.email.value, f.nome.value, f.papel.value); m.innerHTML = '<span style="color:var(--st-aprovado);font-weight:700">Convite cadastrado.</span>'; setTimeout(viewEquipe, 700); }
