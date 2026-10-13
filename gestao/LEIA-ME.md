@@ -19,7 +19,15 @@ Projetos · Visão geral (andamento, fila de revisão, produção por pessoa) ·
 ## Estado
 - Testado em modo demonstração (navegador real). O modo Supabase foi escrito mas **ainda não foi testado contra um servidor real**.
 - O mapa usa Leaflet + OpenStreetMap (precisa de internet); sem isso mostra um mapa simples sem fundo.
-- Falta: importar cadastro (KMZ) pelo painel, relatório em lote, ligar o app de campo (login + sincronização).
+- O app de campo já entra com login e sincroniza com este painel (ver `LEIA-ME.md` da raiz, seção 10).
+- Falta: testar tudo contra o Supabase real.
+
+## Exportar (aba "Bueiros" → "Exportar…")
+Escolha o que exportar (os da tela, só aprovados ou todos) e o formato:
+**GeoPackage** (.gpkg), **Shapefile** (.zip, com .prj e .cpg), **KMZ/KML** (Google Earth, com o eixo), **GeoJSON**, **CSV** (Excel, separador `;`) e **Relatório** (HTML para imprimir ou salvar em PDF; opção de incluir fotos).
+Coordenadas em **SIRGAS 2000 geográficas (EPSG:4674)**; Este, Norte e Fuso UTM seguem como atributos. Cada bueiro leva ~50 atributos (identificação, características, RTK, patologias, revisão).
+Shapefile: nomes de campo com até 10 letras (limite do formato); os nomes completos estão no GeoPackage/CSV/GeoJSON.
+O detalhe do bueiro mostra as **Conferências automáticas** (solução RTK não fixa, precisão, distância do ponto planejado, fora do eixo, km divergente, fuso).
 
 ## Planejamento (aba "Planejamento")
 
