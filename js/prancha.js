@@ -45,11 +45,18 @@
     if (/^TN|TER|TAL|CRISTA|^CA$|^PA$|SOLO|GREIDE/.test(k)) return 'terreno';
     return 'outro';
   }
+  /* Pontos marcados nas bocas (ref "montante:GTZ-I1"): a boca define o papel, mesmo que o código do TXT seja genérico. */
+  function papelDe(p) {
+    const r = String(p.ref || '');
+    if (/^montante:GTZ/.test(r)) return 'gim';
+    if (/^jusante:GTZ/.test(r)) return 'gij';
+    return papel(p.codigo);
+  }
   const grupoCor = p => (p === 'gim' || p === 'gij' || p === 'gtz') ? 'gi' : p;
 
   /* ---------- modelo geométrico ---------- */
   function lerPontos(l) {
-    const brutos = (l.pontos || []).map(p => ({ id: String(p.id), a: nv(p.x), b: nv(p.y), Z: nv(p.z), cod: p.codigo || '', papel: papel(p.codigo) })).filter(p => p.a != null && p.b != null && p.Z != null);
+    const brutos = (l.pontos || []).map(p => ({ id: String(p.id), a: nv(p.x), b: nv(p.y), Z: nv(p.z), cod: p.codigo || '', papel: papelDe(p) })).filter(p => p.a != null && p.b != null && p.Z != null);
     if (!brutos.length) return [];
     const med = arr => { const s = arr.slice().sort((x, y) => x - y); return s[s.length >> 1]; };
     // Padrão do app: X = Norte, Y = Este. Se o arquivo vier invertido (X pequeno, Y > 1.000.000), troca.

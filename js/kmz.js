@@ -124,26 +124,26 @@
     const keys = Object.keys(A), v = {};
     for (const [nome, , teste] of CAMPOS) { const hit = keys.find(kk => teste(kk)); v[nome] = hit ? fixText(A[hit]) : ''; }
     v._lat = U.parseNum(A.lat); v._lon = U.parseNum(A.lon);
+    v._todos = {}; for (const k in f.attrs) { const val = fixText(f.attrs[k]); if (k && val !== '') v._todos[fixText(k)] = val; } // tudo o que veio do Google Earth
     return v;
   }
 
   const mapOpt = (val, opts) => { const n = norm(val); return n ? (opts.find(o => norm(o) === n) || '') : ''; };
   function dimFix(v) { const n = U.parseNum(v); if (n == null || n === 0) return null; if (n >= 200) return n / 1000; if (n > 10) return n / 100; return n; }
   function parseBxH(v) { const m = String(v || '').replace(/,/g, '.').match(/([\d.]+)\s*[xX×*]\s*([\d.]+)/); return m ? [parseFloat(m[1]), parseFloat(m[2])] : null; }
-  function mapConservacao(s) {
+  function mapConservacao(s) { // o app usa três estados: Bom, Regular, Precário
     s = norm(s); if (!s) return '';
-    if (/crit|colap/.test(s)) return 'Crítico';
-    if (/prec/.test(s)) return 'Precário';
-    if (/ruim|pess/.test(s)) return 'Ruim';
+    if (/crit|colap|prec|ruim|pess/.test(s)) return 'Precário';
     if (/reg/.test(s)) return 'Regular';
     if (/bom|boa|otim/.test(s)) return 'Bom';
     return '';
   }
-  const LINHAS = { S: 1, D: 2, T: 3, Q: 4 }, FORMA = { T: 'tubular', C: 'celular', L: 'lenticular', A: 'arco' };
-  const MATERIAL = { C: 'Concreto', M: 'Metal', P: 'PEAD', V: 'Outro', A: 'Alvenaria' };
-  function formaPorTexto(t) { t = norm(t); if (/tub|circ/.test(t)) return 'tubular'; if (/celul|galer|aduela|retang|quadr/.test(t)) return 'celular'; return ''; }
+  const mapClassif = s => { s = norm(s); return /grot/.test(s) ? 'Grota' : /greid/.test(s) ? 'Greide' : ''; };
+  const LINHAS = { S: 1, D: 2, T: 3, Q: 4 }, FORMA = { T: 'Tubular', C: 'Celular', L: 'Lenticular', A: 'Arco' };
+  const MATERIAL = { C: 'Concreto', M: 'Metálico', P: 'PEAD', V: 'PVC', A: 'Alvenaria / pedra' };
+  function formaPorTexto(t) { t = norm(t); if (/tub|circ/.test(t)) return 'Tubular'; if (/celul|galer|aduela|retang|quadr/.test(t)) return 'Celular'; if (/lentic/.test(t)) return 'Lenticular'; if (/arco/.test(t)) return 'Arco'; return ''; }
   function linhasPorTexto(t) { t = norm(t); return /quadr/.test(t) ? 4 : /tripl/.test(t) ? 3 : /dupl/.test(t) ? 2 : /simpl/.test(t) ? 1 : null; }
-  function materialPorTexto(t) { t = norm(t); return /conc/.test(t) ? 'Concreto' : /metal|aco|armco|corrug|chapa/.test(t) ? 'Metal' : /pead|polie/.test(t) ? 'PEAD' : /alvenar|pedra/.test(t) ? 'Alvenaria' : ''; }
+  function materialPorTexto(t) { t = norm(t); return /conc/.test(t) ? 'Concreto' : /metal|aco|armco|corrug|chapa/.test(t) ? 'Metálico' : /pead|polie/.test(t) ? 'PEAD' : /pvc/.test(t) ? 'PVC' : /alvenar|pedra/.test(t) ? 'Alvenaria / pedra' : ''; }
 
   const RE_NOME = /^BU\s+(\d{1,3})\s+([A-Z]{2})\s+(\d{1,3}\+\d{3}(?:[.,]\d+)?)\s+([A-Z]{1,2})\s+(\d+)$/i;
   const RE_KM = /^\d{1,3}\+\d{3}(?:[.,]\d+)?$/;
@@ -166,7 +166,7 @@
     const mn = RE_NOME.exec(nome);
     if (mn) { km = mn[3]; estrada = 'BR-' + mn[1]; uf = uf || mn[2].toUpperCase(); }
     else if (RE_KM.test(nome)) { km = nome; if (ctx.rod) { codigo = `BU ${ctx.rod} ${ctx.uf} ${nome}`.replace(/\s+/g, ' ').trim(); estrada = 'BR-' + ctx.rod; } uf = uf || ctx.uf; }
-    else { const mk = nome.match(/(\d{1,3}\+\d{3})/); if (mk) km = mk[1]; uf = uf || ctx.uf; }
+    else { const mk = nome.match(/(\d{1,3}\+\d{2,3})/); if (mk) km = mk[1]; const mu = nome.match(/\bBU\s+(\d{1,3})\s+([A-Z]{2})\b/i); if (mu) { estrada = 'BR-' + mu[1]; uf = uf || mu[2].toUpperCase(); } uf = uf || ctx.uf; }
 
     l.status = 'a_vistoriar'; l.origem = 'cadastro'; l.data = ''; l.hora = ''; l.responsavel = '';
     l.codigo = codigo; l.cadastroId = a.id; l.estrada = estrada; l.estado = mapOpt(uf, BU.App.UFS) || ''; l.municipio = a.municipio;
@@ -175,34 +175,39 @@
     const geo = coordOk(f.lat, f.lon) ? [f.lat, f.lon] : coordOk(a._lat, a._lon) ? [a._lat, a._lon] : null;
     if (geo) { l.latitude = +geo[0].toFixed(7); l.longitude = +geo[1].toFixed(7); l.coordOrigem = 'cadastro'; BU.GPS.completarUTM(l); }
 
-    // tipo, forma e material pela sigla (ex.: BSTC = bueiro simples tubular de concreto)
+    // tipo de bueiro pela sigla do cadastro (ex.: BSCC = simples, celular, concreto)
     const sg = String(a.sigla || '').toUpperCase().match(/B([SDTQ])([TCLA])([CMPVA])/);
     let forma = '', linhas = null, material = '';
     if (sg) { linhas = LINHAS[sg[1]]; forma = FORMA[sg[2]]; material = MATERIAL[sg[3]]; }
     else { const t = a.descricao || a.sigla; forma = formaPorTexto(t); linhas = linhasPorTexto(t); material = materialPorTexto(t); }
     forma = formaPorTexto(a.forma) || forma;
-    c.tipo = forma === 'tubular' ? 'Tubular' : forma === 'celular' ? 'Celular' : forma ? 'Outro' : '';
-    c.material = material; if (forma === 'celular') c.celulas = linhas;
+    c.tipo = forma; c.material = material; c.celulas = forma ? (linhas || 1) : null; c.formato = BU.Modelo.formatoDe(c.tipo);
+    BU.Form ? BU.Form.aposTipo(l) : (l.meta.sigla = BU.Cat.siglaDe(c), l.meta.descricaoTipo = BU.Cat.descricaoDe(c));
 
     const dM = dimFix(a.dimMont), dJ = dimFix(a.dimJus), sM = parseBxH(a.secMont), sJ = parseBxH(a.secJus), notas = [];
-    if (forma === 'tubular') {
-      c.formato = 'Circular'; c.diametro = dM;
+    if (forma === 'Tubular') {
+      c.diametro = dM;
       if (dM) { m.larguraEntrada = dM; m.alturaEntrada = dM; }
       if (dJ) { m.larguraSaida = dJ; m.alturaSaida = dJ; }
       if (dM && dJ && dM !== dJ) notas.push(`Diâmetro de jusante no cadastro: ${U.numTxt(dJ)} m.`);
-      if (linhas > 1) notas.push(`Cadastro informa ${linhas} linhas (tubos).`);
-    } else if (forma === 'celular') {
+    } else if (forma === 'Celular') {
       if (sM) { c.largura = sM[0]; c.altura = sM[1]; m.larguraEntrada = sM[0]; m.alturaEntrada = sM[1]; }
       if (sJ) { m.larguraSaida = sJ[0]; m.alturaSaida = sJ[1]; }
-      c.formato = 'Retangular'; // o croqui usa Células (largura de cada célula × altura)
-    } else if (forma) c.formato = 'Personalizada';
-    c.conservacao = mapConservacao(a.estado);
+    }
+    c.conservacao = mapConservacao(a.estado); c.estadoCorpo = c.conservacao;
     c.necessita = a.necessita;
     if (notas.length) c.observacoes = notas.join(' ');
     l.observacoes = [a.obs, a.obs2].filter(Boolean).join('\n');
 
+    // metadados do cadastro (Google Earth): tudo o que veio no arquivo entra no formulário, para o vistoriador conferir
+    l.situacao = 'Cadastrado'; l.classificacao = mapClassif(a.classif);
+    l.meta = { ...l.meta, cont: a.cont, descricao: a.descricao, forma: a.forma, dimMont: a.dimMont, dimJus: a.dimJus, secMont: a.secMont, secJus: a.secJus,
+      estadoCad: a.estado, necessitaCad: a.necessita, obsCad: a.obs, obs2Cad: a.obs2, obras: a.obras, verif: a.verif, verifCatt: a.verifCatt, classifCad: a.classif,
+      sigla: BU.Cat.siglaDe(c), descricaoTipo: BU.Cat.descricaoDe(c), nomeKml: nome, atributos: a._todos };
+    if (geo) l.planejado = { latitude: l.latitude, longitude: l.longitude }; // pin do planejamento (base da conferência de presença)
+
     const itens = [];
-    for (const [k, rotulo] of CAMPOS.map(x => [x[0], x[1]])) if (a[k]) itens.push([rotulo, a[k]]);
+    for (const [k, rotulo] of CAMPOS.map(x => [x[0], x[1]])) if (a[k] && k !== 'id') itens.push([rotulo, a[k]]);
     l.cadastro = { arquivo, importadoEm: U.agoraISO(), itens };
     return l;
   }

@@ -72,16 +72,25 @@
   const editavel = p => p.status === ED;
 
   /* ------------------------------------------------------------- KMZ / KML */
+  const DADOS_CAD = ['codigo', 'cadastroId', 'estrada', 'estado', 'municipio', 'km', 'ambiente', 'sentido', 'pistaGe', 'lado', 'situacao', 'classificacao', 'meta', 'caracteristicas', 'medicoes', 'observacoes', 'cadastro', 'planejado', 'origem'];
   async function lerArquivo(file) {
     const txt = await BU.KMZ.textoKml(file);
     const doc = new DOMParser().parseFromString(txt, 'text/xml');
     if (doc.getElementsByTagName('parsererror').length) throw new Error('O arquivo KML está corrompido ou não é um KML.');
     const pontos = [], linhas = [];
+    // atributos do cadastro (Google Earth): cada ponto já vem com o formulário pré-preenchido
+    let feic = [], ctxK = { rod: '', uf: '' };
+    try { feic = BU.KMZ.parseKml(txt).feicoes; ctxK = BU.KMZ.contexto(feic); } catch (e) { feic = []; }
+    const dadosDe = (nome, lat, lon) => {
+      const f = feic.find(x => Math.abs(x.lat - lat) < 1e-9 && Math.abs(x.lon - lon) < 1e-9 && (x.nome === nome || BU.KMZ.fixText(x.nome) === nome)) || feic.find(x => Math.abs(x.lat - lat) < 1e-9 && Math.abs(x.lon - lon) < 1e-9);
+      if (!f || !Object.keys(f.attrs).length) return null;
+      try { const r = BU.KMZ.paraRegistro(f, ctxK, file.name), d = {}; for (const k of DADOS_CAD) if (r[k] !== undefined) d[k] = r[k]; return d; } catch (e) { console.warn(e); return null; }
+    };
     const parse = s => String(s || '').trim().split(/\s+/).map(t => t.split(',').map(Number)).filter(a => a.length >= 2 && isFinite(a[0]) && isFinite(a[1])).map(a => [a[1], a[0]]);
     for (const pm of Array.from(doc.getElementsByTagName('Placemark'))) {
       const nomeEl = [...pm.children].find(c => c.localName === 'name'), nome = BU.KMZ.fixText(nomeEl ? nomeEl.textContent : '');
       for (const pt of Array.from(pm.getElementsByTagName('Point'))) {
-        const [c] = parse((pt.getElementsByTagName('coordinates')[0] || {}).textContent); if (c && coordOk(c[0], c[1])) pontos.push({ nome, lat: c[0], lon: c[1] });
+        const [c] = parse((pt.getElementsByTagName('coordinates')[0] || {}).textContent); if (c && coordOk(c[0], c[1])) pontos.push({ nome, lat: c[0], lon: c[1], dados: dadosDe(nome, c[0], c[1]) });
       }
       for (const ln of Array.from(pm.getElementsByTagName('LineString'))) {
         const c = parse((ln.getElementsByTagName('coordinates')[0] || {}).textContent).filter(a => coordOk(a[0], a[1])); if (c.length > 1) linhas.push({ nome, pts: c });
@@ -102,8 +111,8 @@
     let n = 0, dup = 0;
     if (trazer) for (const q of I.pontos) {
       if (P.pins.some(p => Math.abs(p.lat - q.lat) < 3e-5 && Math.abs(p.lon - q.lon) < 3e-5)) { dup++; continue; } // ~3 m: já existe
-      const usaNome = !nomearKm && !nomeGenerico(q.nome);
-      novoPin(q.lat, q.lon, usaNome ? q.nome : ''); n++;
+      const usaNome = (q.dados || !nomearKm) && !nomeGenerico(q.nome); // nome completo do cadastro vale sempre
+      const pin = novoPin(q.lat, q.lon, usaNome ? q.nome : ''); if (q.dados) { pin.dados = q.dados; pin.auto = false; } n++;
     }
     if (usarLinha && P.pins.length) P.pins.forEach(p => { if (editavel(p) && p.auto) { nomear(p); p.dirty = true; } });
     P.imp = null; render();
@@ -122,7 +131,7 @@
       if (P.removidos.size) await D.removerPlanejados(S.projeto.id, [...P.removidos]);
       if (mexidos.length) {
         const lista = mexidos.map(p => { const u = BU.GPS.paraUTM(p.lat, p.lon, zonaDe(p.lon)); return { id: p.id, codigo: p.codigo.trim(), km: p.km || '', latitude: p.lat, longitude: p.lon, leste: +u.leste.toFixed(3), norte: +u.norte.toFixed(3), zona: String(u.zona),
-          dados: { estrada: (P.eixo.rodovia || S.projeto.rodovia || '').trim(), hemisferio: u.hem, coordOrigem: 'cadastro', origem: 'planejamento', observacoes: p.obs || '' } }; });
+          dados: { ...(p.dados || {}), estrada: (P.eixo.rodovia || (p.dados && p.dados.estrada) || S.projeto.rodovia || '').trim(), hemisferio: u.hem, coordOrigem: 'cadastro', origem: 'planejamento', observacoes: p.obs || (p.dados && p.dados.observacoes) || '', planejado: { latitude: p.lat, longitude: p.lon } } }; });
         const r = await D.salvarPlanejados(S.projeto.id, lista);
         if (r && r.bloqueados) toast(`${r.bloqueados} ponto(s) já vistoriados não foram alterados.`);
       }
@@ -163,7 +172,7 @@
         <p class="small" style="margin:8px 0 0" id="pl-eixo-info">${g ? `Eixo com ${P.eixo.pts.length} pontos, <b>${(g.total / 1000).toFixed(3).replace('.', ',')} km</b> (do km ${esc(C.metrosParaKm(P.eixo.kmIni))} ao km ${esc(C.metrosParaKm(fim))}).` : '<span class="muted">Sem eixo: os pontos recebem nomes BU-001, BU-002… e você pode digitar o km à mão.</span>'}</p>
         ${g && !P.eixo.kmIni ? '<p class="small" style="margin:6px 0 0;color:var(--st-devolvido)"><b>Informe o km do 1º ponto do eixo</b> (hoje está 000+000). O 1º ponto é onde o km começa: trace no sentido do km crescente.</p>' : ''}</div>
       <div class="card"><h3>2. Importar do Google Earth (KMZ / KML)</h3>
-        <p class="muted small" style="margin:4px 0 8px">Pontos (pins) viram bueiros a vistoriar; uma linha vira o eixo da rodovia.</p>
+        <p class="muted small" style="margin:4px 0 8px">Pontos (pins) viram bueiros a vistoriar, com o <b>nome completo</b> e <b>todos os dados do cadastro</b> (tipo, dimensões, estado, observações…) já preenchidos; uma linha vira o eixo da rodovia.</p>
         <input type="file" id="pl-arq" accept=".kmz,.kml" hidden><button class="btn sm" data-pl="arquivo">Escolher arquivo…</button>
         ${I ? `<div class="aviso" style="margin-top:8px"><b>${esc(I.arquivo)}</b>: ${I.pontos.length} ponto(s)${I.linha ? `, ${I.nLinhas} linha(s) (a maior tem ${I.linha.pts.length} vértices)` : ', nenhuma linha'}.
             <label style="display:flex;gap:6px;margin-top:6px"><input type="checkbox" id="imp-pts" checked> Trazer os ${I.pontos.length} ponto(s)</label>

@@ -115,5 +115,26 @@
   const nomeArquivo = s => String(s || 'levantamento').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^_+|_+$/g, '') || 'levantamento';
 
   BU.U = { esc, clone, uid, agoraISO, hojeISO, horaAgora, dataBR, dataHoraBR, stamp, parseNum, numTxt, getPath, setPath, baixar, nomeArquivo };
-  BU.UI = { toast, confirmar, escolher, pedir };
+
+  /* Campo de senha com "olho" para ver a senha por um instante (usado no app e no painel). */
+  const OLHO_ABERTO = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+  const OLHO_FECHADO = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18M10.6 5.1A10.8 10.8 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4M6.5 6.6C3.8 8.4 2 12 2 12s3.6 7 10 7c1.7 0 3.2-.4 4.5-1M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
+  function senhaHTML(o) {
+    o = o || {}; const a = k => (o[k] == null ? '' : ` ${k === 'cls' ? 'class' : k}="${esc(o[k])}"`);
+    return `<span class="pass-wrap"><input type="password"${a('id')}${a('name')} autocomplete="${esc(o.auto || 'current-password')}" autocapitalize="none" autocorrect="off" spellcheck="false"${o.required === false ? '' : ' required'}${o.value != null ? ` value="${esc(o.value)}"` : ''}${o.ph ? ` placeholder="${esc(o.ph)}"` : ''}>`
+      + `<button type="button" class="olho" data-olho aria-label="Mostrar senha" aria-pressed="false">${OLHO_ABERTO}</button></span>`;
+  }
+  document.addEventListener('click', e => {
+    const b = e.target.closest && e.target.closest('[data-olho]'); if (!b) return;
+    const inp = b.parentElement.querySelector('input'); if (!inp) return;
+    const ver = inp.type === 'password'; inp.type = ver ? 'text' : 'password';
+    b.innerHTML = ver ? OLHO_FECHADO : OLHO_ABERTO; b.setAttribute('aria-pressed', String(ver)); b.setAttribute('aria-label', ver ? 'Ocultar senha' : 'Mostrar senha');
+    if (ver) { clearTimeout(b._t); b._t = setTimeout(() => { if (inp.type === 'text') { inp.type = 'password'; b.innerHTML = OLHO_ABERTO; b.setAttribute('aria-pressed', 'false'); b.setAttribute('aria-label', 'Mostrar senha'); } }, 15000); } // volta a esconder sozinho
+  });
+  try {
+    const st = document.createElement('style');
+    st.textContent = '.pass-wrap{position:relative;display:block}.pass-wrap input{width:100%;padding-right:52px}.pass-wrap .olho{position:absolute;right:2px;top:0;bottom:0;width:48px;background:none;border:0;color:inherit;opacity:.75;display:grid;place-items:center;cursor:pointer}.pass-wrap .olho[aria-pressed="true"]{opacity:1}';
+    document.head.appendChild(st);
+  } catch (e) { /* sem DOM */ }
+  BU.UI = { toast, confirmar, escolher, pedir, senhaHTML };
 })();

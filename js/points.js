@@ -235,7 +235,7 @@
     else if (a === 'compartilhar') compartilhar(l);
     else if (a === 'ordem') { P.ordem = { cad: 'asc', asc: 'desc', desc: 'cad' }[P.ordem]; App.renderEtapa(); }
     else if (a === 'mais') { P.limite += 150; App.renderEtapa(); }
-    else if (a === 'ver-croqui') App.irEtapa(5);
+    else if (a === 'ver-croqui') App.irEtapa(App.E.CORPO);
   });
 
   function aoMudar(e) {

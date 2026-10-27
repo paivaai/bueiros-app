@@ -5,7 +5,17 @@
   const BU = window.BU, U = BU.U, UI = BU.UI, DB = BU.DB, esc = U.esc;
 
   const MAX = 1600, QUALIDADE = 0.82;
-  const CATEGORIAS = [['', '— classificar —'], ['entrada', 'Entrada'], ['saida', 'Saída'], ['secao', 'Seção'], ['erosao', 'Erosão'], ['obstrucao', 'Obstrução'], ['patologia', 'Patologia'], ['outro', 'Outro']];
+  const CATEGORIAS = [['', '— classificar —'], ['entrada', 'Entrada'], ['saida', 'Saída'], ['secao', 'Seção'], ['erosao', 'Erosão'], ['obstrucao', 'Obstrução'], ['patologia', 'Patologia'], ['dispositivo', 'Dispositivo'], ['diagnostico', 'Diagnóstico'], ['corpo', 'Corpo / interior'], ['pista', 'Pista'], ['rn', 'RN'], ['geral', 'Vista geral'], ['outro', 'Outro']];
+  /* categoria e legenda automáticas pelo lugar onde a foto foi tirada (ctx) */
+  function rotuloCtx(ctx) {
+    const Cat = BU.Cat; ctx = ctx || '';
+    if (ctx === 'secao') return ['secao', 'Seção do bueiro'];
+    if (ctx.startsWith('pat:')) return ['patologia', Cat.rotulo(Cat.PATOLOGIAS, ctx.slice(4))];
+    if (ctx.startsWith('disp:')) return ['dispositivo', Cat.rotulo(Cat.DISPOSITIVOS, ctx.slice(5))];
+    if (ctx.startsWith('diag:')) return ['diagnostico', Cat.rotulo(Cat.NECESSITA, ctx.slice(5))];
+    if (ctx.startsWith('foto:')) { const k = ctx.slice(5); return [{ montante: 'entrada', jusante: 'saida' }[k] || k, Cat.rotulo(Cat.FOTOS, k)]; }
+    return ['', ''];
+  }
   let ctxPend = ''; // contexto da próxima foto: '' = geral, 'secao', 'pat:<id da patologia>'
   const urls = new Map(); // id -> blob URL (miniaturas)
 
@@ -93,7 +103,7 @@
         const quando = (!daCamera && f.lastModified) ? new Date(f.lastModified) : new Date();
         const r = await reduzir(f, l, quando), id = U.uid();
         await DB.salvarFoto({ id, levantamentoId: l.id, tipo: 'image/jpeg', blob: r.blob, criadoEm: U.agoraISO() });
-        l.fotos.push({ id, categoria: ctx === 'secao' ? 'secao' : ctx.startsWith('pat:') ? 'patologia' : '', ctx, legenda: '', dataHora: quando.toISOString(), w: r.w, h: r.h, bytes: r.blob.size });
+        const [cat, leg] = rotuloCtx(ctx); l.fotos.push({ id, categoria: cat, ctx, legenda: leg, dataHora: quando.toISOString(), w: r.w, h: r.h, bytes: r.blob.size });
         App.marcarSujo();
       } catch (e) {
         UI.toast('Erro na foto: ' + (e && e.message || e) + (e && e.name === 'QuotaExceededError' ? ' (armazenamento cheio)' : ''), 'erro');
@@ -180,15 +190,18 @@
         ${lista.length ? `<div class="lista-pt">${lista.map((f, i) => cartao(f, i, true)).join('')}</div>` : ''}</div>`;
   }
 
+  /* Etapa "Fotos": uma seção por legenda, com quantas fotos forem precisas. O botão abre a câmera direto. */
   function etapaHTML(l) {
-    const u = BU.GPS.utmDe(l);
-    const nSec = l.fotos.filter(f => f.ctx === 'secao').length, nPat = l.fotos.filter(f => (f.ctx || '').startsWith('pat:')).length;
-    return blocoHTML(l, '', 'Fotos gerais do bueiro', { entradas: true })
-      + `<p class="muted small" style="margin:0 4px">As fotos são reduzidas para no máximo 1600 px e ficam só neste aparelho. Fotos da seção (${nSec}) e das patologias (${nPat}) são tiradas nas etapas Seção e Patologias.</p>
+    const u = BU.GPS.utmDe(l), Cat = BU.Cat;
+    const soltas = l.fotos.filter(f => !f.ctx);
+    return `<div class="card"><p class="muted small" style="margin:0">Toque em <b>Tirar foto</b> para abrir a câmera. Pode tirar <b>várias fotos</b> para a mesma legenda. As fotos são reduzidas para no máximo 1600 px e ficam neste aparelho até a sincronização.</p></div>
+      ${Cat.FOTOS.map(([k, r]) => blocoHTML(l, 'foto:' + k, r)).join('')}
+      ${soltas.length ? blocoHTML(l, '', 'Outras fotos (versão anterior)') : ''}
+      ${entradasHTML()}
       <div class="card marca"><h3>Marca d'água e coordenadas</h3>
-        <label class="chk"><input type="checkbox" data-fm="ativo"${CFG.ativo ? ' checked' : ''}> Estampar a logo e as coordenadas UTM nas fotos novas</label>
+        <label class="chk"><input type="checkbox" data-fx="ativo"${CFG.ativo ? ' checked' : ''}> Estampar a logo e as coordenadas UTM nas fotos novas</label>
         <div class="logo-linha">${CFG.logo ? `<img class="logo-prev" src="${esc(CFG.logo)}" alt="Logo da empresa">` : '<span class="muted small">Nenhuma logo enviada.</span>'}
-          <button type="button" class="btn sm" data-fm="logo">${CFG.logo ? 'Trocar logo' : 'Enviar logo'}</button>${CFG.logo ? '<button type="button" class="btn sm danger" data-fm="logo-remover">Remover</button>' : ''}</div>
+          <button type="button" class="btn sm" data-fx="logo">${CFG.logo ? 'Trocar logo' : 'Enviar logo'}</button>${CFG.logo ? '<button type="button" class="btn sm danger" data-fx="logo-remover">Remover</button>' : ''}</div>
         <input type="file" id="fo-logo" accept="image/*" hidden>
         <p class="muted small">${u ? `Coordenadas da Etapa 2: E ${esc(BU.GPS.fmtM(u.E, 3))} · N ${esc(BU.GPS.fmtM(u.N, 3))} · ${esc(BU.GPS.rotuloUTM(u))}.` : '<b>Coordenadas UTM ainda não informadas na Etapa 2:</b> as fotos saem só com a logo.'} A marca fica gravada na foto e vale só para as fotos tiradas depois.</p></div>`;
   }
@@ -206,10 +219,10 @@
   function limpar() { urls.forEach(u => URL.revokeObjectURL(u)); urls.clear(); }
 
   document.addEventListener('click', async e => {
-    const fm = e.target.closest('[data-fm]');
+    const fm = e.target.closest('[data-fx]');
     if (fm && fm.tagName === 'BUTTON') {
-      if (fm.dataset.fm === 'logo') document.getElementById('fo-logo').click();
-      else if (fm.dataset.fm === 'logo-remover') { CFG.logo = ''; await salvarCfg(); BU.App.renderEtapa(); }
+      if (fm.dataset.fx === 'logo') document.getElementById('fo-logo').click();
+      else if (fm.dataset.fx === 'logo-remover') { CFG.logo = ''; await salvarCfg(); BU.App.renderEtapa(); }
       return;
     }
     const b = e.target.closest('[data-fo]'); if (!b || b.tagName === 'SELECT' || b.tagName === 'INPUT') return;
@@ -236,7 +249,7 @@
   });
   function aoMudar(e) {
     const el = e.target, l = BU.App.cur(); if (!l) return;
-    if (el.dataset && el.dataset.fm === 'ativo') { if (e.type === 'change') { CFG.ativo = el.checked; salvarCfg(); } return; }
+    if (el.dataset && el.dataset.fx === 'ativo') { if (e.type === 'change') { CFG.ativo = el.checked; salvarCfg(); } return; }
     if (el.id === 'fo-logo') {
       if (e.type !== 'change') return;
       const f = el.files && el.files[0]; el.value = ''; if (!f) return;

@@ -57,7 +57,7 @@
       ${D.modo === 'demo' ? '<div class="aviso"><b>Modo demonstração.</b> Dados fictícios. Entre com <b>arthur@gfa.demo</b> e a senha <b>demo</b>, ou use o botão abaixo.</div>' : ''}
       ${msg ? `<div class="erro" role="alert">${esc(msg)}</div>` : ''}
       <label class="f">E-mail ou usuário<input type="text" name="email" required autocomplete="username" autocapitalize="none" value="${esc(email || (D.modo === 'demo' ? 'arthur@gfa.demo' : ''))}"></label>
-      <label class="f">Senha<input type="password" name="senha" required autocomplete="current-password" value="${D.modo === 'demo' ? 'demo' : ''}"></label>
+      <label class="f">Senha${BU.UI ? BU.UI.senhaHTML({ name: 'senha', value: D.modo === 'demo' ? 'demo' : '' }) : `<input type="password" name="senha" required autocomplete="current-password" value="${D.modo === 'demo' ? 'demo' : ''}">`}</label>
       <button class="btn pri" type="submit">Entrar</button>
       <p class="small muted" style="margin:0">Acesso só para administradores e gestores. A equipe de campo usa o aplicativo do celular.</p></form>`;
   }
@@ -205,7 +205,7 @@
 
   /* ---------------------------------------------------------------- detalhe */
   async function viewDetalhe(id) {
-    const [b, hist, fotos, eixo] = await Promise.all([D.bueiro(id), D.historico(id), D.fotos(id), D.eixo(S.projeto.id).catch(() => null)]);
+    const [b, hist, fotos, eixo, pres] = await Promise.all([D.bueiro(id), D.historico(id), D.fotos(id), D.eixo(S.projeto.id).catch(() => null), (D.presencas ? D.presencas(id) : Promise.resolve([])).catch(() => [])]);
     if (!b) { pagina('bueiros', '<div class="erro">Bueiro não encontrado.</div>'); return; }
     const d = b.dados || {}, c = d.caracteristicas || {}, campo = S.usuarios.filter(u => u.papel === 'campo');
     let prancha = '';
@@ -224,11 +224,12 @@
           <dt>Responsável</dt><dd>${esc(b.responsavel_nome || '—')}</dd><dt>Atribuído a</dt><dd>${esc(nomeDe(b.atribuido_a))}</dd><dt>Cadastro</dt><dd>${esc(b.cadastro_id || '—')}</dd></dl>
           ${['a_vistoriar', 'rascunho', 'devolvido'].includes(b.status) ? `<div class="linha" style="margin-top:12px"><select id="d-atrib" style="max-width:220px"><option value="">Atribuir a…</option><option value="_nenhum">(remover)</option>${campo.map(u => `<option value="${u.id}"${b.atribuido_a === u.id ? ' selected' : ''}>${esc(u.nome)}</option>`).join('')}</select><button class="btn sm" data-a="atrib-um" data-id="${b.id}">Atribuir</button></div>` : ''}</div>
         <div class="card"><h3>Características</h3><dl class="kv" style="margin-top:10px">
-          <dt>Tipo</dt><dd>${esc(c.tipo || '—')}</dd><dt>Formato</dt><dd>${esc(c.formato || '—')}</dd><dt>Material</dt><dd>${esc(c.material || '—')}</dd>
+          <dt>Tipo</dt><dd>${esc(((d.meta && d.meta.sigla) ? d.meta.sigla + ' · ' : '') + (c.tipo || '—'))}${d.classificacao ? ' <span class="muted small">(' + esc(d.classificacao) + ')</span>' : ''}</dd><dt>Boca montante / jusante</dt><dd>${esc(((d.bocas && d.bocas.montante && d.bocas.montante.tipo) || '—') + ' / ' + ((d.bocas && d.bocas.jusante && d.bocas.jusante.tipo) || '—'))}${d.bocas && d.bocas.jusante && d.bocas.jusante.estadoDissipador ? '<br><span class="muted small">Dissipador: ' + esc(d.bocas.jusante.estadoDissipador) + '</span>' : ''}</dd><dt>Material</dt><dd>${esc(c.material || '—')}</dd>
           <dt>Dimensão</dt><dd>${c.diametro != null ? 'Ø ' + esc(c.diametro) + ' m' : (c.largura != null ? esc(c.largura) + ' × ' + esc(c.altura) + ' m' : '—')}</dd>
           <dt>Conservação</dt><dd>${esc(c.conservacao || '—')}</dd><dt>Assoreamento</dt><dd>${esc(c.assoreamento || '—')}</dd></dl>
           ${d.observacoes ? `<p class="small" style="margin-bottom:0"><b>Observações:</b> ${esc(d.observacoes)}</p>` : ''}</div>
       </div>
+      <div class="card"><h3>Presença da equipe <span class="muted small">(botão “GPS aqui”)</span></h3>${pres.length ? `<div class="tab-wrap" style="margin-top:8px;max-height:200px"><table><thead><tr><th>Quando</th><th>Quem</th><th>Precisão</th><th>Do ponto planejado</th></tr></thead><tbody>${pres.map(r => `<tr style="cursor:default"><td>${quando(r.em)}</td><td>${esc(r.usuario_nome || '—')}</td><td>${r.precisao_m != null ? '± ' + esc(String(r.precisao_m).replace('.', ',')) + ' m' : '—'}</td><td>${r.dist_planejado_m != null ? esc(String(Math.round(r.dist_planejado_m))) + ' m' : '—'}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted small" style="margin:8px 0 0">Nenhum registro de presença ainda (a equipe ainda não tocou em “GPS aqui” neste bueiro, ou o script 11 do servidor não foi rodado).</p>'}</div>
       ${d.naoLocalizado ? `<div class="card" style="border-left:6px solid #7B4FC4"><h3>Não localizado em campo</h3><p style="margin:8px 0 0"><b>${esc(d.naoLocalizado.motivo || '')}</b>${d.naoLocalizado.obs ? ' — ' + esc(d.naoLocalizado.obs) : ''}</p>${d.naoLocalizado.gps ? `<p class="muted small" style="margin:6px 0 0">Posição do GPS do celular: ${(+d.naoLocalizado.gps.latitude).toFixed(6)}, ${(+d.naoLocalizado.gps.longitude).toFixed(6)} · <a target="_blank" rel="noopener" href="https://www.google.com/maps?q=${d.naoLocalizado.gps.latitude},${d.naoLocalizado.gps.longitude}">Google Maps</a></p>` : ''}</div>` : ''}
       ${(() => { const cf = BU.Conf ? BU.Conf.analisar({ ...d, status: b.status }, eixo) : []; return cf.length ? `<div class="card"><h3>Conferências automáticas</h3><ul style="margin:8px 0 0;padding-left:18px">${cf.map(k => `<li style="color:${k.n === 'erro' ? 'var(--st-devolvido)' : 'inherit'}">${esc(k.t)}</li>`).join('')}</ul></div>` : ''; })()}
       ${(Array.isArray(d.patologias) && d.patologias.length) || d.semPatologias ? `<div class="card"><h3>Patologias</h3>${d.semPatologias ? '<p class="muted" style="margin:8px 0 0">Sem patologias aparentes.</p>' : `<div class="tab-wrap" style="margin-top:10px;max-height:none"><table><thead><tr><th>Tipo</th><th>Onde</th><th>Gravidade</th><th>Observação</th></tr></thead><tbody>${d.patologias.map(p => `<tr style="cursor:default"><td><b>${esc(p.tipo || '—')}</b></td><td>${esc(p.local || '—')}</td><td>${esc(p.gravidade || '—')}</td><td style="white-space:normal">${esc(p.obs || '')}</td></tr>`).join('')}</tbody></table></div>`}</div>` : ''}
@@ -248,12 +249,19 @@
   }
 
   /* ---------------------------------------------------------------- criar / editar projeto */
+  const PAPEL = { admin: 'Administrador', gestor: 'Gestor (escritório)', campo: 'Operador (campo)' };
+  const podeEquipe = () => S.perfil && ['admin', 'gestor'].includes(S.perfil.papel);
+  const SENHA_CH = 'abcdefghjkmnpqrstuvwxyz23456789';
+  function gerarSenha(n = 8) { const a = new Uint32Array(n); (window.crypto || { getRandomValues: x => x.forEach((_, i) => (x[i] = Math.random() * 4e9)) }).getRandomValues(a); return [...a].map(v => SENHA_CH[v % SENHA_CH.length]).join(''); }
+  const campoSenha = (name, valor) => (BU.UI ? BU.UI.senhaHTML({ name, value: valor || '', auto: 'new-password' }) : `<input type="text" name="${name}" value="${esc(valor || '')}">`);
+  const linhaMembro = u => `<label class="memb"><input type="checkbox" name="membro" value="${esc(u.id)}"> <span>${esc(u.nome)}</span> <span class="muted small">${esc(mostraUsuario(u.email).replace(' (usuário)', ''))}</span></label>`;
+
   async function viewProjetoForm(id) {
     const p = id ? S.projetos.find(x => x.id === id) : { nome: '', rodovia: '', descricao: '', fuso: '23', hemisferio: 'S', ativo: true };
     if (!p) return viewProjetos();
-    const mem = id ? S.membros : [];
+    try { S.usuarios = await D.usuarios(); } catch (e) { /* usa a lista que já temos */ }
     const fusos = (BU.GPS && BU.GPS.ZONAS) || ['18', '19', '20', '21', '22', '23', '24', '25'];
-    const pessoas = S.usuarios.filter(u => u.papel !== 'admin');
+    const ops = S.usuarios.filter(u => u.papel === 'campo' && u.ativo !== false), ges = S.usuarios.filter(u => u.papel === 'gestor' && u.ativo !== false && u.id !== S.perfil.id);
     pagina(id ? 'geral' : 'projetos', `<div class="crumb"><a href="${id ? '#/p/' + id : '#/'}">← Voltar</a></div>
       <div class="linha"><h1>${id ? 'Editar projeto' : 'Novo projeto'}</h1></div>
       <form id="f-proj" class="card grid" style="max-width:760px;gap:14px" data-id="${esc(id || '')}">
@@ -263,8 +271,14 @@
         <div class="grid g2"><label class="f">Fuso UTM padrão (SIRGAS 2000)<select name="fuso">${fusos.map(z => `<option value="${z}"${String(p.fuso) === z ? ' selected' : ''}>${z}</option>`).join('')}</select></label>
           <label class="f">Hemisfério<select name="hemisferio"><option value="S"${p.hemisferio !== 'N' ? ' selected' : ''}>Sul</option><option value="N"${p.hemisferio === 'N' ? ' selected' : ''}>Norte</option></select></label></div>
         <p class="muted small" style="margin:-6px 0 0">É só o valor sugerido ao campo. O fuso fica gravado em cada bueiro, junto com o Este e o Norte.</p>
-        ${id ? '' : `<fieldset style="border:1px solid var(--line);border-radius:8px;padding:12px"><legend style="font-weight:700;font-size:13px">Quem participa (além de você)</legend>
-          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px 14px">${pessoas.filter(u => u.id !== S.perfil.id).map(u => `<label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="membro" value="${u.id}"> ${esc(u.nome)} <span class="muted small">(${u.papel === 'campo' ? 'campo' : 'gestor'})</span></label>`).join('') || '<span class="muted">Ninguém cadastrado ainda. O administrador cadastra os convites em Equipe e acessos.</span>'}</div></fieldset>`}
+        ${id ? '' : `<fieldset class="quem"><legend>Quem participa (além de você)</legend>
+          <div class="linha" style="margin-bottom:6px"><b>Operadores (campo)</b><span class="esp"></span><button type="button" class="btn sm" data-a="memb-todos" data-g="campo">Marcar todos</button><button type="button" class="btn sm" data-a="memb-nenhum" data-g="campo">Limpar</button></div>
+          <div class="membros" id="lista-operadores">${ops.map(linhaMembro).join('') || '<span class="muted">Nenhum operador cadastrado ainda. Adicione abaixo.</span>'}</div>
+          ${ges.length ? `<div class="linha" style="margin:10px 0 6px"><b>Gestores (escritório)</b></div><div class="membros">${ges.map(linhaMembro).join('')}</div>` : ''}
+          ${podeEquipe() ? `<details class="addop" style="margin-top:10px"><summary><b>+ Adicionar operador agora</b></summary>
+            <div class="grid g2" style="margin-top:8px"><label class="f">Nome<input type="text" id="op-nome" autocomplete="off"></label><label class="f">Usuário (login)<input type="text" id="op-user" autocapitalize="none" autocomplete="off" placeholder="ex.: filipe"></label></div>
+            <label class="f" style="margin-top:6px">Senha<span class="linha">${campoSenha('op-senha', gerarSenha())}<button type="button" class="btn sm" data-a="op-gerar">Gerar</button></span></label>
+            <div class="linha" style="margin-top:8px"><button type="button" class="btn pri sm" data-a="op-add">Adicionar e marcar</button><span id="op-msg" class="small"></span></div></details>` : ''}</fieldset>`}
         <div id="proj-erro"></div>
         <div class="linha"><button class="btn pri" type="submit">${id ? 'Salvar alterações' : 'Criar projeto'}</button>${id ? '<button class="btn dev" type="button" data-a="arquivar">Arquivar projeto</button>' : ''}</div>
       </form>`);
@@ -273,15 +287,28 @@
   /* ---------------------------------------------------------------- equipe */
   async function viewEquipe() {
     S.usuarios = await D.usuarios();
-    const admin = S.perfil.papel === 'admin';
+    if (!S.projetos.length) { try { await carregarProjetos(); } catch (e) { /* segue */ } }
+    const admin = S.perfil.papel === 'admin', pode = podeEquipe();
+    const dom = DOM;
+    const gerencia = u => pode && u.id !== S.perfil.id && (admin || u.papel === 'campo');
+    const projChecks = S.projetos.map(p => `<label class="memb"><input type="checkbox" name="proj" value="${esc(p.id)}"> <span>${esc(p.nome)}</span></label>`).join('') || '<span class="muted small">Nenhum projeto ainda.</span>';
+    const papeis = admin ? '<option value="campo">Operador (usa o app do celular)</option><option value="gestor">Gestor (escritório: revisa e atribui)</option><option value="admin">Administrador</option>' : '<option value="campo">Operador (usa o app do celular)</option>';
     pagina('equipe', `<div class="linha"><h1>Equipe e acessos</h1></div>
-      <div class="grid g2"><div class="card"><h3>Quem tem acesso</h3><div class="tab-wrap" style="margin-top:10px;max-height:none"><table><thead><tr><th>Nome</th><th>E-mail</th><th>Papel</th></tr></thead><tbody>
-        ${S.usuarios.map(u => `<tr style="cursor:default"><td><b>${esc(u.nome)}</b></td><td>${esc(mostraUsuario(u.email))}</td><td>${esc({ admin: 'Administrador', gestor: 'Gestor (escritório)', campo: 'Campo' }[u.papel])}${u.convite ? ' <span class="muted small">(convidado)</span>' : ''}</td></tr>`).join('')}</tbody></table></div></div>
-      <div class="card"><h3>Convidar pessoa</h3>${admin ? `<form id="f-conv" class="grid" style="margin-top:10px;gap:10px">
-        <label class="f">Nome<input type="text" name="nome" required></label><label class="f">E-mail ou usuário<input type="text" name="email" required autocapitalize="none" placeholder="ex.: felipe  (ou um e-mail)"></label>
-        <label class="f">Papel<select name="papel"><option value="campo">Campo (usa o app do celular)</option><option value="gestor">Gestor (escritório: revisa e atribui)</option><option value="admin">Administrador</option></select></label>
-        <button class="btn pri" type="submit">Cadastrar convite</button><div id="conv-msg" class="small"></div>
-        <p class="small muted" style="margin:0">A pessoa cria a conta com <b>esse e-mail ou usuário</b> (no Supabase: Authentication → Add user; para usuário sem e-mail real, use <b>usuário@${DOM}</b> e marque Auto Confirm) e entra já com o papel certo. Sem convite, a conta não enxerga nada.</p></form>` : '<p class="muted">Só o administrador convida pessoas.</p>'}</div></div>`);
+      <div class="grid g2"><div class="card"><h3>Quem tem acesso <span class="muted small">(${S.usuarios.length})</span></h3><div class="tab-wrap" style="margin-top:10px;max-height:none"><table><thead><tr><th>Nome</th><th>Usuário / e-mail</th><th>Papel</th><th></th></tr></thead><tbody>
+        ${S.usuarios.map(u => `<tr style="cursor:default${u.ativo === false ? ';opacity:.55' : ''}"><td><b>${esc(u.nome)}</b>${u.ativo === false ? ' <span class="muted small">(desativado)</span>' : ''}</td><td>${esc(mostraUsuario(u.email))}</td><td>${esc(PAPEL[u.papel] || u.papel)}${u.convite ? ' <span class="muted small">(convidado)</span>' : ''}</td>
+          <td style="white-space:nowrap">${gerencia(u) ? `<button class="btn sm" data-a="pw-reset" data-id="${esc(u.id)}" data-nome="${esc(u.nome)}">Nova senha</button> <button class="btn sm" data-a="pessoa-ativo" data-id="${esc(u.id)}" data-ativo="${u.ativo === false ? '1' : '0'}">${u.ativo === false ? 'Reativar' : 'Desativar'}</button>` : ''}</td></tr>`).join('')}</tbody></table></div></div>
+      <div>${pode ? `<div class="card"><h3>Adicionar pessoa</h3><form id="f-pessoa" class="grid" style="margin-top:10px;gap:10px">
+        <label class="f">Nome<input type="text" name="nome" required autocomplete="off"></label>
+        <label class="f">Usuário ou e-mail<input type="text" name="usuario" required autocapitalize="none" autocomplete="off" placeholder="ex.: filipe  (vira filipe@${esc(dom)})"></label>
+        <label class="f">Senha<span class="linha">${campoSenha('senha', gerarSenha())}<button type="button" class="btn sm" data-a="senha-gerar">Gerar</button></span></label>
+        <label class="f">Papel<select name="papel">${papeis}</select></label>
+        <fieldset class="quem"><legend>Projetos (opcional)</legend><div class="membros">${projChecks}</div></fieldset>
+        <button class="btn pri" type="submit">Criar acesso</button><div id="pessoa-msg" class="small"></div>
+        <p class="small muted" style="margin:0">A conta já nasce pronta: a pessoa entra no app com o usuário e a senha acima. Anote a senha (ela não aparece de novo) e envie por um canal seguro.</p></form></div>
+      <div class="card" style="margin-top:14px"><details><summary><b>Adicionar várias pessoas de uma vez</b></summary>
+        <form id="f-lote" class="grid" style="margin-top:10px;gap:10px"><label class="f">Uma pessoa por linha: <code>nome; usuário; senha</code> (senha pode ficar em branco para gerar)<textarea name="lote" rows="6" placeholder="Filipe Silva; filipe\nMaria Souza; maria; abc12345"></textarea></label>
+          <label class="f">Papel<select name="papel"><option value="campo">Operador (campo)</option>${admin ? '<option value="gestor">Gestor</option>' : ''}</select></label>
+          <button class="btn pri" type="submit">Criar todos</button><div id="lote-msg" class="small"></div></form></details></div>` : '<div class="card"><p class="muted">Só administradores e gestores adicionam pessoas.</p></div>'}</div></div>`);
   }
 
   /* ---------------------------------------------------------------- roteamento */
@@ -330,6 +357,27 @@
           await D.editarProjeto(id, { nome: p.nome, rodovia: p.rodovia, descricao: p.descricao, fuso: p.fuso, hemisferio: p.hemisferio, ativo: false });
           S.projeto = null; S.projetos = []; toast('Projeto arquivado.'); location.hash = '#/';
         }
+        else if (k === 'memb-todos' || k === 'memb-nenhum') { document.querySelectorAll('#f-proj [name=membro]').forEach(c => { if (c.closest('#lista-operadores') || a.dataset.g !== 'campo') c.checked = k === 'memb-todos'; }); }
+        else if (k === 'senha-gerar' || k === 'op-gerar') { const f = a.closest('form, fieldset'); const i = f && f.querySelector('input[name=senha], input[name=op-senha]'); if (i) i.value = gerarSenha(); }
+        else if (k === 'op-add') {
+          const nome = document.getElementById('op-nome').value.trim(), user = document.getElementById('op-user').value.trim(), senha = document.querySelector('[name=op-senha]').value, msg = document.getElementById('op-msg');
+          if (!nome || !user) { msg.innerHTML = '<span class="erro">Preencha nome e usuário.</span>'; return; }
+          a.disabled = true;
+          try {
+            const r = await D.criarUsuario(user, nome, senha, 'campo', []);
+            S.usuarios = await D.usuarios(); const u = S.usuarios.find(x => x.id === r.id) || { id: r.id, nome, email: r.email, papel: 'campo' };
+            const lista = document.getElementById('lista-operadores'); if (!lista.querySelector('.memb')) lista.innerHTML = '';
+            lista.insertAdjacentHTML('beforeend', linhaMembro(u)); lista.lastElementChild.querySelector('input').checked = true;
+            msg.innerHTML = `<span style="color:var(--st-aprovado);font-weight:700">Criado. Usuário <b>${esc(r.usuario)}</b>, senha <b>${esc(senha)}</b> (anote).</span>`;
+            document.getElementById('op-nome').value = ''; document.getElementById('op-user').value = ''; document.querySelector('[name=op-senha]').value = gerarSenha();
+          } catch (e) { msg.innerHTML = `<span class="erro" role="alert">${esc(e.message || e)}</span>`; }
+          a.disabled = false;
+        } else if (k === 'pw-reset') {
+          const nova = gerarSenha(), ok = prompt(`Nova senha para ${a.dataset.nome} (pode editar):`, nova); if (!ok) return;
+          await D.redefinirSenha(a.dataset.id, ok); toast(`Senha de <b>${esc(a.dataset.nome)}</b> trocada para <b>${esc(ok)}</b>. Anote e envie por um canal seguro.`, 15000);
+        } else if (k === 'pessoa-ativo') {
+          await D.definirAtivo(a.dataset.id, a.dataset.ativo === '1'); toast(a.dataset.ativo === '1' ? 'Acesso reativado.' : 'Acesso desativado.'); viewEquipe();
+        }
         else if (k === 'sel-todos') { filtrados().forEach(b => S.sel.add(b.id)); viewBueiros(); }
         else if (k === 'sel-nenhum') { S.sel.clear(); viewBueiros(); }
         else if (k === 'atribuir') {
@@ -370,11 +418,31 @@
         if (id) { await D.editarProjeto(id, { ...d, ativo: true }); S.projetos = []; await carregarProjetos(); S.projeto = null; toast('Projeto atualizado.'); location.hash = '#/p/' + id; }
         else { const novo = await D.criarProjeto(d); S.projetos = []; S.projeto = null; toast('Projeto criado.'); location.hash = '#/p/' + novo; }
       } catch (er) { e.innerHTML = `<div class="erro" role="alert">${esc(er.message || er)}</div>`; btn.disabled = false; }
+    } else if (f.id === 'f-pessoa') {
+      const m = document.getElementById('pessoa-msg'), btn = f.querySelector('button[type=submit]'); btn.disabled = true; m.textContent = 'Criando…';
+      try {
+        const senha = f.senha.value, r = await D.criarUsuario(f.usuario.value, f.nome.value, senha, f.papel.value, [...f.querySelectorAll('[name=proj]:checked')].map(c => c.value));
+        S.usuarios = await D.usuarios(); S.membros = [];
+        toast(`Acesso criado: usuário <b>${esc(r.usuario)}</b>, senha <b>${esc(senha)}</b>. Anote a senha agora.`, 20000); viewEquipe();
+      } catch (e) { m.innerHTML = `<span class="erro" role="alert">${esc(e.message || e)}</span>`; btn.disabled = false; }
+    } else if (f.id === 'f-lote') {
+      const m = document.getElementById('lote-msg'), btn = f.querySelector('button[type=submit]'); btn.disabled = true; m.textContent = 'Criando…';
+      const linhas = f.lote.value.split(/\n+/).map(x => x.trim()).filter(Boolean), res = [];
+      for (const ln of linhas) {
+        const [nome, user, senha0] = ln.split(/[;\t]/).map(x => (x || '').trim()), senha = senha0 || gerarSenha();
+        try { const r = await D.criarUsuario(user || nome, nome, senha, f.papel.value, []); res.push(`<tr><td>${esc(nome)}</td><td>${esc(r.usuario)}</td><td><b>${esc(senha)}</b></td><td style="color:var(--st-aprovado)">ok</td></tr>`); }
+        catch (e) { res.push(`<tr><td>${esc(nome)}</td><td>${esc(user || nome)}</td><td>—</td><td class="erro">${esc(e.message || e)}</td></tr>`); }
+      }
+      S.usuarios = await D.usuarios(); btn.disabled = false;
+      m.innerHTML = `<div class="tab-wrap" style="max-height:none"><table><thead><tr><th>Nome</th><th>Usuário</th><th>Senha</th><th></th></tr></thead><tbody>${res.join('')}</tbody></table></div><p class="muted small">Anote as senhas: elas não aparecem de novo.</p>`;
     } else if (f.id === 'f-conv') {
       const m = document.getElementById('conv-msg');
       try { await D.convidar(paraEmail(f.email.value), f.nome.value, f.papel.value); m.innerHTML = '<span style="color:var(--st-aprovado);font-weight:700">Convite cadastrado.</span>'; setTimeout(viewEquipe, 700); }
       catch (e) { m.innerHTML = `<span class="erro" role="alert">${esc(e.message || e)}</span>`; }
     }
+  });
+  document.addEventListener('keydown', ev => { // Enter nos campos de "adicionar operador" não envia o projeto
+    if (ev.key === 'Enter' && ev.target.closest && ev.target.closest('.addop')) { ev.preventDefault(); const b = document.querySelector('[data-a="op-add"]'); if (b) b.click(); }
   });
   window.addEventListener('hashchange', rotear);
 

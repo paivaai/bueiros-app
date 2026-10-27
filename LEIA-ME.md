@@ -67,3 +67,15 @@ Logo da GFA na barra superior, nos ícones do app, na tela sem conexão, no rela
 - **Não localizei:** botão no cartão do bueiro e na Etapa 1/9. Escolha o motivo; o app guarda a posição do GPS e envia para o escritório revisar. "Voltar a vistoriar" desfaz.
 - **Qualidade do RTK (Etapa 2):** solução (fixa/flutuante), precisão, base, receptor, altura da antena, tipo de altitude. Os dados da base/receptor/antena viram padrão do próximo bueiro. A Etapa 9 avisa quando algo foge do esperado.
 - **Atualizar:** suba todos os arquivos (novos: `js/vendor/`, `js/config.js`, `js/sync.js`, `js/mapa.js`, `js/conferencias.js`).
+
+## 11. Ajustes de outubro/2026 (formulário em 11 etapas)
+
+- **Login (Tela 01)**: o app abre na tela de entrada, com "olho" para ver a senha. O usuário é aceito com ou sem maiúsculas/espaços e a senha também é tentada sem espaços nas pontas. Há "Continuar sem conta" para uso só no aparelho.
+- **Início (Tela 02/03)**: "Meus projetos" (os que você participa), os bueiros do projeto aberto abaixo e a barra inferior **Cadastro · Mapa · ＋ Novo bueiro · Projeto**.
+- **Formulário**: Informação geral (tipo BSCC etc., metadados do cadastro) → Coordenadas (SIRGAS 2000) → Corpo → Boca de montante → Boca de jusante (com **Estado do dissipador**) → Levantamento RTK → Dispositivos (foto de cada) → Patologias (foto de cada) → Diagnóstico (foto de cada serviço, prioridade, observações) → Fotos (câmera direta, várias por legenda) → Revisão.
+- **Bocas**: o desenho da boca (simples, duplo ou triplo) tem pontos vermelhos clicáveis (X, Y, Z) e **obrigatórios**; dá para importar a lista do RTK. Com todos marcados, planta e perfil são gerados.
+- **GPS aqui** grava a presença na tabela `presencas` (rodar o script 11).
+- **Importar KMZ** (app e painel): nome completo (ex.: `BU 101 RJ 002+47- N 1 (sentido norte)`) e todos os campos do cadastro vêm preenchidos.
+- **Vistoriador e data**: sempre quem está logado e o dia de hoje; sem ID de banco na tela.
+- **Painel**: "Quem participa" lista os operadores (marcar todos / adicionar na hora); Equipe permite criar pessoas, trocar senha e desativar.
+- Os desenhos ilustrativos do **Diagnóstico** são pictogramas (não há fotos-exemplo reais).

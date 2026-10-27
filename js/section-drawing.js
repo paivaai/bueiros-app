@@ -160,16 +160,12 @@ ${corpo}${riscos}${notas}${leg}${fl}</svg>`;
     sincronizar(l); box.innerHTML = gerarSVG(l);
   }
 
-  function etapaHTML(l) {
+  /* Só o croqui (desenho + ferramentas). As dimensões ficam na etapa Corpo. */
+  function croquiHTML(l) {
     sincronizar(l);
-    const App = BU.App, tipo = l.caracteristicas.formato, s = l.secao || {};
-    const campos = (CAMPOS_TIPO[tipo] || []).map(c => App.campoHTML({ p: 'caracteristicas.' + c, label: rotulo(tipo, c), t: 'num', unit: 'm', min: 0 })).join('');
+    const s = l.secao || {};
     const seg = (v, t) => `<button type="button" data-sc="modo" data-v="${v}" aria-pressed="${T.modo === v}">${t}</button>`;
-    return `<h2 class="sub-h">Seção transversal</h2><div class="card"><div class="grid">
-        ${App.campoHTML({ p: 'caracteristicas.formato', label: 'Tipo de seção', t: 'select', opts: FORMATOS })}
-        ${campos}</div>
-        <p class="muted small">Dimensões em metros. O desenho se atualiza sozinho e usa os mesmos valores da etapa Características.</p></div>
-      <div class="card croqui-card">
+    return `<div class="card croqui-card"><h3>Croqui da seção</h3>
         <div class="seg-tools" role="group" aria-label="Ferramenta">${seg('ver', 'Ver')}${seg('riscar', '✏️ Riscar')}${seg('anotar', '📝 Anotar')}</div>
         <div id="croqui-wrap" class="modo-${T.modo}"><div id="croqui">${gerarSVG(l)}</div></div>
         <p class="muted small" id="sc-dica">${T.modo === 'riscar' ? 'Arraste o dedo sobre o desenho para riscar.' : T.modo === 'anotar' ? 'Toque no desenho onde quer colocar o texto.' : 'Escolha Riscar ou Anotar para complementar o croqui.'}</p>
@@ -180,6 +176,7 @@ ${corpo}${riscos}${notas}${leg}${fl}</svg>`;
         ${s.salvoEm ? `<p class="muted small">Seção salva em ${esc(U.dataHoraBR(s.salvoEm))}.</p>` : ''}
       </div>`;
   }
+  const etapaHTML = croquiHTML;
 
   function miniatura(l) { return (l.secao && l.secao.salvoEm) || (l.secao && forma(l)) ? `<div class="croqui-mini">${gerarSVG(l)}</div>` : '<div class="croqui-ph">Seção ainda não desenhada</div>'; }
 
@@ -257,5 +254,5 @@ ${corpo}${riscos}${notas}${leg}${fl}</svg>`;
   document.addEventListener('pointerup', fimTraco);
   document.addEventListener('pointercancel', fimTraco);
 
-  BU.Secao = { etapaHTML, redesenhar, miniatura, gerarSVG, exportarPNG, FORMATOS, dims, forma };
+  BU.Secao = { etapaHTML, croquiHTML, redesenhar, miniatura, gerarSVG, exportarPNG, FORMATOS, dims, forma };
 })();

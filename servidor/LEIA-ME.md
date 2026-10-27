@@ -58,3 +58,9 @@ bueiro "A vistoriar". Quem já foi vistoriado nunca é alterado nem removido pel
 
 Cria a situação `nao_localizado`, a coluna `fotos.ctx`, atualiza `v_andamento` e as funções `salvar_bueiro`, `revisar_bueiro` e `atribuir_bueiros`.
 **Gestor também grava levantamento e envia fotos** (quem usa o painel e vai a campo). O campo não define aprovado/devolvido; o escritório revisa bueiros concluídos **e não localizados**.
+
+## 11 — Equipe pelo painel e presença "GPS aqui" (rodar UMA vez, depois do 10; sozinho)
+
+- **Criar pessoas pelo painel** (Equipe e acessos → Adicionar pessoa, ou "várias de uma vez"): funções `criar_usuario`, `redefinir_senha` e `definir_ativo`.
+  O admin cria qualquer papel; o gestor cria só **operadores (campo)**. Login por usuário (`filipe` vira `filipe@gfa-campo.app`). Sem esse script o painel avisa que falta rodá-lo.
+- **Presença da equipe**: tabela própria `presencas` (separada dos bueiros) e função `registrar_presencas`. Cada toque em **GPS aqui** no app grava quem esteve onde, com a precisão do GPS e a distância até o pin planejado. O painel mostra no detalhe do bueiro.
