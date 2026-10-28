@@ -105,3 +105,11 @@ fieldset.quem legend { font-weight: 700; font-size: 13px; padding: 0 6px; }
 .membros { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 6px 14px; }
 .memb { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .addop summary { cursor: pointer; }
+/* janela "Dados do ponto" */
+.dados-ponto h4 { margin: 14px 0 6px; font-size: 14px; }
+.dp-kvs { max-height: 44vh; overflow: auto; border: 1px solid var(--line, #ccc); border-radius: 10px; padding: 2px 10px; }
+.dp-kv { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; border-bottom: 1px solid rgba(0,0,0,.07); font-size: 14px; }
+.dp-kv:last-child { border-bottom: 0; } .dp-kv span { color: #565C63; flex: 0 0 42%; } .dp-kv b { text-align: right; overflow-wrap: anywhere; }
+.dp-fundo { position: fixed; inset: 0; z-index: 3000; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.dp-caixa { background: #fff; border-radius: 14px; padding: 18px 20px; width: min(620px, 100%); max-height: 90vh; overflow: auto; }
+.dp-caixa h2 { margin: 0 0 8px; font-size: 20px; }

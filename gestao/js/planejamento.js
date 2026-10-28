@@ -215,6 +215,7 @@
     P.pins.forEach(p => {
       const ed = editavel(p), mk = L.marker([p.lat, p.lon], { icon: icone(ed ? '#EF5A28' : COR[p.status] || '#555', rotulo ? p.codigo : ''), draggable: ed, title: p.codigo, keyboard: false });
       mk.on('dragend', () => { const ll = mk.getLatLng(); p.lat = +ll.lat.toFixed(7); p.lon = +ll.lng.toFixed(7); if (p.auto) nomear(p); else if (temEixo()) p.off = projetar(p.lat, p.lon).off; p.dirty = true; atualizarLista(); });
+      mk.bindPopup(() => `<b>${esc(p.codigo)}</b><br>km ${esc(p.km || '—')}<br><a href="#" data-dp="${esc(p.id)}">Dados do ponto</a>`);
       mk.on('click', () => { P.sel = p.id; atualizarLista(); });
       mk.addTo(P.cam.pins);
     });
@@ -283,7 +284,7 @@
     desenhar();
   }
   async function view(ctx, forcar) {
-    const { S, D, pagina } = ctx; P.ctx = ctx;
+    const { S, D, pagina } = ctx; P.ctx = ctx; if (BU.DadosPonto) { BU.DadosPonto.D = D; BU.DadosPonto.pinDe = id => P.pins.find(x => x.id === id); }
     if (P.projId !== S.projeto.id || forcar) {
       if (!(P.projId === S.projeto.id && sujo())) {
         P.projId = S.projeto.id; P.removidos = new Set(); P.imp = null; P.sel = null; P.modo = 'ver'; P.cache = null; P.eixoSujo = false;

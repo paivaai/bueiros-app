@@ -4,7 +4,7 @@
   const BU = window.BU || {}, U = BU.U || { esc: s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])) };
   const esc = U.esc;
   const raiz = document.getElementById('raiz');
-  const D = window.Dados.criar();
+  const D = window.Dados.criar(); if (BU.DadosPonto) BU.DadosPonto.D = D;
 
   const ROT = { a_vistoriar: 'A vistoriar', rascunho: 'Em andamento', concluido: 'Aguardando revisão', devolvido: 'Devolvido', aprovado: 'Aprovado', nao_localizado: 'Não localizado' };
   const ORDEM = ['aprovado', 'concluido', 'nao_localizado', 'devolvido', 'rascunho', 'a_vistoriar'];
@@ -184,7 +184,7 @@
     const g = L.featureGroup();
     pts.forEach(b => {
       const mk = L.circleMarker([b.latitude, b.longitude], { radius: 8, color: '#fff', weight: 2, fillColor: COR[b.status], fillOpacity: 1 }).addTo(g);
-      mk.bindPopup(`<b>${esc(b.codigo)}</b><br>km ${esc(b.km || '—')} · ${esc(ROT[b.status])}<br><a href="#/p/${S.projeto.id}/b/${b.id}">Abrir</a>`);
+      mk.bindPopup(`<b>${esc(b.codigo)}</b><br>km ${esc(b.km || '—')} · ${esc(ROT[b.status])}<br><a href="#/p/${S.projeto.id}/b/${b.id}">Abrir</a> · <a href="#" data-dp="${b.id}">Dados</a>`);
       mk.on('mouseover', () => { document.querySelectorAll('tr.sel').forEach(t => t.classList.remove('sel')); const t = document.querySelector(`tr[data-b="${b.id}"]`); if (t) t.classList.add('sel'); });
     });
     g.addTo(m); m.fitBounds(g.getBounds().pad(0.15));
