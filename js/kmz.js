@@ -119,6 +119,14 @@
     ['verif', 'Verificação', k => k === 'verif'],
     ['verifCatt', 'Verificação CATT', k => /^verif_?catt/.test(k)],
   ];
+  /* Nome legível para um campo do cadastro ("MUNICÃ_P" -> "Município"); os que não são reconhecidos só são limpos. */
+  function rotulo(k) {
+    const ch = chave(String(k).replace(/^(ï__|ï»¿|\uFEFF)/, ''));
+    const hit = CAMPOS.find(c => c[3] ? false : c[2](ch));
+    if (/^(lat|lon)$/.test(ch)) return ch === 'lat' ? 'Latitude' : 'Longitude';
+    if (hit) return hit[1];
+    return fixText(String(k).replace(/^(ï__|ï»¿|\uFEFF)/, '')).replace(/[_�]+$/g, '').replace(/_/g, ' ').trim() || String(k);
+  }
   function lerAtributos(f) {
     const A = {}; for (const k in f.attrs) A[chave(k)] = f.attrs[k];
     const keys = Object.keys(A), v = {};
@@ -260,5 +268,5 @@
     }
   }
 
-  BU.KMZ = { importar, parseKml, textoKml, paraRegistro, contexto, fixText };
+  BU.KMZ = { rotulo, importar, parseKml, textoKml, paraRegistro, contexto, fixText };
 })();

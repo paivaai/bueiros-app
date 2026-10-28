@@ -28,8 +28,8 @@
   function popup(l) {
     const nav = `https://www.google.com/maps/dir/?api=1&destination=${l.latitude},${l.longitude}&travelmode=driving`;
     const t = (BU.Sync && BU.Sync.selo(l.id)) || '';
-    return `<div class="mk-pop"><b>${esc(l.codigo || 'Sem código')}</b><div class="muted small">${esc(ROT[l.status] || l.status)}${l.km ? ' · km ' + esc(l.km) : ''}</div>${t ? `<div>${t}</div>` : ''}
-      <div class="row"><a class="btn sm primary" href="#/lev/${esc(l.id)}/1" data-go="#/lev/${esc(l.id)}/1">${l.status === 'a_vistoriar' ? 'Vistoriar' : 'Abrir'}</a><a class="btn sm" target="_blank" rel="noopener" href="${nav}">Navegar</a></div></div>`;
+    return `<div class="mk-pop"><b>${esc(l.codigo || 'Sem código')}</b><div class="muted small">${esc(ROT[l.status] || l.status)}${l.km ? ' · km ' + esc(l.km) : ''}${BU.App && BU.App.completude ? ' · ' + BU.App.completude(l).pct + '% completo' : ''}</div>${t ? `<div>${t}</div>` : ''}
+      <div class="row"><a class="btn sm primary" href="#/lev/${esc(l.id)}/1" data-go="#/lev/${esc(l.id)}/1">${l.status === 'a_vistoriar' ? 'Vistoriar' : 'Abrir'}</a><a class="btn sm" target="_blank" rel="noopener" href="${nav}">Navegar</a><button type="button" class="btn sm" data-a="dados" data-id="${esc(l.id)}">Dados</button></div></div>`;
   }
 
   function trocarBase(k) {
