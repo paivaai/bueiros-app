@@ -153,6 +153,52 @@
   }
   const obrigatoriosFaltando = l => pendencias(l).filter(p => p.ob).map(p => p.t);
 
+  /* Percentual de preenchimento (mesmo critério do HTML de referência: lista de itens exigidos, % = feitos / total). */
+  function completude(l) {
+    const c = l.caracteristicas || {}, m = l.medicoes || {}, B = BU.Bocas, bo = l.bocas || { montante: {}, jusante: {} };
+    const tub = c.tipo === 'Tubular';
+    const foto = k => (l.fotos || []).some(f => f.ctx === 'foto:' + k);
+    const REQ = [
+      ['Código', !!String(l.codigo || '').trim()], ['Classificação (grota/greide)', !!l.classificacao],
+      ['km', !!l.km], ['Pista (sentido geográfico)', !!l.pistaGe], ['Lado da rodovia', !!l.lado], ['Coordenadas', !!BU.GPS.utmDe(l) && l.coordOrigem !== 'cadastro'],
+      ['Nº de linhas', !!c.celulas], ['Forma', !!c.tipo], ['Material', !!c.material],
+      ['Seção do corpo', tub ? c.diametro != null : (c.largura != null && c.altura != null)], ['Comprimento', m.comprimentoBueiro != null],
+      ['Tipo da boca de montante', !!bo.montante.tipo], ['Pontos da boca de montante', !!bo.montante.tipo && !B.faltando(l, 'montante').length], ['Estado da boca de montante', !!bo.montante.estado],
+      ['Tipo da boca de jusante', !!bo.jusante.tipo], ['Pontos da boca de jusante', !!bo.jusante.tipo && !B.faltando(l, 'jusante').length], ['Estado da boca de jusante', !!bo.jusante.estado],
+      ['Croqui', BU.Prancha.croquiPronto(l)], ['Estado de conservação', !!c.conservacao],
+      ['Foto da boca de montante', foto('montante')], ['Foto da boca de jusante', foto('jusante')], ['Foto da seção', (l.fotos || []).some(f => f.ctx === 'secao')],
+    ];
+    const feitos = REQ.filter(x => x[1]).length;
+    return { feitos, total: REQ.length, pct: Math.round(feitos / REQ.length * 100), faltam: REQ.filter(x => !x[1]).map(x => x[0]) };
+  }
+  const barraHTML = l => { const c = completude(l); return `<div class="compl"><span class="muted small">${c.pct}% completo</span><div class="progress" role="progressbar" aria-valuenow="${c.pct}" aria-valuemin="0" aria-valuemax="100"><i style="width:${c.pct}%"></i></div></div>`; };
+
+  /* Todas as informações do ponto, como o balão do Google Earth: o que veio do cadastro (KMZ) + o que está no app. */
+  function dadosPontoHTML(l) {
+    const N = U.numTxt, c = l.caracteristicas || {}, u = BU.GPS.utmDe(l), cp = completude(l);
+    const orig = (l.meta && l.meta.atributos) || {};
+    const tab = itens => `<div class="kvs">${itens.map(([k, v]) => `<div class="kv"><span>${esc(k)}</span><b>${v !== '' && v != null ? esc(v) : '—'}</b></div>`).join('')}</div>`;
+    const dim = c.diametro != null ? `Ø ${N(c.diametro)} m` : (c.largura != null && c.altura != null ? `${N(c.largura)} × ${N(c.altura)} m` : '');
+    const noApp = [
+      ['Código', l.codigo], ['Rodovia', l.estrada], ['km', l.km], ['Município / UF', [l.municipio, l.estado].filter(Boolean).join(' / ')],
+      ['Ambiente', l.ambiente], ['Pista (sentido geográfico)', l.pistaGe], ['Sentido do km', l.sentido], ['Lado da rodovia', l.lado],
+      ['Latitude / Longitude', l.latitude != null ? `${l.latitude}, ${l.longitude}` : ''], ['UTM (SIRGAS 2000)', u ? `E ${BU.GPS.fmtM(u.E, 3)} · N ${BU.GPS.fmtM(u.N, 3)} · ${BU.GPS.rotuloUTM(u)}` : ''],
+      ['Tipo de bueiro', [l.meta && l.meta.sigla, l.meta && l.meta.descricaoTipo].filter(Boolean).join(' — ')], ['Forma / material', [c.tipo, c.material].filter(Boolean).join(' · ')], ['Dimensão', dim],
+      ['Estado de conservação', c.conservacao], ['Classificação', l.classificacao], ['Observações', l.observacoes],
+    ];
+    const chaves = Object.keys(orig);
+    return `<div class="dados-ponto"><p><b>${esc(l.codigo || 'Sem código')}</b> <span class="chip">${cp.pct}% completo</span></p>
+      ${chaves.length ? `<h4>Cadastro original (Google Earth / KMZ)</h4>${tab(chaves.map(k => [BU.KMZ && BU.KMZ.rotulo ? BU.KMZ.rotulo(k) : k, orig[k]]))}` : '<p class="muted small">Este bueiro não veio de um arquivo KMZ.</p>'}
+      <h4>Como está no app</h4>${tab(noApp)}
+      ${cp.faltam.length ? `<h4>Ainda falta preencher (${cp.faltam.length})</h4><p class="small">${cp.faltam.map(esc).join(' · ')}</p>` : '<p class="small">Todos os itens preenchidos.</p>'}</div>`;
+  }
+  async function verDados(id) {
+    let l = S.cur && S.cur.id === id ? S.cur : (S.lista || []).find(x => x.id === id);
+    if (!l) { try { l = (await DB.listar()).find(x => x.id === id); } catch (e) { /* ignora */ } }
+    if (!l) { UI.toast('Bueiro não encontrado', 'erro'); return; }
+    await UI.escolher('Dados do ponto', dadosPontoHTML(l), [{ k: 'x', label: 'Fechar', cls: 'primary' }]);
+  }
+
   function validarNumero(el) {
     const raw = el.value.trim(), t = el.dataset.t;
     if (raw === '') return { val: null, erro: '' };
@@ -275,9 +321,10 @@
       ${l.status === 'devolvido' && l.comentarioRevisao ? `<div class="pend aviso">↩ ${esc(l.comentarioRevisao)}</div>` : ''}
       <div>${esc(local)}</div>
       ${tec ? `<div class="muted small">${esc(tec)}</div>` : ''}
+      ${barraHTML(l)}
       <div class="muted small">${av ? esc(l.observacoes ? l.observacoes.split('\n')[0] : 'Ainda não vistoriado') : `${esc(U.dataBR(l.data))} · ${esc(l.responsavel || 'sem responsável')} · atualizado ${esc(U.dataHoraBR(l.atualizadoEm))}`}</div>
       <div class="row">
-        <button type="button" class="btn primary" data-a="abrir">${av ? 'Vistoriar' : 'Abrir'}</button>${nav}
+        <button type="button" class="btn primary" data-a="abrir">${av ? 'Vistoriar' : 'Abrir'}</button>${nav}<button type="button" class="btn" data-a="dados">Dados</button>
       </div>
       <div class="row">${['a_vistoriar', 'rascunho', 'devolvido'].includes(l.status) ? '<button type="button" class="btn sm" data-a="nao-localizado">Não localizei</button>' : ''}<button type="button" class="btn sm" data-a="duplicar">Duplicar</button><button type="button" class="btn sm danger" data-a="excluir">Excluir</button></div></article>`;
   }
@@ -525,6 +572,7 @@
     if (a === 'nao-localizado') marcarNaoLocalizado(id);
     else if (a === 'reabrir-vistoria') reabrirVistoria();
     else if (a === 'continuar' || a === 'abrir') location.hash = `#/lev/${id}/1`;
+    else if (a === 'dados') verDados(id);
     else if (a === 'duplicar') duplicar(id);
     else if (a === 'excluir') excluir(id);
     else if (a === 'projeto') { if (BU.Sync.projetoId() !== id) await BU.Sync.escolherProjeto(id); S.lista = await DB.listar(); viewLista(); }
@@ -638,7 +686,7 @@
   }
   /* Interface usada pelos módulos gps.js, points.js, section-drawing.js e photos.js */
   window.BU.App = {
-    cur: () => S.cur, S, irEtapa: n => { if (S.cur) irEtapa(n); }, prefillNovo: async l => { await prefillResponsavel(l); await prefillZona(l); }, marcarSujo, salvarAtual, campoHTML, E, ETAPAS, novo: novoLevantamento, normalizar, pendencias, CAMPOS, OPCOES, UFS, verLista,
+    cur: () => S.cur, S, irEtapa: n => { if (S.cur) irEtapa(n); }, prefillNovo: async l => { await prefillResponsavel(l); await prefillZona(l); }, marcarSujo, salvarAtual, campoHTML, E, ETAPAS, novo: novoLevantamento, normalizar, pendencias, completude, dadosPontoHTML, verDados, CAMPOS, OPCOES, UFS, verLista,
     rotear, irParaLista: () => { location.hash = '#/lista'; if (S.hashAtual === '#/lista') rotear(); },
     renderEtapa: () => { if (S.cur) renderWizard(); },
     refrescar: async () => {

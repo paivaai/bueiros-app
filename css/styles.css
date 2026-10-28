@@ -277,3 +277,12 @@ h2.sec { font-size: 15px; text-transform: uppercase; letter-spacing: .04em; colo
 details.ferr summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 #sync-login .btn.primary { width: 100%; margin-top: 10px; } #sync-login .linkbtn { width: 100%; }
 .dotrow { width: 100%; max-width: 100%; }
+
+/* percentual de completo + dados do ponto */
+.compl { margin: 2px 0 4px; } .compl .progress { margin-top: 4px; }
+.dados-ponto h4 { margin: 14px 0 6px; font-size: 14px; }
+.dados-ponto .kvs { max-height: 46vh; overflow: auto; border: 1px solid var(--line); border-radius: var(--r); padding: 2px 10px; }
+.dados-ponto .kv { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; border-bottom: 1px solid var(--surface-2); font-size: 14px; }
+.dados-ponto .kv:last-child { border-bottom: 0; } .dados-ponto .kv span { color: var(--muted); flex: 0 0 42%; } .dados-ponto .kv b { text-align: right; overflow-wrap: anywhere; }
+.progress { height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+.progress i { display: block; height: 100%; background: var(--accent); }
