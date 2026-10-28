@@ -9,39 +9,20 @@
   /* =========================================================
      Modelo e opções
      ========================================================= */
-  const SCHEMA = 1;
-  const UFS = ['AC', 'AL', 'AM', 'AP', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MG', 'MS', 'MT', 'PA', 'PB', 'PE', 'PI', 'PR', 'RJ', 'RN', 'RO', 'RR', 'RS', 'SC', 'SE', 'SP', 'TO'];
-  const SN = ['Sim', 'Não', 'Não avaliado'];
-  const OPCOES = {
-    ambiente: ['Rural', 'Urbano'], sentido: ['Crescente', 'Decrescente'],
-    pista: ['Norte', 'Sul', 'Leste', 'Oeste', 'Canteiro central'], lado: ['Direito', 'Esquerdo', 'Centro'],
-  };
+  const { UFS, SN, OPCOES } = BU.Modelo;
   const STATUS = { a_vistoriar: ['A vistoriar', 'avistoriar'], rascunho: ['Rascunho', 'rascunho'], concluido: ['Concluído', 'concluido'], devolvido: ['Devolvido', 'devolvido'], aprovado: ['Aprovado', 'aprovado'], nao_localizado: ['Não localizado', 'naoloc'] };
   const BOCA = ['Boca simples', 'Com ala', 'Com muro de testa', 'Com caixa coletora', 'Sem proteção', 'Outro'];
 
+  /* Etapas do formulário (a ordem segue o HTML de referência). */
   const ETAPAS = [
-    { n: 1, nome: 'Identificação' }, { n: 2, nome: 'Localização' }, { n: 3, nome: 'Características' }, { n: 4, nome: 'Medições' },
-    { n: 5, nome: 'Seção' }, { n: 6, nome: 'Pontos' }, { n: 7, nome: 'Patologias' }, { n: 8, nome: 'Fotos' }, { n: 9, nome: 'Revisão' },
+    { n: 1, nome: 'Informação geral' }, { n: 2, nome: 'Coordenadas e RTK' }, { n: 3, nome: 'Corpo' }, { n: 4, nome: 'Boca de montante' }, { n: 5, nome: 'Boca de jusante' },
+    { n: 6, nome: 'Levantamento RTK' }, { n: 7, nome: 'Dispositivos associados' }, { n: 8, nome: 'Patologias' }, { n: 9, nome: 'Diagnóstico' }, { n: 10, nome: 'Fotos' }, { n: 11, nome: 'Revisão' },
   ];
+  const E = { GERAL: 1, COORD: 2, CORPO: 3, MONT: 4, JUS: 5, RTK: 6, DISP: 7, PATO: 8, DIAG: 9, FOTOS: 10, REV: 11 };
+  const ETAPAS_FOTO = [E.CORPO, E.DISP, E.PATO, E.DIAG, E.FOTOS];
 
   /* Cada campo: p = caminho dentro do levantamento; t = tipo; half = ocupa meia largura. */
   const CAMPOS = {
-    1: [
-      { p: 'codigo', label: 'Código do levantamento', req: true, ph: 'ex.: RJ-000 km 170+470', t: 'codigo' },
-      { p: 'estrada', label: 'Nome ou número da estrada', ph: 'ex.: BR-101' },
-      { p: 'municipio', label: 'Município' },
-      { p: 'estado', label: 'Estado', t: 'select', opts: UFS, half: true },
-      { p: 'km', label: 'Km + metros', ph: '170+470', half: true },
-      { p: 'ambiente', label: 'Ambiente', t: 'select', opts: OPCOES.ambiente, half: true },
-      { p: 'sentido', label: 'Sentido do km', t: 'select', opts: OPCOES.sentido, half: true },
-      { p: 'pistaGe', label: 'Pista (sentido geográfico)', t: 'select', opts: OPCOES.pista, half: true },
-      { p: 'lado', label: 'Lado da rodovia', t: 'select', opts: OPCOES.lado, half: true },
-      { p: 'data', label: 'Data', t: 'date', req: true, half: true },
-      { p: 'hora', label: 'Hora', t: 'time', half: true },
-      { p: 'responsavel', label: 'Responsável', req: true, t: 'resp' },
-      { p: 'equipe', label: 'Empresa ou equipe', ph: 'GFA' },
-      { p: 'observacoes', label: 'Observações gerais', t: 'textarea' },
-    ],
     2: [
       { p: 'leste', label: 'Este (E)', t: 'num', unit: 'm', min: 100000, max: 900000, ph: '712392,430' },
       { p: 'norte', label: 'Norte (N)', t: 'num', unit: 'm', min: 0, max: 10000000, ph: '7480303,180' },
@@ -60,96 +41,10 @@
       { p: 'rtk.base', label: 'Base / correção', ph: 'ex.: base própria, RBMC-RJNI, NTRIP' },
       { p: 'rtk.receptor', label: 'Receptor', ph: 'ex.: Emlid RS3' },
     ],
-    3: [
-      { h: 'Tipo e geometria' },
-      { p: 'caracteristicas.tipo', label: 'Tipo de bueiro', t: 'select', opts: ['Tubular', 'Celular', 'Aduela', 'Galeria', 'Outro'] },
-      { p: 'caracteristicas.formato', label: 'Formato da seção', t: 'select', opts: ['Circular', 'Retangular', 'Personalizada'] },
-      { p: 'caracteristicas.celulas', label: 'Células', t: 'int', min: 0 },
-      { p: 'caracteristicas.material', label: 'Material', t: 'select', opts: ['Concreto', 'Concreto armado', 'Metal', 'PEAD', 'Pedra', 'Alvenaria', 'Outro'] },
-      { h: 'Dimensões' },
-      { p: 'caracteristicas.diametro', label: 'Diâmetro', t: 'num', unit: 'm', min: 0 },
-      { p: 'caracteristicas.largura', label: 'Largura', t: 'num', unit: 'm', min: 0 },
-      { p: 'caracteristicas.altura', label: 'Altura', t: 'num', unit: 'm', min: 0 },
-      { p: 'caracteristicas.comprimento', label: 'Comprimento aprox.', t: 'num', unit: 'm', min: 0 },
-      { h: 'Condição' },
-      { p: 'caracteristicas.situacaoEstrutural', label: 'Situação estrutural', t: 'select', opts: ['Íntegra', 'Fissuras leves', 'Fissuras severas', 'Deformada', 'Colapsada', 'Não avaliada'] },
-      { p: 'caracteristicas.conservacao', label: 'Estado de conservação', t: 'select', opts: ['Bom', 'Regular', 'Precário', 'Ruim', 'Crítico', 'Não avaliado'] },
-      { p: 'caracteristicas.necessita', label: 'Intervenção necessária', ph: 'ex.: Limpeza, Roçada' },
-      { h: 'Ocorrências' },
-      { p: 'caracteristicas.erosao', label: 'Erosão', t: 'select', opts: SN, half: true },
-      { p: 'caracteristicas.assoreamento', label: 'Assoreamento', t: 'select', opts: SN, half: true },
-      { p: 'caracteristicas.obstrucao', label: 'Obstrução', t: 'select', opts: SN, half: true },
-      { p: 'caracteristicas.agua', label: 'Presença de água', t: 'select', opts: SN, half: true },
-      { p: 'caracteristicas.vegetacao', label: 'Vegetação', t: 'select', opts: SN, half: true },
-      { h: 'Entrada, saída e fluxo' },
-      { p: 'caracteristicas.tipoEntrada', label: 'Tipo de entrada', t: 'select', opts: BOCA },
-      { p: 'caracteristicas.tipoSaida', label: 'Tipo de saída', t: 'select', opts: BOCA },
-      { p: 'caracteristicas.sentidoFluxo', label: 'Sentido do fluxo', ph: 'ex.: Norte → Sul' },
-      { p: 'caracteristicas.observacoes', label: 'Observações', t: 'textarea' },
-    ],
-    4: [
-      { p: 'medicoes.larguraPista', label: 'Largura da pista', t: 'num', unit: 'm', min: 0 },
-      { p: 'medicoes.larguraAcostamento', label: 'Largura do acostamento', t: 'num', unit: 'm', min: 0 },
-      { p: 'medicoes.alturaEntrada', label: 'Altura da entrada', t: 'num', unit: 'm', min: 0 },
-      { p: 'medicoes.larguraEntrada', label: 'Largura da entrada', t: 'num', unit: 'm', min: 0 },
-      { p: 'medicoes.alturaSaida', label: 'Altura da saída', t: 'num', unit: 'm', min: 0 },
-      { p: 'medicoes.larguraSaida', label: 'Largura da saída', t: 'num', unit: 'm', min: 0 },
-      { p: 'medicoes.profMontante', label: 'Profundidade de montante', t: 'num', unit: 'm', min: 0 },
-      { p: 'medicoes.profJusante', label: 'Profundidade de jusante', t: 'num', unit: 'm', min: 0 },
-      { p: 'medicoes.comprimentoBueiro', label: 'Comprimento do bueiro', t: 'num', unit: 'm', min: 0 },
-      { p: 'medicoes.declividade', label: 'Declividade aprox.', t: 'num', unit: '%', neg: true },
-      { p: 'medicoes.cotaEntrada', label: 'Cota de entrada', t: 'num', unit: 'm', neg: true },
-      { p: 'medicoes.cotaSaida', label: 'Cota de saída', t: 'num', unit: 'm', neg: true },
-      { p: 'medicoes.nivelAgua', label: 'Nível da água', t: 'num', unit: 'm', min: 0 },
-      { p: 'medicoes.vazaoEstimada', label: 'Vazão estimada', t: 'num', unit: 'm³/s', min: 0 },
-      { p: 'medicoes.observacoes', label: 'Observações de campo', t: 'textarea' },
-    ],
   };
 
-  function novoLevantamento() {
-    const agora = U.agoraISO();
-    return {
-      versaoSchema: SCHEMA, id: U.uid(), status: 'rascunho',
-      origem: 'campo', cadastroId: '', cadastro: null, coordOrigem: null,
-      codigo: '', estrada: '', municipio: '', estado: '', km: '', ambiente: '', sentido: '', pistaGe: '', lado: '', data: U.hojeISO(), hora: U.horaAgora(),
-      responsavel: '', equipe: 'GFA', observacoes: '',
-      leste: null, norte: null, zona: '23', hemisferio: 'S', altitude: null,
-      latitude: null, longitude: null, // só para o botão Navegar (derivadas do UTM)
-      rtk: { solucao: '', precisaoH: null, precisaoV: null, satelites: null, base: '', receptor: '', alturaAntena: null, tipoAltitude: '', geoide: '' },
-      naoLocalizado: null, planejado: null,
-      caracteristicas: {
-        tipo: '', formato: '', celulas: null, material: '', diametro: null, largura: null, altura: null, comprimento: null, espessura: null, larguraTopo: null,
-        situacaoEstrutural: '', conservacao: '', erosao: '', assoreamento: '', obstrucao: '', agua: '', vegetacao: '',
-        tipoEntrada: '', tipoSaida: '', sentidoFluxo: '', observacoes: '', necessita: '',
-      },
-      medicoes: {
-        larguraPista: null, larguraAcostamento: null, alturaEntrada: null, larguraEntrada: null, alturaSaida: null, larguraSaida: null,
-        profMontante: null, profJusante: null, comprimentoBueiro: null, declividade: null, cotaEntrada: null, cotaSaida: null,
-        nivelAgua: null, vazaoEstimada: null, observacoes: '',
-      },
-      secao: null, prancha: { inverter: false }, medicoesAuto: {}, pontosArquivo: '', pontos: [], fotos: [], patologias: [], semPatologias: false,
-      criadoEm: agora, atualizadoEm: agora,
-    };
-  }
-  /* Completa registros antigos com campos que surgirem em fases futuras (compatibilidade). */
-  function normalizar(r) {
-    const b = novoLevantamento();
-    const l = {
-      ...b, ...r,
-      caracteristicas: { ...b.caracteristicas, ...(r.caracteristicas || {}) },
-      medicoes: { ...b.medicoes, ...(r.medicoes || {}) }, rtk: { ...b.rtk, ...(r.rtk || {}) },
-      prancha: { ...b.prancha, ...(r.prancha || {}) }, medicoesAuto: { ...(r.medicoesAuto || {}) },
-      pontos: r.pontos || [], fotos: r.fotos || [], patologias: r.patologias || [],
-    };
-    if (!String(l.equipe || '').trim()) l.equipe = 'GFA';
-    // Formatos antigos (versões anteriores) viram os 3 formatos atuais.
-    const c = l.caracteristicas;
-    if (c.formato === 'Quadrada') { c.formato = 'Retangular'; if (c.altura == null) c.altura = c.largura; }
-    else if (c.formato === 'Aduela simples') c.formato = 'Retangular';
-    else if (c.formato === 'Aduela dupla') { c.formato = 'Retangular'; if (!(c.celulas > 1)) c.celulas = 2; }
-    else if (c.formato === 'Trapezoidal') c.formato = 'Personalizada';
-    return BU.GPS.completarUTM(l);
-  }
+  const novoLevantamento = () => BU.Modelo.novo();
+  const normalizar = r => BU.Modelo.normalizar(r);
 
   /* =========================================================
      Estado
@@ -171,6 +66,8 @@
   }
   /* Responsável: lembra o último nome usado neste aparelho para não digitar em cada bueiro. */
   async function prefillResponsavel(l) {
+    const logado = BU.Sync.nomeUsuario(); // com conta aberta, o vistoriador é sempre quem está logado
+    if (logado && !['concluido', 'aprovado'].includes(l.status)) { l.responsavel = logado; return; }
     if (l.responsavel) return;
     try { if (S.ultimoResp == null) S.ultimoResp = (await DB.cfgObter('ultimoResponsavel')) || ''; } catch (e) { S.ultimoResp = ''; }
     if (S.ultimoResp) l.responsavel = S.ultimoResp;
@@ -216,33 +113,45 @@
   /* =========================================================
      Validação e pendências
      ========================================================= */
-  function obrigatoriosFaltando(l) {
-    const f = [];
-    if (!String(l.codigo || '').trim()) f.push('código');
-    if (!l.data) f.push('data');
-    if (!String(l.responsavel || '').trim()) f.push('responsável');
-    return f;
-  }
+  const nomeBoca = k => (k === 'montante' ? 'montante' : 'jusante');
   function pendencias(l) {
-    const P = [];
-    if (!String(l.codigo || '').trim()) P.push({ n: 'erro', t: 'Código do levantamento não preenchido', e: 1 });
-    if (!l.data) P.push({ n: 'erro', t: 'Data não preenchida', e: 1 });
-    if (!String(l.responsavel || '').trim()) P.push({ n: 'erro', t: 'Responsável não preenchido', e: 1 });
-    if (!BU.GPS.utmDe(l)) P.push({ n: 'aviso', t: 'Coordenadas UTM (RTK) não informadas', e: 2 });
-    else if (l.coordOrigem === 'cadastro') P.push({ n: 'aviso', t: 'Coordenadas vêm do cadastro: confirme com o RTK no local', e: 2 });
-    if (!l.caracteristicas.tipo) P.push({ n: 'aviso', t: 'Tipo de bueiro não informado', e: 3 });
-    if (l.medicoes.cotaEntrada == null) P.push({ n: 'aviso', t: 'Cota de entrada não preenchida', e: 4 });
-    if (!BU.Prancha.croquiPronto(l)) P.push({ n: 'aviso', t: 'Croqui ainda não gerado (importe os pontos do RTK ou informe as dimensões)', e: 5 });
-    if (!l.pontos.length) P.push({ n: 'aviso', t: 'Nenhum ponto cadastrado', e: 6 });
-    if (!l.semPatologias && !l.patologias.length) P.push({ n: 'aviso', t: 'Patologias não registradas (adicione ou marque “sem patologias”)', e: 7 });
+    const P = [], c = l.caracteristicas, m = l.medicoes, B = BU.Bocas;
+    const ob = (t, e) => P.push({ n: 'erro', t, e, ob: true }), av = (t, e) => P.push({ n: 'aviso', t, e });
+    if (!String(l.codigo || '').trim()) ob('Código do levantamento não preenchido', E.GERAL);
+    if (!l.data) ob('Data não preenchida', E.GERAL);
+    if (!String(l.responsavel || '').trim()) ob('Vistoriador não identificado', E.GERAL);
+    if (l.status === 'nao_localizado') return P;
+    if (!l.classificacao) av('Classificação (grota ou greide) não informada', E.GERAL);
+    if (!c.celulas || !c.tipo || !c.material) av('Tipo de bueiro incompleto (nº de linhas, forma e material)', E.GERAL);
+    if (!BU.GPS.utmDe(l)) av('Coordenadas UTM (RTK) não informadas', E.COORD);
+    else if (l.coordOrigem === 'cadastro') av('Coordenadas vêm do cadastro: confirme com o RTK no local', E.COORD);
+    const dimOk = c.tipo === 'Tubular' ? c.diametro != null : (c.largura != null && c.altura != null);
+    if (c.tipo && !dimOk) av(c.tipo === 'Tubular' ? 'Diâmetro do corpo não informado' : 'Base e altura do corpo não informadas', E.CORPO);
+    if (m.comprimentoBueiro == null) av('Comprimento do bueiro não informado', E.CORPO);
+    if (!c.estadoCorpo) av('Estado do corpo não informado', E.CORPO);
+    ['montante', 'jusante'].forEach(k => {
+      const bc = l.bocas[k], e = k === 'montante' ? E.MONT : E.JUS;
+      if (!bc.tipo) ob(`Tipo da boca de ${nomeBoca(k)} não informado`, e);
+      if (!bc.estado) av(`Estado da boca de ${nomeBoca(k)} não informado`, e);
+      if (k === 'jusante' && bc.dissipador && bc.dissipador !== 'Nenhum' && !bc.estadoDissipador) av('Estado do dissipador não informado', e);
+      const f = B.faltando(l, k);
+      if (f.length) ob(`Boca de ${nomeBoca(k)}: ${f.length} ponto(s) vermelho(s) sem marcar (${f.slice(0, 3).map(x => x.nome.split(' (')[0]).join('; ')}${f.length > 3 ? '…' : ''})`, e);
+    });
+    if (!l.pontos.length) av('Nenhum ponto cadastrado', E.RTK);
+    if (!BU.Prancha.croquiPronto(l)) av('Croqui ainda não gerado (importe os pontos do RTK ou informe as dimensões)', E.RTK);
+    BU.Cat.DISPOSITIVOS.forEach(([k, r]) => { if (l.dispositivos[k] && !l.fotos.some(f => f.ctx === 'disp:' + k)) av(`Dispositivo “${r}” sem foto`, E.DISP); });
+    if (!l.semPatologias && !l.patologias.length) av('Patologias não registradas (marque ou use “sem patologias”)', E.PATO);
     for (const p of l.patologias) {
-      if (!l.semPatologias && !l.fotos.some(f => f.ctx === 'pat:' + p.id)) { P.push({ n: 'aviso', t: `Patologia “${p.tipo || 'sem tipo'}”${p.local ? ' (' + p.local.split(' (')[0].toLowerCase() + ')' : ''} sem foto`, e: 7 }); break; }
+      if (!l.semPatologias && !l.fotos.some(f => f.ctx === 'pat:' + p.id)) { av(`Patologia “${p.tipo || 'sem tipo'}” sem foto`, E.PATO); break; }
     }
-    if (!l.fotos.some(f => f.ctx === 'secao')) P.push({ n: 'aviso', t: 'Nenhuma foto da seção', e: 5 });
-    if (!l.fotos.length) P.push({ n: 'aviso', t: 'Nenhuma foto adicionada', e: 8 });
-    for (const c of BU.Conf.analisar(l, S.eixo)) P.push({ n: c.n, t: c.t, e: c.e });
+    if (!c.conservacao) av('Estado de conservação não informado', E.DIAG);
+    (l.diagnostico.necessita || []).forEach(k => { if (!l.fotos.some(f => f.ctx === 'diag:' + k)) av(`Serviço “${BU.Cat.rotulo(BU.Cat.NECESSITA, k)}” sem foto`, E.DIAG); });
+    if (!l.fotos.some(f => f.ctx === 'secao')) av('Nenhuma foto da seção', E.CORPO);
+    if (!l.fotos.length) av('Nenhuma foto adicionada', E.FOTOS);
+    for (const cf of BU.Conf.analisar(l, S.eixo)) P.push({ n: cf.n, t: cf.t, e: cf.e });
     return P;
   }
+  const obrigatoriosFaltando = l => pendencias(l).filter(p => p.ob).map(p => p.t);
 
   function validarNumero(el) {
     const raw = el.value.trim(), t = el.dataset.t;
@@ -305,35 +214,45 @@
   /* =========================================================
      Renderização — Início
      ========================================================= */
+  /* Bueiros do projeto aberto: os do projeto escolhido e os que ainda são só deste aparelho. */
+  const doProjeto = l => { const pid = BU.Sync.projetoId(), m = BU.Sync.meta(l.id); return !pid || !m || !m.projetoId || m.projetoId === pid; };
+  function cartaoProjeto(p, ativo) {
+    const mine = S.lista.filter(l => { const m = BU.Sync.meta(l.id); return m && m.projetoId === p.id; });
+    const feitos = mine.filter(l => l.status !== 'a_vistoriar').length, n = mine.length, pc = n ? Math.round(100 * feitos / n) : 0;
+    return `<article class="card proj${ativo ? ' ativo' : ''}" data-id="${esc(p.id)}">
+      <div class="lev-top"><b>${esc(p.nome)}</b>${ativo ? '<span class="chip concluido">aberto</span>' : ''}</div>
+      <div class="muted small">${esc([p.rodovia, p.fuso ? 'fuso ' + p.fuso + (p.hemisferio || '') : ''].filter(Boolean).join(' · ') || 'Projeto')}</div>
+      <div class="prog" aria-hidden="true"><i style="width:${pc}%"></i></div>
+      <div class="muted small">${n ? `${feitos} de ${n} vistoriados neste aparelho` : 'Nenhum bueiro baixado ainda'}</div>
+      <div class="row"><button type="button" class="btn ${ativo ? '' : 'primary'}" data-a="projeto" data-id="${esc(p.id)}">${ativo ? 'Ver bueiros' : 'Abrir projeto'}</button></div></article>`;
+  }
   function viewHome() {
-    const n = S.lista.length;
-    const feitos = S.lista.filter(l => l.status !== 'a_vistoriar'), aVist = n - feitos.length;
-    const ultimaData = feitos.map(l => l.data).filter(Boolean).sort().pop();
-    const alvo = S.lista.find(l => l.status === 'rascunho') || S.lista.find(l => l.status === 'concluido') || ordenar(S.lista)[0];
-    const proximo = !S.lista.some(l => l.status === 'rascunho') && aVist;
+    const logado = BU.Sync.logado(), projs = BU.Sync.projetos(), ativo = BU.Sync.projetoId();
+    const visiveis = S.lista.filter(doProjeto), n = visiveis.length;
+    const feitos = visiveis.filter(l => l.status !== 'a_vistoriar').length;
+    const cont = { todos: n }; for (const k in STATUS) cont[k] = visiveis.filter(x => x.status === k).length;
+    const chips = [['todos', 'Todos'], ['a_vistoriar', 'A vistoriar'], ['rascunho', 'Rascunho'], ['concluido', 'Concluído'], ['devolvido', 'Devolvido'], ['nao_localizado', 'Não localizado'], ['aprovado', 'Aprovado']]
+      .map(([k, t]) => `<button type="button" class="fchip" data-a="filtro" data-v="${k}" aria-pressed="${S.filtro === k}">${t} <span>${cont[k]}</span></button>`).join('');
+    const proj = BU.Sync.projeto();
     $('#view').innerHTML = `
-      <section class="page">
-        <div class="card hero">
-          <h1>Cadastro de Bueiros</h1>
-          <p class="muted">Levantamento de campo. Funciona sem internet; os dados ficam neste aparelho.</p>
-          <div class="stats">
-            <div><b>${aVist ? feitos.length + ' / ' + n : n}</b><span>${aVist ? `vistoriados (${aVist} a vistoriar)` : (n === 1 ? 'levantamento salvo' : 'levantamentos salvos')}</span></div>
-            <div><b>${ultimaData ? esc(U.dataBR(ultimaData)) : '—'}</b><span>último levantamento</span></div>
-          </div>
-        </div>
+      <section class="page home">
+        <div class="saudacao"><div><small class="muted">${logado ? 'Olá,' : 'Sem conta'}</small><b>${esc(BU.Sync.nomeUsuario() || 'Dados só neste aparelho')}</b></div></div>
         ${BU.Sync.cartaoHome()}
-        <div class="menu">
-          <button type="button" class="btn big primary" data-go="#/novo">+ Novo levantamento</button>
-          <button type="button" class="btn big" data-a="continuar" ${alvo ? `data-id="${esc(alvo.id)}"` : 'disabled'}>${proximo ? 'Próximo bueiro a vistoriar' : 'Continuar levantamento'}
-            <small>${alvo ? esc(alvo.codigo || 'Sem código') : 'nenhum levantamento ainda'}</small></button>
-          <button type="button" class="btn big" data-go="#/mapa">Mapa <small>bueiros, eixo e minha posição</small></button>
-          <button type="button" class="btn big" data-go="#/lista">Projetos salvos</button>
-          <button type="button" class="btn big" data-a="importar-kmz">Importar cadastro (KMZ/KML) <small>carrega os bueiros do arquivo do cadastro</small></button>
-          <button type="button" class="btn big" data-a="importar-home">Importar arquivo TXT <small>cria um levantamento com os pontos do RTK</small></button>
-          <button type="button" class="btn big" data-a="backup" ${n ? '' : 'disabled'}>Exportar dados <small>backup completo em JSON, com fotos</small></button>
-          <button type="button" class="btn big" data-a="restaurar">Restaurar backup <small>volta os levantamentos de um JSON</small></button>
-          ${S.instalar ? '<button type="button" class="btn big primary" data-a="instalar">Instalar app no celular</button>' : ''}
-        </div>
+        ${logado || projs.length ? `<h2 class="sec">Meus projetos</h2>${projs.length ? projs.map(p => cartaoProjeto(p, p.id === ativo)).join('') : '<div class="card vazio">Nenhum projeto liberado para você ainda. Peça ao escritório para incluir você na equipe.</div>'}` : ''}
+        <h2 class="sec" id="lista-bueiros">${proj ? 'Bueiros · ' + esc(proj.nome) : 'Bueiros'}</h2>
+        ${logado && projs.length && !ativo ? '<div class="card vazio">Abra um projeto acima para ver os bueiros dele.</div>' : `
+        <div class="filtros" role="group" aria-label="Filtrar por situação">${chips}</div>
+        <input id="busca" class="busca" type="search" placeholder="Buscar por nome, km, município…" value="${esc(S.q)}" aria-label="Buscar">
+        <div id="itens">${itensLista()}</div>`}
+        <details class="card ferr"><summary><b>Ferramentas</b> <span class="muted small">importar, backup, instalar</span></summary>
+          <div class="menu">
+            <button type="button" class="btn big" data-a="importar-kmz">Importar cadastro (KMZ/KML) <small>carrega os bueiros com todos os campos do arquivo</small></button>
+            <button type="button" class="btn big" data-a="importar-home">Importar arquivo TXT <small>cria um levantamento com os pontos do RTK</small></button>
+            <button type="button" class="btn big" data-a="backup" ${S.lista.length ? '' : 'disabled'}>Exportar dados <small>backup completo em JSON, com fotos</small></button>
+            <button type="button" class="btn big" data-a="restaurar">Restaurar backup <small>volta os levantamentos de um JSON</small></button>
+            ${S.instalar ? '<button type="button" class="btn big primary" data-a="instalar">Instalar app no celular</button>' : ''}
+          </div></details>
+        <p class="muted small" style="text-align:center">${feitos} de ${n} bueiros vistoriados</p>
       </section>`;
   }
 
@@ -364,30 +283,18 @@
   }
   function listaFiltrada() {
     const q = S.q.trim().toLowerCase();
-    let l = S.filtro === 'todos' ? S.lista : S.lista.filter(x => x.status === S.filtro);
+    let l = S.lista.filter(doProjeto); if (S.filtro !== 'todos') l = l.filter(x => x.status === S.filtro);
     if (q) l = l.filter(x => [x.codigo, x.estrada, x.municipio, x.responsavel, x.km, x.cadastroId].join(' ').toLowerCase().includes(q));
     return ordenar(l);
   }
   function itensLista() {
-    if (!S.lista.length) return '<div class="card vazio">Nenhum levantamento salvo ainda.<br><button type="button" class="btn primary" data-go="#/novo">+ Novo levantamento</button><button type="button" class="btn" data-a="importar-kmz">Importar cadastro (KMZ/KML)</button></div>';
+    if (!S.lista.filter(doProjeto).length) return '<div class="card vazio">Nenhum bueiro ainda.<br><button type="button" class="btn primary" data-go="#/novo">+ Novo bueiro</button><button type="button" class="btn" data-a="importar-kmz">Importar cadastro (KMZ/KML)</button></div>';
     const l = listaFiltrada();
     if (!l.length) return '<div class="card vazio">Nada encontrado para esse filtro ou busca.</div>';
     return `<div class="muted small">${l.length} bueiro(s)</div>` + l.slice(0, S.limite).map(cartaoLista).join('')
       + (l.length > S.limite ? `<button type="button" class="btn" data-a="mais-lista">Mostrar mais (${l.length - S.limite})</button>` : '');
   }
-  function viewLista() {
-    const cont = { todos: S.lista.length }; for (const k in STATUS) cont[k] = S.lista.filter(x => x.status === k).length;
-    const chips = [['todos', 'Todos'], ['a_vistoriar', 'A vistoriar'], ['rascunho', 'Rascunho'], ['concluido', 'Concluído'], ['devolvido', 'Devolvido'], ['nao_localizado', 'Não localizado'], ['aprovado', 'Aprovado']]
-      .map(([k, t]) => `<button type="button" class="fchip" data-a="filtro" data-v="${k}" aria-pressed="${S.filtro === k}">${t} <span>${cont[k]}</span></button>`).join('');
-    $('#view').innerHTML = `
-      <section class="page">
-        <div class="page-head"><h1>Projetos salvos</h1><button type="button" class="btn primary" data-go="#/novo">+ Novo</button></div>
-        <div class="filtros" role="group" aria-label="Filtrar por situação">${chips}</div>
-        <input id="busca" class="busca" type="search" placeholder="Buscar por código, km, município…" value="${esc(S.q)}" aria-label="Buscar">
-        <div id="itens">${itensLista()}</div>
-        <button type="button" class="btn" data-go="#/">‹ Início</button>
-      </section>`;
-  }
+  function viewLista() { viewHome(); const el = document.getElementById('lista-bueiros'); if (el) el.scrollIntoView(); }
   function verLista(filtro) { S.filtro = filtro || 'todos'; S.limite = 60; S.q = ''; if (location.hash === '#/lista') rotear(); else location.hash = '#/lista'; }
 
   /* =========================================================
@@ -442,14 +349,14 @@
     const coord = u ? `E ${BU.GPS.fmtM(u.E, 3)} · N ${BU.GPS.fmtM(u.N, 3)} · ${BU.GPS.rotuloUTM(u)}` : '';
     return `
       <div class="card"><h3>Identificação</h3>
-        ${linha('Código', l.codigo)}${linha('Local', [l.estrada, l.municipio ? l.municipio + (l.estado ? '/' + l.estado : '') : ''].filter(Boolean).join(' · '))}
-        ${linha('Data e hora', [U.dataBR(l.data), l.hora].filter(Boolean).join(' '))}${linha('Responsável', l.responsavel)}${linha('Equipe', l.equipe)}</div>
+        ${linha('Nome', l.codigo)}${linha('Local', [l.estrada, l.municipio ? l.municipio + (l.estado ? '/' + l.estado : '') : ''].filter(Boolean).join(' · '))}
+        ${linha('Data e hora', [U.dataBR(l.data), l.hora].filter(Boolean).join(' '))}${linha('Vistoriador', l.responsavel)}${linha('Equipe', l.equipe)}</div>
       <div class="card"><h3>Localização</h3>${linha('Coordenadas', coord)}${linha('Altitude (Z)', l.altitude != null ? N(l.altitude) + ' m' : '')}</div>
       <div class="card"><h3>Bueiro</h3>
-        ${linha('Tipo / formato', [c.tipo, c.formato].filter(Boolean).join(' / '))}${linha('Dimensões', dim)}${linha('Material', c.material)}
+        ${linha('Tipo de bueiro', [l.meta && l.meta.sigla, l.meta && l.meta.descricaoTipo].filter(Boolean).join(' · ') || [c.tipo, c.formato].filter(Boolean).join(' / '))}${linha('Dimensões', dim)}${linha('Material', c.material)}
         ${linha('Conservação', c.conservacao)}${linha('Cota entrada / saída', (m.cotaEntrada != null || m.cotaSaida != null) ? `${N(m.cotaEntrada) || '—'} / ${N(m.cotaSaida) || '—'}` : '')}
         ${BU.Prancha.miniatura(l)}</div>
-      <div class="card"><h3>Registros</h3>${linha('Pontos', String(l.pontos.length))}${linha('Patologias', l.semPatologias ? 'sem patologias aparentes' : String(l.patologias.length))}${linha('Fotos', `${l.fotos.length} (seção ${l.fotos.filter(f => f.ctx === 'secao').length} · patologias ${l.fotos.filter(f => (f.ctx || '').startsWith('pat:')).length})`)}</div>
+      <div class="card"><h3>Registros</h3>${linha('Pontos', String(l.pontos.length))}${linha('Patologias', l.semPatologias ? 'sem patologias aparentes' : String(l.patologias.length))}${linha('Fotos', `${l.fotos.length} (seção ${l.fotos.filter(f => f.ctx === 'secao').length} · patologias ${l.fotos.filter(f => (f.ctx || '').startsWith('pat:')).length} · dispositivos/diagnóstico ${l.fotos.filter(f => /^(disp|diag):/.test(f.ctx || '')).length})`)}</div>
       <div class="card"><h3>Pendências <span class="chip ${P.length ? 'rascunho' : 'concluido'}">${P.length || 'nenhuma'}</span></h3>
         ${P.length ? P.map(p => `<div class="pend ${p.n}"><span>${p.n === 'erro' ? '⛔' : '⚠️'} ${esc(p.t)}</span><button type="button" class="btn sm" data-etapa="${p.e}">Ir</button></div>`).join('') : '<p class="muted">Tudo preenchido.</p>'}
         <p class="muted small">Pendências são avisos: você pode salvar mesmo assim.</p></div>
@@ -461,15 +368,19 @@
     const l = S.cur, n = S.etapa, et = ETAPAS[n - 1];
     if (BU.Prancha.sincronizarMedicoes(l)) marcarSujo(); // cotas, comprimento e declividade vêm dos pontos do TXT
     let corpo;
-    if (n === 2) corpo = `<div class="card"><h3>Coordenadas UTM (SIRGAS 2000)</h3>${camposHTML(CAMPOS[2])}<p class="muted small">Este = E · Norte = N · Altitude = Z (cota). Metros.</p></div>` + BU.GPS.cartaoHTML(l)
-      + `<div class="card"><h3>Qualidade do RTK</h3>${camposHTML(CAMPOS['2b'])}<p class="muted small">Preencha com o que o coletor mostrou no ponto. Base, receptor, altura da antena e tipo de altitude ficam como padrão para o próximo bueiro.</p></div>` + conferenciasHTML(l, 2);
-    else if (CAMPOS[n]) corpo = `<div class="card">${camposHTML(CAMPOS[n])}</div>` + (n === 1 ? cadastroHTML(l) : '');
-    else if (n === 5) corpo = BU.Prancha.etapaHTML(l) + BU.Secao.etapaHTML(l) + BU.Fotos.blocoHTML(l, 'secao', 'Fotos da seção', { entradas: true });
-    else if (n === 6) corpo = BU.Pontos.etapaHTML(l);
-    else if (n === 7) corpo = BU.Patologias.etapaHTML(l);
-    else if (n === 8) corpo = BU.Fotos.etapaHTML(l);
+    const F = BU.Form;
+    if (n === E.GERAL) corpo = F.geralHTML(l) + cadastroHTML(l);
+    else if (n === E.COORD) corpo = F.coordenadasHTML(l, conferenciasHTML(l, E.COORD));
+    else if (n === E.CORPO) corpo = F.corpoHTML(l);
+    else if (n === E.MONT) corpo = BU.Bocas.etapaHTML(l, 'montante');
+    else if (n === E.JUS) corpo = BU.Bocas.etapaHTML(l, 'jusante');
+    else if (n === E.RTK) corpo = BU.Pontos.etapaHTML(l) + BU.Prancha.etapaHTML(l);
+    else if (n === E.DISP) corpo = F.dispositivosHTML(l);
+    else if (n === E.PATO) corpo = BU.Patologias.etapaHTML(l);
+    else if (n === E.DIAG) corpo = F.diagnosticoHTML(l);
+    else if (n === E.FOTOS) corpo = BU.Fotos.etapaHTML(l);
     else corpo = revisaoHTML();
-    if (![5, 7, 8].includes(n)) BU.Fotos.limpar();
+    if (!ETAPAS_FOTO.includes(n)) BU.Fotos.limpar();
 
     $('#view').innerHTML = `
       <section class="page wiz">
@@ -478,16 +389,16 @@
           <span id="save-state" class="chip save ${S.saveState}">${SAVE_TXT[S.saveState]}</span>
         </div>
         ${l.status === 'devolvido' ? `<div class="card devolvido"><b>↩ Devolvido pelo escritório</b><p>${esc(l.comentarioRevisao || 'Sem comentário.')}</p><p class="muted small">Corrija e salve de novo: ele volta para revisão.</p></div>` : ''}
-        ${l.status === 'nao_localizado' ? `<div class="card naoloc"><b>Não localizado</b><p>${esc((l.naoLocalizado && l.naoLocalizado.motivo) || '')}${l.naoLocalizado && l.naoLocalizado.obs ? ' — ' + esc(l.naoLocalizado.obs) : ''}</p><button type="button" class="btn sm" data-a="reabrir-vistoria">Voltar a vistoriar</button></div>` : (['a_vistoriar', 'rascunho', 'devolvido'].includes(l.status) && (n === 1 || n === 9) ? `<button type="button" class="btn linkbtn" data-a="nao-localizado" data-id="${esc(l.id)}">Não consegui localizar este bueiro</button>` : '')}
+        ${l.status === 'nao_localizado' ? `<div class="card naoloc"><b>Não localizado</b><p>${esc((l.naoLocalizado && l.naoLocalizado.motivo) || '')}${l.naoLocalizado && l.naoLocalizado.obs ? ' — ' + esc(l.naoLocalizado.obs) : ''}</p><button type="button" class="btn sm" data-a="reabrir-vistoria">Voltar a vistoriar</button></div>` : (['a_vistoriar', 'rascunho', 'devolvido'].includes(l.status) && (n === E.GERAL || n === E.REV) ? `<button type="button" class="btn linkbtn" data-a="nao-localizado" data-id="${esc(l.id)}">Não consegui localizar este bueiro</button>` : '')}
         ${l.status === 'aprovado' ? '<div class="card aprovado"><b>✔ Aprovado pelo escritório</b><p class="muted small">Não é mais enviado ao servidor. Alterações ficam só neste aparelho.</p></div>' : ''}
         <nav class="steps" aria-label="Etapas">${ETAPAS.map(e => `<button type="button" class="seg${e.n === n ? ' atual' : ''}${e.n < n ? ' feito' : ''}" data-etapa="${e.n}" aria-label="Etapa ${e.n}: ${e.nome}"${e.n === n ? ' aria-current="step"' : ''}><span></span></button>`).join('')}</nav>
-        <div class="step-title"><span>Etapa ${n} de 9</span><h1>${esc(et.nome)}</h1></div>
+        <div class="step-title"><span>Etapa ${n} de ${ETAPAS.length}</span><h1>${esc(et.nome)}</h1></div>
         ${corpo}
       </section>`;
 
-    if ([5, 7, 8].includes(n)) BU.Fotos.aposRender();
-    const bar = $('#actionbar'); bar.hidden = false;
-    bar.innerHTML = n < 9
+    if (ETAPAS_FOTO.includes(n)) BU.Fotos.aposRender();
+    const bar = $('#actionbar'); bar.hidden = false; bar.className = 'actionbar';
+    bar.innerHTML = n < ETAPAS.length
       ? `<button type="button" class="btn" data-a="voltar">‹ Voltar</button><button type="button" class="btn" data-a="salvar">Salvar</button><button type="button" class="btn primary" data-a="proximo">Próximo ›</button>`
       : `<button type="button" class="btn" data-a="voltar">‹ Voltar</button><button type="button" class="btn primary grow" data-a="concluir">Salvar levantamento</button>`;
   }
@@ -511,7 +422,8 @@
     }
     if (el.dataset.p.startsWith('medicoes.') && S.cur.medicoesAuto) delete S.cur.medicoesAuto[el.dataset.p.slice(9)]; // o que o usuário digita vale mais que o calculado
     marcarSujo();
-    if (S.etapa === 5) { if (el.dataset.p === 'caracteristicas.formato') { if (e.type === 'change') renderWizard(); } else { BU.Secao.redesenhar(); BU.Prancha.redesenhar(); } }
+    BU.Form.aposCampo(S.cur, el.dataset.p);
+    if (S.etapa === E.CORPO) { if (e.type === 'change' && el.dataset.p === 'caracteristicas.formato') renderWizard(); else { BU.Secao.redesenhar(); BU.Prancha.redesenhar(); } }
     if (['codigo', 'estrada', 'municipio'].includes(el.dataset.p)) {
       $('#r-cod').textContent = S.cur.codigo || 'Novo levantamento'; $('#r-sub').textContent = resumoTxt();
     }
@@ -586,7 +498,7 @@
     else { l.atualizadoEm = U.agoraISO(); await DB.salvar(l); }
     if (BU.Sync) BU.Sync.agendar();
     UI.toast('Marcado como não localizado. Se quiser, anexe uma foto do local.');
-    location.hash = `#/lev/${id}/8`; if (S.hashAtual === `#/lev/${id}/8`) rotear();
+    location.hash = `#/lev/${id}/${E.FOTOS}`; if (S.hashAtual === `#/lev/${id}/${E.FOTOS}`) rotear();
   }
   async function reabrirVistoria() {
     if (!S.cur) return; S.cur.status = 'rascunho'; S.cur.naoLocalizado = null; S.dirty = true; S.rev++;
@@ -615,6 +527,7 @@
     else if (a === 'continuar' || a === 'abrir') location.hash = `#/lev/${id}/1`;
     else if (a === 'duplicar') duplicar(id);
     else if (a === 'excluir') excluir(id);
+    else if (a === 'projeto') { if (BU.Sync.projetoId() !== id) await BU.Sync.escolherProjeto(id); S.lista = await DB.listar(); viewLista(); }
     else if (a === 'backup') backup();
     else if (a === 'resp-remover') { if (await UI.confirmar(`Tirar “${t.dataset.nome}” da lista de responsáveis? Os levantamentos já feitos não mudam.`, { titulo: 'Remover da lista', ok: 'Remover' })) { await removerResp(t.dataset.nome); renderWizard(); } }
     else if (a === 'coord-pontos') { if (BU.Prancha.usarCentroComoCoordenada(S.cur)) { marcarSujo(); renderWizard(); UI.toast('Coordenadas preenchidas com o centro do bueiro'); } else UI.toast('Não foi possível calcular o centro com os pontos atuais', 'aviso'); }
@@ -639,6 +552,12 @@
   /* =========================================================
      Rotas
      ========================================================= */
+  /* Barra inferior das telas principais: Cadastro, Mapa, Novo bueiro, Projeto */
+  function mostrarNav(h) {
+    const bar = $('#actionbar'), on = k => ((k === 'cad' && (h === '#/' || h === '' || h === '#/lista')) || (k === 'mapa' && h === '#/mapa') || (k === 'proj' && h === '#/sync')) ? ' atual' : '';
+    bar.hidden = false; bar.className = 'actionbar navbar';
+    bar.innerHTML = `<button type="button" class="nav${on('cad')}" data-go="#/"><span class="i">▦</span>Cadastro</button><button type="button" class="nav${on('mapa')}" data-go="#/mapa"><span class="i">⌖</span>Mapa</button><button type="button" class="nav novo" data-go="#/novo"><span class="i">＋</span>Novo bueiro</button><button type="button" class="nav${on('proj')}" data-go="#/sync"><span class="i">☰</span>Projeto</button>`;
+  }
   async function rotear() {
     if (S.ignorar) { S.ignorar = false; return; }
     const h = location.hash || '#/';
@@ -647,14 +566,15 @@
     window.scrollTo(0, 0);
     if (BU.Mapa) BU.Mapa.parar();
     const bar = $('#actionbar');
+    if (BU.Sync.precisaLogin()) { S.cur = null; bar.hidden = true; bar.innerHTML = ''; bar.className = 'actionbar'; BU.Sync.viewLogin(); S.hashAtual = h; return; }
 
-    const m = h.match(/^#\/lev\/([^/]+)\/(\d)$/);
+    const m = h.match(/^#\/lev\/([^/]+)\/(\d{1,2})$/);
     if (h === '#/novo') {
-      S.cur = novoLevantamento(); await prefillResponsavel(S.cur); await prefillZona(S.cur); await prefillRtk(S.cur); BU.Sync.prefillNovo(S.cur); S.persistido = false; S.dirty = false; S.saveState = 'salvo';
+      S.cur = novoLevantamento(); S.cur.data = U.hojeISO(); S.cur.hora = U.horaAgora(); await prefillResponsavel(S.cur); await prefillZona(S.cur); await prefillRtk(S.cur); BU.Sync.prefillNovo(S.cur); S.persistido = false; S.dirty = false; S.saveState = 'salvo';
       location.replace(`#/lev/${S.cur.id}/1`); return;
     }
     if (m) {
-      const id = m[1], n = Math.min(9, Math.max(1, +m[2]));
+      const id = m[1], n = Math.min(ETAPAS.length, Math.max(1, +m[2]));
       if (!S.cur || S.cur.id !== id) {
         const r = await DB.obter(id);
         if (!r) { UI.toast('Levantamento não encontrado', 'erro'); location.replace('#/lista'); return; }
@@ -670,9 +590,10 @@
     // Telas fora do formulário
     S.cur = null; bar.hidden = true; bar.innerHTML = '';
     S.lista = await DB.listar();
-    if (h === '#/mapa') await BU.Mapa.view(S.lista);
+    if (h === '#/mapa') await BU.Mapa.view(S.lista.filter(doProjeto));
     else if (h === '#/sync') await BU.Sync.view();
     else { await BU.Sync.recarregar(); if (h === '#/lista') viewLista(); else viewHome(); }
+    mostrarNav(h);
     S.hashAtual = h;
   }
 
@@ -717,8 +638,8 @@
   }
   /* Interface usada pelos módulos gps.js, points.js, section-drawing.js e photos.js */
   window.BU.App = {
-    cur: () => S.cur, S, irEtapa: n => { if (S.cur) irEtapa(n); }, prefillNovo: async l => { await prefillResponsavel(l); await prefillZona(l); }, marcarSujo, salvarAtual, campoHTML, novo: novoLevantamento, normalizar, pendencias, CAMPOS, OPCOES, UFS, verLista,
-    irParaLista: () => { location.hash = '#/lista'; if (S.hashAtual === '#/lista') rotear(); },
+    cur: () => S.cur, S, irEtapa: n => { if (S.cur) irEtapa(n); }, prefillNovo: async l => { await prefillResponsavel(l); await prefillZona(l); }, marcarSujo, salvarAtual, campoHTML, E, ETAPAS, novo: novoLevantamento, normalizar, pendencias, CAMPOS, OPCOES, UFS, verLista,
+    rotear, irParaLista: () => { location.hash = '#/lista'; if (S.hashAtual === '#/lista') rotear(); },
     renderEtapa: () => { if (S.cur) renderWizard(); },
     refrescar: async () => {
       if (S.cur) return;

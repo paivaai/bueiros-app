@@ -185,6 +185,19 @@
         if (usuarios.some(u => u.email === email)) throw new Error('Esse e-mail já tem acesso.');
         usuarios.push({ id: 'u-' + Date.now(), nome: nome || email.split('@')[0], email, papel, ativo: true, convite: true });
       },
+      async criarUsuario(usuario, nome, senha, papel, projs) {
+        let u = String(usuario || '').replace(/\s+/g, '').toLowerCase(); if (!u) throw new Error('Informe o usuário.');
+        const email = u.includes('@') ? u : u + '@gfa-campo.app';
+        if (String(senha || '').length < 6) throw new Error('A senha precisa ter pelo menos 6 caracteres.');
+        if (usuarios.some(x => x.email === email)) throw new Error('Já existe uma conta com "' + u + '".');
+        if (D.usuarioAtual.papel === 'gestor' && papel !== 'campo') throw new Error('O gestor só cadastra pessoas de campo.');
+        const id = 'u-' + Date.now() + Math.floor(Math.random() * 1000); usuarios.push({ id, nome: nome || u, email, papel: papel || 'campo', ativo: true });
+        (projs || []).forEach(pid => { (membrosDe[pid] = membrosDe[pid] || []).push(id); });
+        return { id, usuario: u, email };
+      },
+      async presencas() { return []; },
+      async redefinirSenha(id, senha) { if (String(senha || '').length < 6) throw new Error('A senha precisa ter pelo menos 6 caracteres.'); if (!usuarios.some(x => x.id === id)) throw new Error('Pessoa não encontrada.'); },
+      async definirAtivo(id, ativo) { const u = usuarios.find(x => x.id === id); if (!u) throw new Error('Pessoa não encontrada.'); if (u.id === D.usuarioAtual.id) throw new Error('Você não pode desativar a si mesmo.'); u.ativo = !!ativo; },
       /* demonstração ao vivo: de tempos em tempos "alguém do campo" atualiza um bueiro */
       assinar(projetoId, cb) {
         ouvintes.push(cb);
@@ -230,6 +243,7 @@
       });
     }
     const erro = e => { if (e) throw new Error(e.message || String(e)); };
+    const erroEquipe = e => { if (!e) return; const m = String(e.message || e); if (/could not find the function|does not exist|PGRST202/i.test((e.code || '') + m)) throw new Error('Falta rodar o script servidor/11_equipe_presenca.sql no Supabase (SQL Editor). Depois tente de novo.'); throw new Error(m); };
     async function lerPerfil() {
       const { data: { session } } = await sb.auth.getSession();
       if (!session) return null;
@@ -298,6 +312,12 @@
         if (perfil.papel !== 'admin') throw new Error('Só o administrador convida pessoas.');
         const { error } = await sb.from('convites').insert({ organizacao_id: perfil.organizacao_id, email: String(email).trim(), nome: nome || null, papel, criado_por: perfil.id }); erro(error);
       },
+      async criarUsuario(usuario, nome, senha, papel, projs) {
+        const { data, error } = await sb.rpc('criar_usuario', { p_usuario: usuario, p_nome: nome || null, p_senha: senha, p_papel: papel || 'campo', p_projetos: projs || [] }); erroEquipe(error); return data;
+      },
+      async presencas(bueiroId) { const { data, error } = await sb.from('presencas').select('id,usuario_nome,precisao_m,dist_planejado_m,em').eq('bueiro_id', bueiroId).order('em', { ascending: false }).limit(50); if (error) return []; return data || []; },
+      async redefinirSenha(id, senha) { const { error } = await sb.rpc('redefinir_senha', { p_usuario: id, p_senha: senha }); erroEquipe(error); },
+      async definirAtivo(id, ativo) { const { error } = await sb.rpc('definir_ativo', { p_usuario: id, p_ativo: !!ativo }); erroEquipe(error); },
       assinar(projetoId, cb) {
         canal = sb.channel('bueiros-' + projetoId)
           .on('postgres_changes', { event: '*', schema: 'public', table: 'bueiros', filter: 'projeto_id=eq.' + projetoId }, p => {

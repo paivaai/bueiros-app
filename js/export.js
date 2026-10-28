@@ -71,7 +71,9 @@
       const fs = fotos.filter(f => f.meta.ctx === 'pat:' + p.id);
       return `<table class="kv"><tr><th>${i + 1}. ${esc(p.tipo || 'Sem tipo')}</th><td>${esc([p.local, p.gravidade && 'gravidade ' + p.gravidade.toLowerCase()].filter(Boolean).join(' · '))}${p.obs ? '<br><small>' + esc(p.obs) + '</small>' : ''}</td></tr></table>${fs.length ? `<div class="fotos">${fs.map(fig).join('')}</div>` : ''}`;
     }).join('')}</section>` : (l.semPatologias ? '<section><h2>Patologias</h2><p>Sem patologias aparentes.</p></section>' : '');
-    const fts = grupo('Fotos da seção', fotos.filter(f => f.meta.ctx === 'secao')) + pats + grupo('Fotos gerais', fotos.filter(f => !f.meta.ctx));
+    const C = BU.Cat, porCtx = (pre, rot, tit) => { const g = fotos.filter(f => String(f.meta.ctx || '').startsWith(pre)); return g.length ? `<section><h2>${tit} (${g.length})</h2><div class="fotos">${g.map(fig).join('')}</div></section>` : ''; };
+    const fts = grupo('Fotos da seção', fotos.filter(f => f.meta.ctx === 'secao')) + porCtx('disp:', null, 'Dispositivos associados') + pats + porCtx('diag:', null, 'Serviços necessários (diagnóstico)')
+      + grupo('Fotos gerais', fotos.filter(f => !f.meta.ctx || /^foto:/.test(f.meta.ctx)));
     const pe = pend.length ? `<section><h2>Pendências</h2><ul>${pend.map(p => `<li>${esc(p.t)}</li>`).join('')}</ul></section>` : '';
     const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Relatório ${esc(l.codigo || 'bueiro')}</title><style>
 body{font:14px/1.45 Arial,Helvetica,sans-serif;color:#16201A;margin:0;padding:16px;max-width:820px;margin-inline:auto}

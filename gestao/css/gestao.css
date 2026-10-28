@@ -98,3 +98,10 @@ tbody tr { cursor: pointer; } tbody tr:hover, tbody tr.sel { background: var(--a
 .exp-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
 .exp-grade .btn { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; padding: 10px 12px; }
 .exp-grade .btn small { font-weight: 400; opacity: .75; }
+
+/* equipe e participantes */
+fieldset.quem { border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin: 0; }
+fieldset.quem legend { font-weight: 700; font-size: 13px; padding: 0 6px; }
+.membros { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 6px 14px; }
+.memb { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.addop summary { cursor: pointer; }

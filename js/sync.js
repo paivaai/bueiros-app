@@ -11,9 +11,9 @@
 
   const E = {
     sb: null, sessao: null, perfil: null, projetos: [], projetoId: '', ocupado: false, ultima: null, msg: '', online: true,
-    metas: new Map(), progresso: '', timer: null, deb: null, adotando: false,
+    metas: new Map(), progresso: '', timer: null, deb: null, adotando: false, semConta: false, enviadas: new Set(),
   };
-  const emailDe = t => { t = String(t || '').trim().toLowerCase(); return t.includes('@') ? t : (t ? t + '@' + (CFG.USUARIO_DOMINIO || 'gfa-campo.app') : ''); };
+  const emailDe = t => { t = String(t || '').replace(/\s+/g, '').toLowerCase(); return t.includes('@') ? t : (t ? t + '@' + (CFG.USUARIO_DOMINIO || 'gfa-campo.app') : ''); };
   const ehRede = e => !navigator.onLine || (e && (e.name === 'TypeError' || /failed to fetch|networkerror|network request|load failed|timeout|fetch/i.test(String(e.message || e))) && !e.code);
   const projeto = () => E.projetos.find(p => p.id === E.projetoId) || null;
   const logado = () => !!(E.sessao && E.sessao.user);
@@ -27,7 +27,7 @@
     return E.sb;
   }
   async function iniciar() {
-    try { E.perfil = await DB.cfgObter('sincPerfil'); E.projetos = (await DB.cfgObter('sincProjetos')) || []; E.projetoId = (await DB.cfgObter('sincProjetoAtivo')) || ''; E.ultima = await DB.cfgObter('sincUltima'); } catch (e) { /* segue vazio */ }
+    try { E.perfil = await DB.cfgObter('sincPerfil'); E.projetos = (await DB.cfgObter('sincProjetos')) || []; E.projetoId = (await DB.cfgObter('sincProjetoAtivo')) || ''; E.ultima = await DB.cfgObter('sincUltima'); E.semConta = !!(await DB.cfgObter('semConta')); E.enviadas = new Set((await DB.cfgObter('presencasEnviadas')) || []); } catch (e) { /* segue vazio */ }
     const sb = cliente();
     if (sb) { try { const { data } = await sb.auth.getSession(); E.sessao = data && data.session || null; } catch (e) { /* offline: sem sessão lida */ } }
     if (!logado()) E.perfil = E.perfil && E.perfil.saiu ? null : E.perfil;
@@ -49,12 +49,52 @@
 
   async function entrar(usuario, senha) {
     const sb = cliente(); if (!sb) throw new Error('Sem conexão com o servidor agora. Tente com internet.');
-    const { data, error } = await sb.auth.signInWithPassword({ email: emailDe(usuario), password: senha });
-    if (error) throw new Error(/invalid login/i.test(error.message) ? 'Usuário ou senha incorretos.' : error.message);
+    const email = emailDe(usuario); if (!email) throw new Error('Informe o usuário.'); if (!senha) throw new Error('Informe a senha.');
+    // tenta a senha como foi digitada e, se falhar, sem espaços nas pontas (o teclado do celular costuma colocar um espaço no fim)
+    const tent = [senha]; if (senha.trim() !== senha) tent.push(senha.trim());
+    let data = null, error = null;
+    for (const pw of tent) { ({ data, error } = await sb.auth.signInWithPassword({ email, password: pw })); if (!error) break; if (!/invalid login/i.test(error.message)) break; }
+    if (error) {
+      const m = String(error.message || '');
+      if (/invalid login/i.test(m)) throw new Error('Usuário ou senha incorretos. Confira o usuário (sem espaços) e use o “olho” para ver a senha digitada.');
+      if (/not confirmed/i.test(m)) throw new Error('Esta conta ainda não foi confirmada. Fale com o escritório.');
+      if (/rate limit|too many/i.test(m)) throw new Error('Muitas tentativas. Aguarde um minuto e tente de novo.');
+      throw new Error(m);
+    }
     E.sessao = data.session;
     await carregarPerfil(); await carregarProjetos();
+    E.semConta = false; await DB.cfgSalvar('semConta', 0).catch(() => {});
     if (!E.projetoId && E.projetos.length === 1) await escolherProjeto(E.projetos[0].id, true);
     pintar();
+  }
+  const temServidor = () => !!(CFG.SUPABASE_URL && window.supabase);
+  const precisaLogin = () => temServidor() && !logado() && !E.semConta && !(E.perfil && !navigator.onLine);
+  const nomeUsuario = () => (logado() && E.perfil && E.perfil.nome) || '';
+  async function seguirSemConta() { E.semConta = true; await DB.cfgSalvar('semConta', 1).catch(() => {}); }
+  function loginHTML(extra) {
+    return `<form class="card" id="sync-login" autocomplete="on"><h3>Entrar</h3>
+        <div class="f"><label for="sl-u">Usuário</label><input id="sl-u" name="username" type="text" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" inputmode="email" required></div>
+        <div class="f"><label for="sl-s">Senha</label>${UI.senhaHTML({ id: 'sl-s', name: 'password' })}</div>
+        <div class="err" id="sl-err" role="alert" hidden></div>
+        <button class="btn primary" type="submit" id="sl-ok">Entrar</button>
+        ${extra || ''}
+        <p class="muted small">O usuário é o que o escritório cadastrou para você (ex.: <b>filipe</b>). Sem internet o app continua funcionando: tudo fica neste aparelho e vai para o servidor quando você entrar e estiver online.</p></form>`;
+  }
+  function ligarLogin(depois) {
+    const f = $('#sync-login'); if (!f) return;
+    f.addEventListener('submit', async ev => {
+      ev.preventDefault(); const b = $('#sl-ok'), er = $('#sl-err'); b.disabled = true; er.hidden = true; b.textContent = 'Entrando…';
+      try { await entrar(f.username.value, f.password.value); await depois(); }
+      catch (e) { er.textContent = ehRede(e) ? 'Sem internet. Conecte-se para entrar a primeira vez.' : (e.message || String(e)); er.hidden = false; b.disabled = false; b.textContent = 'Entrar'; }
+    });
+    const sem = $('#sl-sem'); if (sem) sem.addEventListener('click', async () => { await seguirSemConta(); location.hash = '#/'; if (BU.App && BU.App.rotear) BU.App.rotear(); });
+  }
+  /* Tela 01: a primeira tela do app quando não há conta aberta */
+  function viewLogin() {
+    const alvo = $('#view'); if (!alvo) return;
+    alvo.innerHTML = `<section class="page login-gate"><div class="login-logo"><img src="assets/logo-gfa.png" alt="GFA Engenharia"><h1>Cadastro de Bueiros</h1><p class="muted">Entre com a sua conta para receber os projetos e enviar o que levantar.</p></div>
+      ${loginHTML('<button type="button" class="btn linkbtn" id="sl-sem">Continuar sem conta (dados só neste aparelho)</button>')}</section>`;
+    ligarLogin(async () => { location.hash = '#/'; if (BU.App && BU.App.rotear) BU.App.rotear(); if (E.projetoId) sincronizar(); });
   }
   async function sair() {
     const n = [...E.metas.values()].filter(m => m.sujo && !m.local).length;
@@ -111,6 +151,7 @@
       await carregarProjetos().catch(() => {}); // traz também o eixo atualizado
       await carregarMetas();
       const env = await enviar();
+      await enviarPresencas().catch(e => { if (ehRede(e)) throw e; console.warn('presenças:', e); });
       const rec = await receber();
       await baixarFotosFaltantes();
       E.ultima = new Date().toISOString(); await DB.cfgSalvar('sincUltima', E.ultima).catch(() => {});
@@ -152,6 +193,23 @@
     }
     // fotos de bueiros já enviados que ganharam foto/legenda depois
     return enviados;
+  }
+
+  /* "GPS aqui": envia os registros de presença para a tabela própria (script 11 do servidor). */
+  async function enviarPresencas() {
+    const lista = [];
+    for (const l of await DB.listar()) {
+      const m = E.metas.get(l.id); if (m && m.local) continue;
+      const pid = (m && m.projetoId) || E.projetoId; if (!pid) continue;
+      for (const r of (l.presencas || [])) if (r && r.id && !E.enviadas.has(r.id) && r.latitude != null) lista.push({ id: r.id, projeto_id: pid, bueiro_id: l.id, latitude: r.latitude, longitude: r.longitude, precisao: r.precisao, distancia: r.distancia, em: r.em });
+    }
+    for (let i = 0; i < lista.length; i += 100) {
+      const lote = lista.slice(i, i + 100);
+      const r = await E.sb.rpc('registrar_presencas', { p_lista: lote });
+      if (r.error) { if (ehRede(r.error)) throw r.error; if (/does not exist|PGRST202|42883/i.test((r.error.code || '') + r.error.message)) return; throw new Error(r.error.message); } // sem o script 11: segue sem
+      lote.forEach(x => E.enviadas.add(x.id));
+      await DB.cfgSalvar('presencasEnviadas', [...E.enviadas].slice(-2000)).catch(() => {});
+    }
   }
   function traduzir(er) {
     const t = String(er.message || er);
@@ -296,12 +354,7 @@
     const c = contagens(), lev = new Map((await DB.listar()).map(l => [l.id, l]));
     let h = '<section class="page"><div class="page-head"><h1>Conta e sincronização</h1></div>';
     if (!logado()) {
-      h += `<form class="card" id="sync-login" autocomplete="on"><h3>Entrar</h3>
-        <div class="f"><label for="sl-u">Usuário ou e-mail</label><input id="sl-u" name="username" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" required></div>
-        <div class="f"><label for="sl-s">Senha</label><input id="sl-s" name="password" type="password" autocomplete="current-password" required></div>
-        <div class="err" id="sl-err" role="alert" hidden></div>
-        <button class="btn primary" type="submit" id="sl-ok">Entrar</button>
-        <p class="muted small">Sem internet o app continua funcionando: tudo fica neste aparelho e vai para o servidor quando você entrar e estiver online.</p></form>`;
+      h += loginHTML();
     } else {
       h += `<div class="card"><h3>Conta</h3><div class="kv"><span>Nome</span><b>${esc(E.perfil ? E.perfil.nome : '—')}</b></div><div class="kv"><span>Perfil</span><b>${esc(E.perfil ? ({ admin: 'Administrador', gestor: 'Gestor', campo: 'Campo' }[E.perfil.papel] || E.perfil.papel) : '—')}</b></div>
         <div class="row"><button type="button" class="btn" data-sync="sair">Sair da conta</button></div></div>
@@ -323,12 +376,7 @@
     }
     h += '<button type="button" class="btn" data-go="#/">‹ Início</button></section>';
     alvo.innerHTML = h;
-    const f = $('#sync-login');
-    if (f) f.addEventListener('submit', async ev => {
-      ev.preventDefault(); const b = $('#sl-ok'), er = $('#sl-err'); b.disabled = true; er.hidden = true; b.textContent = 'Entrando…';
-      try { await entrar(f.username.value, f.password.value); await view(); if (E.projetoId) sincronizar(); }
-      catch (e) { er.textContent = ehRede(e) ? 'Sem internet. Conecte-se para entrar a primeira vez.' : (e.message || String(e)); er.hidden = false; b.disabled = false; b.textContent = 'Entrar'; }
-    });
+    ligarLogin(async () => { await view(); if (E.projetoId) sincronizar(); });
     const sp = $('#sync-proj');
     if (sp) sp.addEventListener('change', async () => { if (sp.value) { await escolherProjeto(sp.value); view(); } });
   }
@@ -351,5 +399,5 @@
   }
   function prefillNovo(l) { const p = projeto(); if (p && p.rodovia && !l.estrada) l.estrada = p.rodovia; }
 
-  BU.Sync = { recarregar: carregarMetas, iniciar, sincronizar, agendar, view, selo, cartaoHome, pintar, projeto, logado, eixoAtivo, prefillNovo, projetoId: () => E.projetoId };
+  BU.Sync = { precisaLogin, viewLogin, nomeUsuario, projetos: () => E.projetos, meta: id => E.metas.get(id) || null, escolherProjeto, perfil: () => E.perfil, recarregar: carregarMetas, iniciar, sincronizar, agendar, view, selo, cartaoHome, pintar, projeto, logado, eixoAtivo, prefillNovo, projetoId: () => E.projetoId };
 })();
