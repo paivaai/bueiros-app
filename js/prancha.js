@@ -45,7 +45,7 @@
     if (/^TN|TER|TAL|CRISTA|^CA$|^PA$|SOLO|GREIDE/.test(k)) return 'terreno';
     return 'outro';
   }
-  /* Pontos marcados nas bocas (ref "montante:GTZ-I1"): a boca define o papel, mesmo que o código do TXT seja genérico. */
+  /* Pontos marcados nas bocas (ref "montante:GTZ-1"): a boca define o papel, mesmo que o código do TXT seja genérico. */
   function papelDe(p) {
     const r = String(p.ref || '');
     if (/^montante:GTZ/.test(r)) return 'gim';

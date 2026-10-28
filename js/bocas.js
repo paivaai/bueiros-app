@@ -1,6 +1,6 @@
 /* bocas.js — etapas "Boca de montante" e "Boca de jusante": localização (GPS aqui / mapa / digitar, em SIRGAS 2000),
    tipo, material e estado da boca, e o DESENHO da boca com os pontos vermelhos a levantar (X, Y, Z de cada um).
-   Os pontos marcados viram pontos do levantamento (l.pontos, com ref = "montante:GTZ-I1"), então a planta e o perfil (prancha.js)
+   Os pontos marcados viram pontos do levantamento (l.pontos, com ref = "montante:GTZ-1"), então a planta e o perfil (prancha.js)
    se desenham sozinhos. Expõe BU.Bocas e BU.Presenca. */
 (function () {
   'use strict';
@@ -25,8 +25,7 @@
   function pontosDaBoca(l, lado) {
     const P = perfilBoca(l, lado), out = [], sufx = k => (P.n > 1 ? ` · linha ${k}` : '');
     for (let k = 1; k <= P.n; k++) {
-      out.push({ k: `GTZ-I${k}`, nome: 'Fundo da galeria (geratriz inferior)' + sufx(k), cod: 'OAC-GTZ' });
-      out.push({ k: `GTZ-S${k}`, nome: 'Topo interno (geratriz superior)' + sufx(k), cod: 'OAC-GTZ' });
+      out.push({ k: `GTZ-${k}`, nome: 'Geratriz da galeria (centro da boca)' + sufx(k), cod: 'OAC-GTZ' });
     }
     const cod = P.alas ? 'OAC-ALA' : 'OAC-MURO';
     if (P.muro) {
@@ -58,46 +57,43 @@
     return pontosDaBoca(l, lado).filter(d => { const s = estado(l, lado, d.k); return !s.p && !s.nao; });
   }
 
-  /* ---------- desenho (vista frontal da boca) ---------- */
+  /* ---------- desenho da boca (vista em planta, igual ao modelo): pontos vermelhos clicáveis ---------- */
   function desenho(l, lado) {
-    const P = perfilBoca(l, lado), pts = pontosDaBoca(l, lado), pos = {};
-    const W = 360, H = 250, solo = 205, topo = 62, XL = 80, XR = 280;
-    let corpo = '', xs = [];
-    // aberturas
-    const span = 168, gap = 10, w = (span - (P.n - 1) * gap) / P.n, x0 = (W - span) / 2;
-    const dmax = 104, hAb = Math.min(dmax, w * (P.tub ? 1 : 1.15), 110), base = solo - 22;
-    for (let k = 0; k < P.n; k++) {
-      const cx = x0 + k * (w + gap) + w / 2, d = Math.min(w, hAb), yt = base - hAb;
-      xs.push(cx);
-      if (P.tub) corpo += `<circle cx="${cx}" cy="${base - d / 2}" r="${d / 2}" fill="#fff" stroke="#16201A" stroke-width="2.4"/>`;
-      else corpo += `<rect x="${cx - w / 2}" y="${yt}" width="${w}" height="${hAb}" rx="2" fill="#fff" stroke="#16201A" stroke-width="2.4"/>`;
-      pos[`GTZ-I${k + 1}`] = [cx, base]; pos[`GTZ-S${k + 1}`] = [cx, P.tub ? base - d : yt];
+    const P = perfilBoca(l, lado), pts = pontosDaBoca(l, lado), pos = {}, n = P.n;
+    const half = 60 * n, tipX = half + 108, baseX = half + 168, W = 2 * (half + 168) + 40, cx = W / 2, H = 190;
+    const yT = 30, yU = 68, yB = 140, yE = 152, GR = '#C8C9CB', OURO = '#D9A21B';
+    const xl = cx - half, xr = cx + half; // cantos da "U" (junção)
+    let g = '';
+    if (P.muro) {
+      if (P.alas) {
+        const L1 = xl - 108, L0 = xl - 168, R1 = xr + 108, R0 = xr + 168;
+        g += `<g fill="none" stroke="${OURO}" stroke-width="1.2"><path d="M${L1} ${yT} H${R1} M${L1} ${yT} L${L0} ${yB} M${R1} ${yT} L${R0} ${yB} M${L0} ${yB} H${xl - 30} L${xl} ${yU + 6} H${xr} L${xr + 30} ${yB} H${R0}"/>`;
+        for (let x = L1 + 25; x < R1; x += 25) g += `<path d="M${x} ${yT} v${(Math.round(x / 25) % 2) ? 14 : 28}"/>`;
+        g += `<path d="M${L1} ${yT} V${yB} M${L1 + 50} ${yT} V${yB} M${R1} ${yT} V${yB} M${R1 - 50} ${yT} V${yB}"/></g>`;
+        pos['AE-PT'] = [L1, yT]; pos['AE-PB'] = [L0, yB]; pos['AD-PT'] = [R1, yT]; pos['AD-PB'] = [R0, yB];
+      }
+      g += `<path d="M${xl - 24} ${yE} L${xl} ${yU} H${xr} L${xr + 24} ${yE}" fill="none" stroke="${GR}" stroke-width="14" stroke-linejoin="miter"/>`;
+      pos['AE-JT'] = [xl, yU]; pos['AE-JB'] = [xl - 24, yE]; pos['AD-JT'] = [xr, yU]; pos['AD-JB'] = [xr + 24, yE];
     }
-    let parede = '';
     if (P.caixa) {
-      parede = `<rect x="${XL - 10}" y="${topo + 8}" width="${XR - XL + 20}" height="${solo - topo - 8}" fill="#e7ece8" stroke="#16201A" stroke-width="2.4"/>`;
-      pos['CX-TE'] = [XL - 10, topo + 8]; pos['CX-TD'] = [XR + 10, topo + 8]; pos['CX-BE'] = [XL - 10, solo]; pos['CX-BD'] = [XR + 10, solo];
-    } else if (P.muro) {
-      const ala = P.alas;
-      parede = `<path d="M${XL} ${topo} H${XR} V${solo} H${XL} Z" fill="#e7ece8" stroke="#16201A" stroke-width="2.4"/>`;
-      if (ala) parede += `<path d="M${XL} ${topo} L${XL - 62} ${topo + 52} V${solo} H${XL} Z M${XR} ${topo} L${XR + 62} ${topo + 52} V${solo} H${XR} Z" fill="#dfe6e1" stroke="#16201A" stroke-width="2.4" stroke-linejoin="round"/>`;
-      pos['AE-JT'] = [XL, topo]; pos['AE-JB'] = [XL, solo]; pos['AD-JT'] = [XR, topo]; pos['AD-JB'] = [XR, solo];
-      if (ala) { pos['AE-PT'] = [XL - 62, topo + 52]; pos['AE-PB'] = [XL - 62, solo]; pos['AD-PT'] = [XR + 62, topo + 52]; pos['AD-PB'] = [XR + 62, solo]; }
-    } else {
-      // sem muro: o tubo sai do aterro (talude)
-      parede = `<path d="M18 ${solo} L${XL + 20} ${topo + 10} H${XR - 20} L${W - 18} ${solo} Z" fill="#efe9dc" stroke="#9b8b66" stroke-width="1.6"/>`;
+      g += `<rect x="${xl - 20}" y="${yT + 6}" width="${2 * half + 40}" height="${yE - yT - 6}" fill="#E7ECE8" fill-opacity=".14" stroke="${OURO}" stroke-width="1.4"/>`;
+      pos['CX-TE'] = [xl - 20, yT + 6]; pos['CX-TD'] = [xr + 20, yT + 6]; pos['CX-BE'] = [xl - 20, yE]; pos['CX-BD'] = [xr + 20, yE];
     }
-    const chao = `<line x1="8" y1="${solo}" x2="${W - 8}" y2="${solo}" stroke="#56635A" stroke-width="2"/><path d="M8 ${solo} h${W - 16}" stroke="#56635A" stroke-dasharray="2 5" transform="translate(0 6)"/>`;
+    // aberturas (uma por linha), com o ponto da geratriz sobre a linha da boca
+    for (let k = 0; k < n; k++) {
+      const x = cx + (k - (n - 1) / 2) * 120, topY = P.muro || P.caixa ? yT : yU - 34;
+      g += `<rect x="${x - 20}" y="${topY}" width="40" height="${yU - topY}" fill="${GR}"/>`;
+      pos[`GTZ-${k + 1}`] = [x, yU];
+    }
     const bolas = pts.map((d, i) => {
       const p = pos[d.k]; if (!p) return '';
       const s = estado(l, lado, d.k), cls = s.p ? 'ok' : s.nao ? 'nao' : 'falta';
-      const lado2 = d.k.startsWith('AE') || d.k === 'CX-TE' || d.k === 'CX-BE' ? -1 : 1;
       return `<g class="dot ${cls}" data-bc="dot" data-lado="${lado}" data-k="${esc(d.k)}" tabindex="0" role="button" aria-label="${esc(d.nome)}">
-        <circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="12" class="halo"/><circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="9"/>
-        <text x="${p[0].toFixed(1)}" y="${(p[1] + 3.6).toFixed(1)}" text-anchor="middle">${i + 1}</text></g>`;
+        <circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="19" class="halo"/><circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="11"/>
+        <text x="${p[0].toFixed(1)}" y="${(p[1] + 4).toFixed(1)}" text-anchor="middle">${i + 1}</text></g>`;
     }).join('');
-    return `<svg class="boca-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Desenho da ${LADOS[lado].toLowerCase()}">${chao}${parede}${corpo}${bolas}
-      <text x="${W / 2}" y="${H - 6}" text-anchor="middle" class="leg">vista de frente, de fora do bueiro olhando para a boca</text></svg>`;
+    return `<svg class="boca-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Desenho da ${LADOS[lado].toLowerCase()}"><rect width="${W}" height="${H}" fill="#0b0d0c" rx="8"/>${g}${bolas}
+      <text x="${W / 2}" y="${H - 6}" text-anchor="middle" class="leg">planta da boca · toque no ponto vermelho para marcar X, Y e Z</text></svg>`;
   }
 
   /* ---------- localização da boca ---------- */
@@ -223,7 +219,7 @@
     const livres = l.pontos.filter(p => !p.ref); let n = 0;
     const atrib = (lado, k, p) => { if (!p || p.ref || !pontosDaBoca(l, lado).some(d => d.k === k)) return; p.ref = refDe(lado, k); delete l.bocas[lado].naoMarcados[k]; n++; };
     const gU = unidades(livres.filter(isGtz), 0.3);
-    const nM = pontosDaBoca(l, 'montante').filter(d => d.k.startsWith('GTZ-I')).length, nJ = pontosDaBoca(l, 'jusante').filter(d => d.k.startsWith('GTZ-I')).length;
+    const nM = pontosDaBoca(l, 'montante').filter(d => d.k.startsWith('GTZ-')).length, nJ = pontosDaBoca(l, 'jusante').filter(d => d.k.startsWith('GTZ-')).length;
     // separa as galerias em duas bocas (a mais alta é a montante)
     let grupo = { montante: [], jusante: [] };
     if (gU.length >= 2) {
@@ -238,7 +234,7 @@
     const cM = centro(grupo.montante), cJ = centro(grupo.jusante);
     ['montante', 'jusante'].forEach(lado => {
       const us = grupo[lado].slice().sort((u, v) => u.E - v.E || u.N - v.N);
-      us.forEach((u, i) => { const k = i + 1; if (u.par) { atrib(lado, `GTZ-I${k}`, u.base); atrib(lado, `GTZ-S${k}`, u.topo); } else atrib(lado, `GTZ-I${k}`, u.p[0]); });
+      us.forEach((u, i) => { const k = i + 1; atrib(lado, `GTZ-${k}`, u.base || u.p[0]); });
     });
     // alas / muros / caixa: cada unidade vai para a boca mais próxima
     const aU = unidades(livres.filter(p => isAla(p) && !p.ref), 0.3);

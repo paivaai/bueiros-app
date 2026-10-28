@@ -243,7 +243,7 @@ details.cad summary { cursor: pointer; min-height: 44px; display: flex; align-it
 .prio b { font-size: 22px; } .prio span { font-size: 13px; color: var(--muted); }
 .prio.media { background: var(--warn-bg); } .prio.alta { background: #FFD9B8; } .prio.urgente { background: var(--err-bg); color: var(--danger); }
 .foto-bloco { display: grid; gap: 8px; }
-.boca .boca-svg { width: 100%; height: auto; max-height: 360px; background: #F7F9F6; border: 1px solid var(--line); border-radius: 12px; }
+.boca .boca-svg { width: 100%; height: auto; max-height: 360px; background: #0b0d0c; border: 1px solid var(--line); border-radius: 12px; }
 .boca-svg .dot { cursor: pointer; outline: none; }
 .boca-svg .dot circle:not(.halo) { stroke: #fff; stroke-width: 2; }
 .boca-svg .dot.falta circle:not(.halo) { fill: #D92D20; }
@@ -252,7 +252,7 @@ details.cad summary { cursor: pointer; min-height: 44px; display: flex; align-it
 .boca-svg .dot .halo { fill: transparent; stroke: none; }
 .boca-svg .dot:focus .halo, .boca-svg .dot:hover .halo { fill: rgba(217,45,32,.22); }
 .boca-svg .dot text { fill: #fff; font: 700 11px var(--font); pointer-events: none; }
-.boca-svg .leg { fill: #56635A; font: 11px var(--font); }
+.boca-svg .leg { fill: #9aa59d; font: 11px var(--font); }
 .dotlist { display: grid; gap: 6px; margin-top: 10px; }
 .dotrow { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 6px 10px; text-align: left; border: 2px solid var(--line); background: var(--surface); border-radius: 12px; }
 .dotrow .n { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: 800; font-size: 14px; background: #D92D20; }
