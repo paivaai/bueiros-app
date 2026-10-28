@@ -295,7 +295,7 @@
     const papeis = admin ? '<option value="campo">Operador (usa o app do celular)</option><option value="gestor">Gestor (escritório: revisa e atribui)</option><option value="admin">Administrador</option>' : '<option value="campo">Operador (usa o app do celular)</option>';
     pagina('equipe', `<div class="linha"><h1>Equipe e acessos</h1></div>
       <div class="grid g2"><div class="card"><h3>Quem tem acesso <span class="muted small">(${S.usuarios.length})</span></h3><div class="tab-wrap" style="margin-top:10px;max-height:none"><table><thead><tr><th>Nome</th><th>Usuário / e-mail</th><th>Papel</th><th></th></tr></thead><tbody>
-        ${S.usuarios.map(u => `<tr style="cursor:default${u.ativo === false ? ';opacity:.55' : ''}"><td><b>${esc(u.nome)}</b>${u.ativo === false ? ' <span class="muted small">(desativado)</span>' : ''}</td><td>${esc(mostraUsuario(u.email))}</td><td>${esc(PAPEL[u.papel] || u.papel)}${u.convite ? ' <span class="muted small">(convidado)</span>' : ''}</td>
+        ${S.usuarios.map(u => `<tr style="cursor:default${u.ativo === false ? ';opacity:.55' : ''}"><td><b>${esc(u.nome)}</b>${u.ativo === false ? ' <span class="muted small">(desativado)</span>' : ''}</td><td>${esc(mostraUsuario(u.email))}</td><td>${admin && u.id !== S.perfil.id ? `<select data-papel="${esc(u.id)}" aria-label="Papel de ${esc(u.nome)}" style="max-width:170px">${['campo', 'gestor', 'admin'].map(k => `<option value="${k}"${k === u.papel ? ' selected' : ''}>${esc(PAPEL[k])}</option>`).join('')}</select>` : esc(PAPEL[u.papel] || u.papel)}${u.convite ? ' <span class="muted small">(convidado)</span>' : ''}</td>
           <td style="white-space:nowrap">${gerencia(u) ? `<button class="btn sm" data-a="pw-reset" data-id="${esc(u.id)}" data-nome="${esc(u.nome)}">Nova senha</button> <button class="btn sm" data-a="pessoa-ativo" data-id="${esc(u.id)}" data-ativo="${u.ativo === false ? '1' : '0'}">${u.ativo === false ? 'Reativar' : 'Desativar'}</button>` : ''}</td></tr>`).join('')}</tbody></table></div></div>
       <div>${pode ? `<div class="card"><h3>Adicionar pessoa</h3><form id="f-pessoa" class="grid" style="margin-top:10px;gap:10px">
         <label class="f">Nome<input type="text" name="nome" required autocomplete="off"></label>
@@ -401,7 +401,8 @@
     if (tr && !t.closest('a')) location.hash = `#/p/${S.projeto.id}/b/${tr.dataset.ir}`;
   });
   document.addEventListener('input', ev => { if (ev.target.id === 'f-q') { S.filtro.q = ev.target.value; viewBueiros(); } });
-  document.addEventListener('change', ev => {
+  document.addEventListener('change', async ev => {
+    if (ev.target.dataset && ev.target.dataset.papel) { const sel = ev.target; try { await D.definirPapel(sel.dataset.papel, sel.value); toast('Papel alterado.'); viewEquipe(); } catch (e) { toast(esc(e.message || e)); viewEquipe(); } return; }
     if (ev.target.id === 'f-st') { S.filtro.st = ev.target.value; viewBueiros(); }
     else if (ev.target.id === 'f-resp') { S.filtro.resp = ev.target.value; viewBueiros(); }
   });
