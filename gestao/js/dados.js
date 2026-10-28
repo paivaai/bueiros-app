@@ -196,6 +196,7 @@
         return { id, usuario: u, email };
       },
       async presencas() { return []; },
+      async definirPapel(id, papel) { const u = usuarios.find(x => x.id === id); if (!u) throw new Error('Pessoa não encontrada.'); if (u.id === D.usuarioAtual.id) throw new Error('Você não pode mudar o seu próprio papel.'); u.papel = papel; },
       async redefinirSenha(id, senha) { if (String(senha || '').length < 6) throw new Error('A senha precisa ter pelo menos 6 caracteres.'); if (!usuarios.some(x => x.id === id)) throw new Error('Pessoa não encontrada.'); },
       async definirAtivo(id, ativo) { const u = usuarios.find(x => x.id === id); if (!u) throw new Error('Pessoa não encontrada.'); if (u.id === D.usuarioAtual.id) throw new Error('Você não pode desativar a si mesmo.'); u.ativo = !!ativo; },
       /* demonstração ao vivo: de tempos em tempos "alguém do campo" atualiza um bueiro */
@@ -315,6 +316,7 @@
       async criarUsuario(usuario, nome, senha, papel, projs) {
         const { data, error } = await sb.rpc('criar_usuario', { p_usuario: usuario, p_nome: nome || null, p_senha: senha, p_papel: papel || 'campo', p_projetos: projs || [] }); erroEquipe(error); return data;
       },
+      async definirPapel(id, papel) { const { error } = await sb.rpc('definir_papel', { p_usuario: id, p_papel: papel }); if (error && /could not find the function|PGRST202/i.test((error.code || '') + error.message)) throw new Error('Falta rodar o script servidor/12_papel_usuario.sql no Supabase.'); erro(error); },
       async presencas(bueiroId) { const { data, error } = await sb.from('presencas').select('id,usuario_nome,precisao_m,dist_planejado_m,em').eq('bueiro_id', bueiroId).order('em', { ascending: false }).limit(50); if (error) return []; return data || []; },
       async redefinirSenha(id, senha) { const { error } = await sb.rpc('redefinir_senha', { p_usuario: id, p_senha: senha }); erroEquipe(error); },
       async definirAtivo(id, ativo) { const { error } = await sb.rpc('definir_ativo', { p_usuario: id, p_ativo: !!ativo }); erroEquipe(error); },

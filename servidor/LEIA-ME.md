@@ -64,3 +64,6 @@ Cria a situação `nao_localizado`, a coluna `fotos.ctx`, atualiza `v_andamento`
 - **Criar pessoas pelo painel** (Equipe e acessos → Adicionar pessoa, ou "várias de uma vez"): funções `criar_usuario`, `redefinir_senha` e `definir_ativo`.
   O admin cria qualquer papel; o gestor cria só **operadores (campo)**. Login por usuário (`filipe` vira `filipe@gfa-campo.app`). Sem esse script o painel avisa que falta rodá-lo.
 - **Presença da equipe**: tabela própria `presencas` (separada dos bueiros) e função `registrar_presencas`. Cada toque em **GPS aqui** no app grava quem esteve onde, com a precisão do GPS e a distância até o pin planejado. O painel mostra no detalhe do bueiro.
+
+## 12 — Mudar o papel de uma pessoa (rodar UMA vez, depois do 11)
+Cria `definir_papel`: o **administrador** troca o papel (Operador, Gestor, Administrador) pela lista na tela Equipe e acessos. Gestor e administrador adicionam pessoas; o gestor só adiciona operadores.
