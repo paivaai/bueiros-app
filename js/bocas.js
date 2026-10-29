@@ -24,13 +24,13 @@
   /* Lista ordenada dos pontos vermelhos: { k, nome, cod } */
   function pontosDaBoca(l, lado) {
     const P = perfilBoca(l, lado), out = [], sufx = k => (P.n > 1 ? ` · linha ${k}` : '');
-    for (let k = 1; k <= P.n; k++) out.push({ k: `GTZ-${k}`, nome: 'Geratriz da galeria (centro da boca)' + sufx(k), cod: 'OAC-GTZ' });
+    for (let k = 1; k <= P.n; k++) out.push({ k: `GTZ-${k}`, nome: 'Geratriz · centro da boca' + sufx(k), cod: 'OAC-GTZ' });
     const cod = P.alas ? 'OAC-ALA' : 'OAC-MURO', quem = P.alas ? 'Ala' : 'Muro';
     if (P.muro) {
       [['AE', 'esquerda'], ['AD', 'direita']].forEach(([s, lado2]) => {
-        if (P.reta) out.push({ k: `${s}-JT`, nome: `Muro de testa ${lado2} · extremidade`, cod: 'OAC-MURO' });
-        else { out.push({ k: `${s}-JT`, nome: `${quem} ${lado2} · junção · topo`, cod }); out.push({ k: `${s}-JB`, nome: `${quem} ${lado2} · junção · base`, cod }); }
-        if (P.alas) { out.push({ k: `${s}-PT`, nome: `Ala ${lado2} · ponta · topo`, cod }); out.push({ k: `${s}-PB`, nome: `Ala ${lado2} · ponta · base`, cod }); }
+        if (P.reta) out.push({ k: `${s}-JT`, nome: `Muro de testa · lado ${lado2} · extremidade`, cod: 'OAC-MURO' });
+        else { out.push({ k: `${s}-JT`, nome: `${P.alas ? 'Muro de testa' : quem} · lado ${lado2} · topo`, cod: 'OAC-MURO' }); out.push({ k: `${s}-JB`, nome: `${P.alas ? 'Muro de testa' : quem} · lado ${lado2} · base`, cod: 'OAC-MURO' }); }
+        if (P.alas) { out.push({ k: `${s}-PT`, nome: `Ala · lado ${lado2} · ponta · topo`, cod: 'OAC-ALA' }); out.push({ k: `${s}-PB`, nome: `Ala · lado ${lado2} · ponta · base`, cod: 'OAC-ALA' }); }
       });
     }
     return out;
@@ -89,17 +89,16 @@
       pos['AE-PT'] = [-(half + 120), 0]; pos['AE-PB'] = [-(half + 219), 100]; pos['AD-PT'] = [half + 120, 0]; pos['AD-PB'] = [half + 219, 100];
     }
     ext = Math.max(ext, 420);
-    const W = 2 * ext + 80, H = y1 - y0 + 30, cx = W / 2;
+    const W = 2 * ext + 80, H = y1 - y0 + 10, cx = W / 2;
     const bolas = pts.map((d, i) => {
       const p = pos[d.k]; if (!p) return '';
       const s = estado(l, lado, d.k), cls = s.p ? 'ok' : s.nao ? 'nao' : 'falta', x = f(cx + p[0]), y = f(p[1] - y0);
       return `<g class="dot ${cls}" data-bc="dot" data-lado="${lado}" data-k="${esc(d.k)}" tabindex="0" role="button" aria-label="${esc((i + 1) + '. ' + d.nome)}">
-        <circle cx="${x}" cy="${y}" r="34" class="halo"/><circle cx="${x}" cy="${y}" r="15"/></g>`;
+        <circle cx="${x}" cy="${y}" r="34" class="halo"/><circle cx="${x}" cy="${y}" r="18"/><text x="${x}" y="${f(y + 7)}" text-anchor="middle">${i + 1}</text></g>`;
     }).join('');
-    const extras = previa ? Object.entries(pos).filter(([k]) => !pts.some(d => d.k === k)).map(([k, p]) => `<g class="dot falta" style="pointer-events:none"><circle cx="${f(cx + p[0])}" cy="${f(p[1] - y0)}" r="15"/></g>`).join('') : '';
+    const extras = previa ? Object.entries(pos).filter(([k]) => !pts.some(d => d.k === k)).map(([k, p]) => `<g class="dot falta" style="pointer-events:none"><circle cx="${f(cx + p[0])}" cy="${f(p[1] - y0)}" r="18"/></g>`).join('') : '';
     return `<div class="boca-wrap"><svg class="boca-svg" viewBox="0 0 ${f(W)} ${f(H)}" style="min-width:${Math.round(W * 0.44)}px" role="img" aria-label="Desenho da ${LADOS[lado].toLowerCase()}"><rect width="${f(W)}" height="${f(H)}" fill="#000" rx="10"/>
-      <g transform="translate(${f(cx)} ${f(-y0)})">${g}</g>${extras}${bolas}
-      <text x="${f(W / 2)}" y="${f(H - 8)}" text-anchor="middle" class="leg">toque no ponto vermelho para marcar X, Y e Z</text></svg></div>`;
+      <g transform="translate(${f(cx)} ${f(-y0)})">${g}</g>${extras}${bolas}</svg></div>`;
   }
 
   /* ---------- localização da boca ---------- */
@@ -139,7 +138,7 @@
         <div class="f"><label>Estado da boca <span class="req">*</span></label>${chips('estado', Cat.ESTADOS, b.estado, lado)}</div>
         <div class="f"><label for="f-obstr-${lado}">Obstrução da seção: <b id="obstr-v-${lado}">${ob}%</b></label><input id="f-obstr-${lado}" type="range" min="0" max="100" step="5" value="${ob}" data-fm="obstr" data-lado="${lado}"></div></div></div>
       <div class="card boca"><h3>Pontos a levantar <span class="chip ${falta ? 'rascunho' : 'concluido'}">${marcados}/${pts.length}</span></h3>
-        <p class="muted small" style="margin:0 0 6px">Cada ponto vermelho é uma posição que o topógrafo precisa marcar (X, Y e Z). Toque no ponto para preencher. Com todos marcados o app monta a planta (2D), o perfil e o modelo 3D.</p>
+        <p class="muted small" style="margin:0 0 6px">Marque cada ponto vermelho do desenho com X, Y e Z. Os números do desenho são os mesmos da lista abaixo. Toque no ponto, ou na linha da lista, para preencher.</p>
         ${aviso}${desenho(l, lado)}
         <div class="dotlist">${lista}</div></div>
       ${BU.Form.dispositivosHTML(l, lado)}
