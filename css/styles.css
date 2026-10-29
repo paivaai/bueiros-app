@@ -324,3 +324,6 @@ a.syncbtn { text-decoration: none; }
 .orienta h4 { margin: 0 0 6px; font-size: 14px; }
 .orienta .kv { display: flex; gap: 10px; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--line); } .orienta .kv:last-child { border-bottom: 0; }
 .orienta .kv span { color: var(--muted); flex: 0 0 38%; } .orienta .kv b { text-align: right; overflow-wrap: anywhere; }
+
+.card.atencao { border: 2px solid var(--danger); background: var(--err-bg); }
+.card.atencao .rec { margin-top: 6px; padding: 6px 8px; border-radius: 8px; background: #fff; }

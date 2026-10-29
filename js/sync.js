@@ -358,7 +358,7 @@
     let t, cls, n = 0;
     if (!logado()) { t = 'Sem conta aberta: toque no bonequinho para entrar'; cls = 'off'; }
     else if (E.ocupado) { t = 'Sincronizando…'; cls = 'ocupado'; }
-    else if (prob) { t = `${prob} com problema: toque para tentar de novo`; cls = 'erro'; n = prob; }
+    else if (prob) { t = `${prob} com problema de sincronização: toque para ver e resolver`; cls = 'erro'; n = prob; }
     else if (c.aEnviar) { t = `${c.aEnviar} a enviar: toque para sincronizar`; cls = 'pend'; n = c.aEnviar; }
     else { t = 'Sincronizado: toque para atualizar'; cls = 'on'; }
     el.className = 'syncbtn ' + cls; el.title = t; el.setAttribute('aria-label', t); el.setAttribute('aria-busy', String(!!E.ocupado));
@@ -395,11 +395,20 @@
           <div class="row"><button type="button" class="btn" data-sync="projetos">Atualizar lista de projetos</button></div></div>
         ${E.msg ? `<div class="card"><p class="pend aviso" style="margin:0">${esc(E.msg)}</p></div>` : ''}`;
       const prob = [...E.metas.values()].filter(m => m.conflito || m.erro);
-      if (prob.length) h += `<div class="card"><h3>Precisam de atenção</h3>${prob.map(m => {
-        const l = lev.get(m.id); const nome = l ? (l.codigo || 'Sem código') : m.id;
-        return `<div class="pend erro" style="display:block"><b>${esc(nome)}</b><div class="small">${m.conflito ? 'O escritório (ou outra pessoa) alterou este bueiro enquanto você também alterava.' : esc(m.erro)}</div>
-          ${m.conflito ? `<div class="row"><button type="button" class="btn sm" data-sync="meu" data-id="${esc(m.id)}">Manter o meu</button><button type="button" class="btn sm" data-sync="deles" data-id="${esc(m.id)}">Usar o do escritório</button></div>`
-            : `<div class="row"><a class="btn sm" href="#/lev/${esc(m.id)}/1">Abrir</a><button type="button" class="btn sm" data-sync="tentar" data-id="${esc(m.id)}">Tentar de novo</button></div>`}</div>`; }).join('')}</div>`;
+      if (prob.length) {
+        const bloco = `<div class="card atencao"><h3>⚠️ ${prob.length === 1 ? '1 bueiro precisa' : prob.length + ' bueiros precisam'} de atenção</h3>
+          <p class="small" style="margin:0 0 8px">Estes bueiros <b>não foram sincronizados</b> com o escritório. Enquanto isso, o que você fez fica guardado só neste aparelho. Resolva um por um:</p>
+          ${prob.map(m => {
+            const l = lev.get(m.id), nome = l ? (l.codigo || 'Sem código') : m.id;
+            return `<div class="pend erro" style="display:block"><b>${esc(nome)}</b>
+              <div class="small">${m.conflito ? 'Problema: o escritório (ou outra pessoa) alterou este bueiro enquanto você também alterava.' : 'Problema: ' + esc(m.erro)}</div>
+              <div class="small rec"><b>O que fazer:</b> ${m.conflito
+                ? 'se o que você fez em campo é o mais atual, toque em <b>Manter o meu</b>. Se o escritório já corrigiu e o seu é antigo, toque em <b>Usar o do escritório</b>.'
+                : 'confira se o celular está com internet e toque em <b>Tentar de novo</b>. Se o erro voltar, abra o bueiro, toque em Salvar e tente outra vez. Se continuar, avise o escritório.'}</div>
+              ${m.conflito ? `<div class="row"><button type="button" class="btn sm" data-sync="meu" data-id="${esc(m.id)}">Manter o meu</button><button type="button" class="btn sm" data-sync="deles" data-id="${esc(m.id)}">Usar o do escritório</button></div>`
+                : `<div class="row"><a class="btn sm" href="#/lev/${esc(m.id)}/1">Abrir</a><button type="button" class="btn sm" data-sync="tentar" data-id="${esc(m.id)}">Tentar de novo</button></div>`}</div>`; }).join('')}</div>`;
+        h = h.replace('<div class="page-head"><h1>Conta e projeto</h1></div>', m => m + bloco);
+      }
     }
     h += '<button type="button" class="btn" data-go="#/">‹ Início</button></section>';
     alvo.innerHTML = h;
@@ -411,7 +420,12 @@
   document.addEventListener('click', async e => {
     const b = e.target.closest('[data-sync]'); if (!b || b.disabled) return;
     const a = b.dataset.sync;
-    if (a === 'agora') { if (!logado()) { location.hash = '#/sync'; return; } await sincronizar(); if (location.hash === '#/sync') view(); }
+    if (a === 'agora') {
+      if (!logado()) { location.hash = '#/sync'; return; }
+      const c = contagens();
+      if (c.conflitos + c.erros > 0 && location.hash !== '#/sync') { location.hash = '#/sync'; return; } // com problema, o ícone leva até ele
+      await sincronizar(); if (location.hash === '#/sync') view();
+    }
     else if (a === 'sair') { await sair(); view(); }
     else if (a === 'projetos') { try { await carregarProjetos(); UI.toast('Lista atualizada'); } catch (er) { UI.toast(ehRede(er) ? 'Sem internet' : er.message, 'erro'); } view(); }
     else if (a === 'meu' || a === 'deles') resolver(b.dataset.id, a);
