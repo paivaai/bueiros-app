@@ -102,6 +102,7 @@ ${sec}${croqui}${prancha}${pts}${fts}${pe}
       if (!l.pontos.length) throw new Error('Nenhum ponto cadastrado');
       return { blob: new Blob([BU.Pontos.textoTXT(l)], { type: 'text/plain;charset=utf-8' }), nome: `PONTOS-${base(l)}.txt` };
     }
+    if (tipo === 'antt') return { blob: new Blob([await BU.Antt.gerarHTML(l)], { type: 'text/html;charset=utf-8' }), nome: `FICHA-ANTT-${base(l)}.html` };
     const fotos = await fotosDe(l);
     if (tipo === 'json') return { blob: gerarJSON(l, fotos), nome: `LEVANTAMENTO-${base(l)}.json` };
     return { blob: gerarRelatorio(l, fotos), nome: `RELATORIO-${base(l)}.html` };
@@ -110,9 +111,9 @@ ${sec}${croqui}${prancha}${pts}${fts}${pe}
     try {
       await BU.App.salvarAtual({ forcar: true });
       const r = await gerar(tipo, l);
-      if (tipo === 'relatorio') {
+      if (tipo === 'relatorio' || tipo === 'antt') {
         const url = URL.createObjectURL(r.blob), w = window.open(url, '_blank');
-        if (!w) { U.baixar(r.blob, r.nome); UI.toast('Relatório baixado. Abra o arquivo para imprimir ou salvar em PDF.'); }
+        if (!w) { U.baixar(r.blob, r.nome); UI.toast('Arquivo baixado. Abra-o para imprimir ou salvar em PDF.'); }
         else setTimeout(() => URL.revokeObjectURL(url), 120000);
       } else { U.baixar(r.blob, r.nome); UI.toast('Arquivo gerado: ' + r.nome); }
     } catch (e) { UI.toast('Não foi possível exportar: ' + (e && e.message || e), 'erro'); }
@@ -120,7 +121,7 @@ ${sec}${croqui}${prancha}${pts}${fts}${pe}
   async function compartilhar(l) {
     if (!navigator.share) { UI.toast('Este navegador não compartilha arquivos. Use os botões de baixar.', 'aviso'); return; }
     const k = await UI.escolher('Compartilhar arquivo', '<p>Qual arquivo enviar?</p>', [
-      { k: 'relatorio', label: 'Relatório (HTML)', cls: 'primary' }, { k: 'json', label: 'JSON completo (com fotos)' }, { k: 'csv', label: 'CSV dos dados' }, { k: 'txt', label: 'TXT dos pontos' }, { k: 'x', label: 'Cancelar' }]);
+      { k: 'antt', label: 'Ficha padrão ANTT', cls: 'primary' }, { k: 'relatorio', label: 'Relatório (HTML)' }, { k: 'json', label: 'JSON completo (com fotos)' }, { k: 'csv', label: 'CSV dos dados' }, { k: 'txt', label: 'TXT dos pontos' }, { k: 'x', label: 'Cancelar' }]);
     if (!k || k === 'x') return;
     try {
       await BU.App.salvarAtual({ forcar: true });
@@ -132,13 +133,14 @@ ${sec}${croqui}${prancha}${pts}${fts}${pe}
 
   function painelHTML() {
     return `<div class="card"><h3>Exportar</h3><div class="col2">
-      <button type="button" class="btn primary" data-ex="relatorio">Gerar relatório</button>
+      <button type="button" class="btn primary" data-ex="antt">Ficha padrão ANTT</button>
+      <button type="button" class="btn" data-ex="relatorio">Gerar relatório</button>
       <button type="button" class="btn" data-ex="json">Exportar JSON</button>
       <button type="button" class="btn" data-ex="csv">Exportar CSV</button>
       <button type="button" class="btn" data-ex="txt">Exportar TXT (pontos)</button>
       <button type="button" class="btn" data-ex="croqui">Imagem da prancha</button>
       <button type="button" class="btn" data-ex="compartilhar">Compartilhar arquivo</button></div>
-      <p class="muted small">O relatório reúne tudo, com planta, perfil, quadro de dados, pontos e fotos. Abra e use “Imprimir / salvar PDF”. O JSON inclui as fotos e serve de backup.</p></div>`;
+      <p class="muted small"><b>Ficha padrão ANTT:</b> relatório de drenagem em uma folha, no modelo da concessionária, com as logos. Abra e use “Imprimir / salvar PDF”. O relatório completo reúne tudo, com planta, perfil, quadro de dados, pontos e fotos. Abra e use “Imprimir / salvar PDF”. O JSON inclui as fotos e serve de backup.</p></div>`;
   }
   document.addEventListener('click', e => {
     const b = e.target.closest('[data-ex]'); if (!b) return;
