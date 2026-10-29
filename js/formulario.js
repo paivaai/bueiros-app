@@ -158,7 +158,7 @@
         <div class="f"><label>Estado de conservação <span class="req">*</span></label>${chipsHTML('caracteristicas.conservacao', Cat.ESTADOS, c.conservacao)}
           <p class="muted small" style="margin:6px 0 0">${sug ? `Sugestão pelo corpo e pelas bocas: <b>${esc(sug)}</b>${c.conservacao ? '' : ' (toque para aceitar)'}.` : 'Classifique o corpo e as bocas para ter uma sugestão.'}</p>
           ${sug && !c.conservacao ? `<button type="button" class="btn sm" data-fm="aceitar-cons" data-v="${esc(sug)}">Usar ${esc(sug)}</button>` : ''}</div>
-        <div class="f"><label>Necessita</label><p class="muted small" style="margin:0 0 6px">Marque o que precisa ser feito e, para cada serviço, onde aplicar.</p>
+        <div class="f" style="margin-top:16px"><label>Necessita</label><p class="muted small" style="margin:0 0 8px">Marque os serviços necessários. Depois de marcar, escolha onde aplicar cada um: boca de montante, corpo ou boca de jusante.</p>
           <div class="icogrid">${Cat.NECESSITA.map(([k, r]) => `<button type="button" class="icobtn${nec.includes(k) ? ' on' : ''}" data-fm="nec" data-k="${k}" aria-pressed="${nec.includes(k)}">${ICONES[k] || ''}<span>${esc(r)}</span></button>`).join('')}</div></div></div>
       ${nec.length ? `<div class="card"><h3>Onde aplicar cada serviço</h3>
         ${nec.map(k => { const on = (d.onde && d.onde[k]) || [];
