@@ -15,33 +15,14 @@
 
   /* Etapas do formulário (a ordem segue o HTML de referência). */
   const ETAPAS = [
-    { n: 1, nome: 'Informação geral' }, { n: 2, nome: 'Coordenadas e RTK' }, { n: 3, nome: 'Corpo' }, { n: 4, nome: 'Boca de montante' }, { n: 5, nome: 'Boca de jusante' },
-    { n: 6, nome: 'Levantamento RTK' }, { n: 7, nome: 'Dispositivos associados' }, { n: 8, nome: 'Patologias' }, { n: 9, nome: 'Diagnóstico' }, { n: 10, nome: 'Fotos' }, { n: 11, nome: 'Revisão' },
+    { n: 1, nome: 'Informação geral' }, { n: 2, nome: 'Corpo' }, { n: 3, nome: 'Boca de montante' }, { n: 4, nome: 'Boca de jusante' },
+    { n: 5, nome: 'Levantamento RTK' }, { n: 6, nome: 'Dispositivos associados' }, { n: 7, nome: 'Patologias' }, { n: 8, nome: 'Diagnóstico' }, { n: 9, nome: 'Fotos' }, { n: 10, nome: 'Revisão' },
   ];
-  const E = { GERAL: 1, COORD: 2, CORPO: 3, MONT: 4, JUS: 5, RTK: 6, DISP: 7, PATO: 8, DIAG: 9, FOTOS: 10, REV: 11 };
+  const E = { GERAL: 1, COORD: 1, CORPO: 2, MONT: 3, JUS: 4, RTK: 5, DISP: 6, PATO: 7, DIAG: 8, FOTOS: 9, REV: 10 }; // a antiga etapa "Coordenadas e RTK" foi retirada
   const ETAPAS_FOTO = [E.CORPO, E.DISP, E.PATO, E.DIAG, E.FOTOS];
 
   /* Cada campo: p = caminho dentro do levantamento; t = tipo; half = ocupa meia largura. */
-  const CAMPOS = {
-    2: [
-      { p: 'leste', label: 'Este (E)', t: 'num', unit: 'm', min: 100000, max: 900000, ph: '712392,430' },
-      { p: 'norte', label: 'Norte (N)', t: 'num', unit: 'm', min: 0, max: 10000000, ph: '7480303,180' },
-      { p: 'zona', label: 'Fuso / Zona UTM', t: 'select', opts: BU.GPS.ZONAS, half: true, sem: true },
-      { p: 'hemisferio', label: 'Hemisfério', t: 'select', opts: ['S', 'N'], half: true, sem: true },
-      { p: 'altitude', label: 'Altitude (Z)', t: 'num', unit: 'm', neg: true, ph: '15,904' },
-    ],
-    '2b': [
-      { p: 'rtk.solucao', label: 'Solução do RTK', t: 'select', opts: ['Fixa', 'Flutuante', 'DGPS', 'Autônoma'] },
-      { p: 'rtk.precisaoH', label: 'Precisão horizontal', t: 'num', unit: 'm', min: 0, ph: '0,015' },
-      { p: 'rtk.precisaoV', label: 'Precisão vertical', t: 'num', unit: 'm', min: 0, ph: '0,025' },
-      { p: 'rtk.satelites', label: 'Satélites', t: 'int', min: 0 },
-      { p: 'rtk.tipoAltitude', label: 'Tipo da altitude (Z)', t: 'select', opts: ['Elipsoidal', 'Ortométrica'], half: true },
-      { p: 'rtk.geoide', label: 'Modelo geoidal', ph: 'ex.: MAPGEO2015', half: true },
-      { p: 'rtk.alturaAntena', label: 'Altura da antena', t: 'num', unit: 'm', min: 0 },
-      { p: 'rtk.base', label: 'Base / correção', ph: 'ex.: base própria, RBMC-RJNI, NTRIP' },
-      { p: 'rtk.receptor', label: 'Receptor', ph: 'ex.: Emlid RS3' },
-    ],
-  };
+  const CAMPOS = {};
 
   const novoLevantamento = () => BU.Modelo.novo();
   const normalizar = r => BU.Modelo.normalizar(r);
@@ -90,7 +71,7 @@
     if (S.cur) { if (nome) { await lembrarResp(nome); S.cur.responsavel = nome; marcarSujo(); } renderWizard(); }
   }
 
-  const RTK_PADRAO = ['base', 'receptor', 'alturaAntena', 'tipoAltitude', 'geoide'];
+  const RTK_PADRAO = ['alturaAntena']; // o resto do RTK é fixo do projeto (BU.Modelo.RTK_PROJETO)
   async function prefillRtk(l) {
     try { if (S.ultimoRtk == null) S.ultimoRtk = (await DB.cfgObter('ultimoRtk')) || {}; } catch (e) { S.ultimoRtk = {}; }
     for (const k of RTK_PADRAO) if ((l.rtk[k] == null || l.rtk[k] === '') && S.ultimoRtk[k] != null && S.ultimoRtk[k] !== '') l.rtk[k] = S.ultimoRtk[k];
@@ -123,11 +104,12 @@
     if (l.status === 'nao_localizado') return P;
     if (!l.classificacao) av('Classificação (grota ou greide) não informada', E.GERAL);
     if (!c.celulas || !c.tipo || !c.material) av('Tipo de bueiro incompleto (nº de linhas, forma e material)', E.GERAL);
-    if (!BU.GPS.utmDe(l)) av('Coordenadas UTM (RTK) não informadas', E.COORD);
-    else if (l.coordOrigem === 'cadastro') av('Coordenadas vêm do cadastro: confirme com o RTK no local', E.COORD);
+    if (l.rtk && l.rtk.alturaAntena == null) av('Altura da antena do RTK não informada', E.GERAL);
+    if (!BU.GPS.utmDe(l)) av('Coordenadas não definidas: importe os pontos do RTK', E.RTK);
+    else if (l.coordOrigem === 'cadastro') av('Coordenadas ainda são as do cadastro: serão substituídas ao importar os pontos do RTK', E.RTK);
     const dimOk = c.tipo === 'Tubular' ? c.diametro != null : (c.largura != null && c.altura != null);
     if (c.tipo && !dimOk) av(c.tipo === 'Tubular' ? 'Diâmetro do corpo não informado' : 'Base e altura do corpo não informadas', E.CORPO);
-    if (m.comprimentoBueiro == null) av('Comprimento do bueiro não informado', E.CORPO);
+    if (m.comprimentoBueiro == null) av('Comprimento e declividade são calculados: importe os pontos de montante e jusante', E.RTK);
     if (!c.estadoCorpo) av('Estado do corpo não informado', E.CORPO);
     ['montante', 'jusante'].forEach(k => {
       const bc = l.bocas[k], e = k === 'montante' ? E.MONT : E.JUS;
@@ -280,14 +262,18 @@
     const chips = [['todos', 'Todos'], ['a_vistoriar', 'A vistoriar'], ['rascunho', 'Rascunho'], ['concluido', 'Concluído'], ['devolvido', 'Devolvido'], ['nao_localizado', 'Não localizado'], ['aprovado', 'Aprovado']]
       .map(([k, t]) => `<button type="button" class="fchip" data-a="filtro" data-v="${k}" aria-pressed="${S.filtro === k}">${t} <span>${cont[k]}</span></button>`).join('');
     const proj = BU.Sync.projeto();
+    const escolher = logado && projs.length && !ativo;
+    const cab = proj
+      ? `<div class="saudacao"><div><small class="muted">Olá, ${esc(BU.Sync.nomeUsuario() || '')}</small><h1 class="titulo-proj">${esc(proj.nome)}</h1><small class="muted">${esc([proj.rodovia, proj.fuso ? 'fuso ' + proj.fuso + (proj.hemisferio || '') : ''].filter(Boolean).join(' · '))}${n ? ` · ${feitos} de ${n} vistoriados` : ''} · <a href="#/sync">trocar projeto</a></small></div></div>`
+      : `<div class="saudacao"><div><small class="muted">${logado ? 'Olá,' : 'Sem conta'}</small><b>${esc(BU.Sync.nomeUsuario() || 'Dados só neste aparelho')}</b></div></div>`;
     $('#view').innerHTML = `
       <section class="page home">
-        <div class="saudacao"><div><small class="muted">${logado ? 'Olá,' : 'Sem conta'}</small><b>${esc(BU.Sync.nomeUsuario() || 'Dados só neste aparelho')}</b></div></div>
+        ${cab}
         ${BU.Sync.cartaoHome()}
-        ${logado || projs.length ? `<h2 class="sec">Meus projetos</h2>${projs.length ? projs.map(p => cartaoProjeto(p, p.id === ativo)).join('') : '<div class="card vazio">Nenhum projeto liberado para você ainda. Peça ao escritório para incluir você na equipe.</div>'}` : ''}
-        <h2 class="sec" id="lista-bueiros">${proj ? 'Bueiros · ' + esc(proj.nome) : 'Bueiros'}</h2>
-        ${logado && projs.length && !ativo ? '<div class="card vazio">Abra um projeto acima para ver os bueiros dele.</div>' : `
-        <div class="filtros" role="group" aria-label="Filtrar por situação">${chips}</div>
+        ${escolher ? `<h2 class="sec">Escolha o projeto</h2>${projs.map(p => cartaoProjeto(p, false)).join('')}` : ''}
+        ${logado && !projs.length ? '<div class="card vazio">Nenhum projeto liberado para você ainda. Peça ao escritório para incluir você na equipe.</div>' : ''}
+        ${escolher ? '' : `<div id="lista-bueiros"></div>
+        <div class="filtros-fixos"><div class="filtros" role="group" aria-label="Filtrar por situação">${chips}</div></div>
         <input id="busca" class="busca" type="search" placeholder="Buscar por nome, km, município…" value="${esc(S.q)}" aria-label="Buscar">
         <div id="itens">${itensLista()}</div>`}
         <details class="card ferr"><summary><b>Ferramentas</b> <span class="muted small">importar, backup, instalar</span></summary>
@@ -300,7 +286,11 @@
           </div></details>
         <p class="muted small" style="text-align:center">${feitos} de ${n} bueiros vistoriados</p>
       </section>`;
+    ajustarTopo();
   }
+  /* altura do cabeçalho: os filtros ficam fixos logo abaixo dele ao rolar */
+  function ajustarTopo() { const t = document.querySelector('.topbar'); if (t) document.documentElement.style.setProperty('--topbar-h', t.offsetHeight + 'px'); }
+  window.addEventListener('resize', ajustarTopo);
 
   /* =========================================================
      Renderização — Lista
@@ -308,7 +298,8 @@
   function resumoTecnico(l) {
     const c = l.caracteristicas, N = U.numTxt;
     const dim = c.diametro != null ? `Ø ${N(c.diametro)} m` : (c.largura != null && c.altura != null ? `${N(c.largura)} × ${N(c.altura)} m` : '');
-    return [c.tipo, c.material, dim].filter(Boolean).join(' · ');
+    const sigla = (l.meta && l.meta.sigla) || (BU.Cat && BU.Cat.siglaDe ? BU.Cat.siglaDe(c) : '');
+    return [sigla || [c.tipo, c.material].filter(Boolean).join(' · '), dim].filter(Boolean).join(' · ');
   }
   function cartaoLista(l) {
     const local = [l.km && 'km ' + l.km, l.municipio ? l.municipio + (l.estado ? '/' + l.estado : '') : '', !l.km && l.estrada].filter(Boolean).join(' · ') || 'Local não informado';
@@ -324,9 +315,18 @@
       ${barraHTML(l)}
       <div class="muted small">${av ? esc(l.observacoes ? l.observacoes.split('\n')[0] : 'Ainda não vistoriado') : `${esc(U.dataBR(l.data))} · ${esc(l.responsavel || 'sem responsável')} · atualizado ${esc(U.dataHoraBR(l.atualizadoEm))}`}</div>
       <div class="row">
-        <button type="button" class="btn primary" data-a="abrir">${av ? 'Vistoriar' : 'Abrir'}</button>${nav}<button type="button" class="btn" data-a="dados">Dados</button>
-      </div>
-      <div class="row">${['a_vistoriar', 'rascunho', 'devolvido'].includes(l.status) ? '<button type="button" class="btn sm" data-a="nao-localizado">Não localizei</button>' : ''}<button type="button" class="btn sm" data-a="duplicar">Duplicar</button><button type="button" class="btn sm danger" data-a="excluir">Excluir</button></div></article>`;
+        <button type="button" class="btn primary" data-a="abrir">${av ? 'Vistoriar' : 'Abrir'}</button>${nav}<button type="button" class="btn mais" data-a="menu" aria-label="Mais opções" title="Mais opções">⋯</button>
+      </div></article>`;
+  }
+  /* "⋯": Dados, Não localizei e Excluir ficam recolhidos para ninguém apagar sem querer. */
+  async function menuBueiro(id) {
+    const l = S.lista.find(x => x.id === id); if (!l) return;
+    const bot = [{ k: 'dados', label: 'Dados do ponto' }];
+    if (['a_vistoriar', 'rascunho', 'devolvido'].includes(l.status)) bot.push({ k: 'nl', label: 'Não localizei este bueiro' });
+    if (podeExcluir(l)) bot.push({ k: 'excluir', label: 'Excluir bueiro…', cls: 'danger' });
+    bot.push({ k: 'x', label: 'Fechar' });
+    const r = await UI.escolher(l.codigo || 'Sem código', '<p class="muted small">Escolha uma opção.</p>', bot);
+    if (r === 'dados') verDados(id); else if (r === 'nl') marcarNaoLocalizado(id); else if (r === 'excluir') excluir(id);
   }
   function listaFiltrada() {
     const q = S.q.trim().toLowerCase();
@@ -411,13 +411,31 @@
       <button type="button" class="btn" data-etapa="1">Editar</button>`;
   }
 
+  /* Bueiro criado em campo: preenche o que estiver vazio com o cadastro (KMZ) do projeto: ponto mais próximo no km, e a pista pela letra do código (N/S/L/O). */
+  const kmMetros = t => { const m = String(t || '').match(/(\d{1,3})\+(\d{2,3})/); return m ? +m[1] * 1000 + +m[2] : null; };
+  const PISTA_LETRA = { N: 'Norte', S: 'Sul', L: 'Leste', O: 'Oeste' };
+  function prefillDoCadastro(l) {
+    if (['cadastro', 'planejamento'].includes(l.origem) || ['concluido', 'aprovado'].includes(l.status)) return false;
+    const fontes = S.lista.filter(x => x.id !== l.id && doProjeto(x) && (x.planejado || ['cadastro', 'planejamento'].includes(x.origem)));
+    if (!fontes.length) return false;
+    const kmL = kmMetros(l.km) ?? kmMetros(l.codigo), cod = String(l.codigo || '').match(/\d\+\d{2,3}[^\s]*\s+([NSLO])\b/i);
+    if (!l.pistaGe && cod) l.pistaGe = PISTA_LETRA[cod[1].toUpperCase()] || '';
+    const proximo = lista => lista.map(x => ({ x, d: kmL != null && kmMetros(x.km) != null ? Math.abs(kmMetros(x.km) - kmL) : 1e9 })).sort((a, b) => a.d - b.d)[0];
+    const geral = proximo(fontes), mesma = l.pistaGe ? proximo(fontes.filter(x => x.pistaGe === l.pistaGe)) : null;
+    let mudou = false; const set = (k, v) => { if (v && !l[k]) { l[k] = v; mudou = true; } };
+    if (geral) { const g = geral.x; set('estrada', g.estrada); set('estado', g.estado); set('municipio', g.municipio); set('ambiente', g.ambiente); if (!l.pistaGe && geral.d < 1e9) { /* pista só pela letra do código */ } }
+    const ref = mesma || geral; if (ref) { set('sentido', ref.x.sentido); set('lado', ref.x.lado); if (mesma) set('ambiente', mesma.x.ambiente); }
+    return mudou;
+  }
+
   function renderWizard() {
     const l = S.cur, n = S.etapa, et = ETAPAS[n - 1];
-    if (BU.Prancha.sincronizarMedicoes(l)) marcarSujo(); // cotas, comprimento e declividade vêm dos pontos do TXT
+    if (BU.Prancha.sincronizarMedicoes(l)) marcarSujo(); // cotas, comprimento, declividade e recobrimento vêm dos pontos do RTK
+    try { if (l.pontos && l.pontos.length && l.coordOrigem !== 'rtk' && BU.Prancha.usarCentroComoCoordenada(l)) marcarSujo(); } catch (e) { /* sem modelo ainda */ } // coordenada do bueiro = centro dos pontos do RTK
+    if (n === E.GERAL && prefillDoCadastro(l)) marcarSujo();
     let corpo;
     const F = BU.Form;
-    if (n === E.GERAL) corpo = F.geralHTML(l) + cadastroHTML(l);
-    else if (n === E.COORD) corpo = F.coordenadasHTML(l, conferenciasHTML(l, E.COORD));
+    if (n === E.GERAL) corpo = F.geralHTML(l) + conferenciasHTML(l, E.GERAL);
     else if (n === E.CORPO) corpo = F.corpoHTML(l);
     else if (n === E.MONT) corpo = BU.Bocas.etapaHTML(l, 'montante');
     else if (n === E.JUS) corpo = BU.Bocas.etapaHTML(l, 'jusante');
@@ -436,7 +454,7 @@
           <span id="save-state" class="chip save ${S.saveState}">${SAVE_TXT[S.saveState]}</span>
         </div>
         ${l.status === 'devolvido' ? `<div class="card devolvido"><b>↩ Devolvido pelo escritório</b><p>${esc(l.comentarioRevisao || 'Sem comentário.')}</p><p class="muted small">Corrija e salve de novo: ele volta para revisão.</p></div>` : ''}
-        ${l.status === 'nao_localizado' ? `<div class="card naoloc"><b>Não localizado</b><p>${esc((l.naoLocalizado && l.naoLocalizado.motivo) || '')}${l.naoLocalizado && l.naoLocalizado.obs ? ' — ' + esc(l.naoLocalizado.obs) : ''}</p><button type="button" class="btn sm" data-a="reabrir-vistoria">Voltar a vistoriar</button></div>` : (['a_vistoriar', 'rascunho', 'devolvido'].includes(l.status) && (n === E.GERAL || n === E.REV) ? `<button type="button" class="btn linkbtn" data-a="nao-localizado" data-id="${esc(l.id)}">Não consegui localizar este bueiro</button>` : '')}
+        ${l.status === 'nao_localizado' ? `<div class="card naoloc"><b>Não localizado</b><p>${esc((l.naoLocalizado && l.naoLocalizado.motivo) || '')}${l.naoLocalizado && l.naoLocalizado.obs ? ' — ' + esc(l.naoLocalizado.obs) : ''}</p><button type="button" class="btn sm" data-a="reabrir-vistoria">Voltar a vistoriar</button></div>` : ''}
         ${l.status === 'aprovado' ? '<div class="card aprovado"><b>✔ Aprovado pelo escritório</b><p class="muted small">Não é mais enviado ao servidor. Alterações ficam só neste aparelho.</p></div>' : ''}
         <nav class="steps" aria-label="Etapas">${ETAPAS.map(e => `<button type="button" class="seg${e.n === n ? ' atual' : ''}${e.n < n ? ' feito' : ''}" data-etapa="${e.n}" aria-label="Etapa ${e.n}: ${e.nome}"${e.n === n ? ' aria-current="step"' : ''}><span></span></button>`).join('')}</nav>
         <div class="step-title"><span>Etapa ${n} de ${ETAPAS.length}</span><h1>${esc(et.nome)}</h1></div>
@@ -478,25 +496,18 @@
 
   function irEtapa(n) { location.hash = `#/lev/${S.cur.id}/${n}`; }
 
-  async function duplicar(id) {
-    const o = await DB.obter(id); if (!o) return;
-    const c = U.clone(normalizar(o));
-    c.id = U.uid(); c.codigo = (o.codigo || 'Sem código') + ' (cópia)'; c.status = 'rascunho';
-    c.criadoEm = c.atualizadoEm = U.agoraISO();
-    const fotos = [];
-    for (const f of c.fotos) { // copia também o arquivo de cada foto, com novo id
-      const r = await DB.obterFoto(f.id); if (!r) continue;
-      const nid = U.uid(); await DB.salvarFoto({ ...r, id: nid, levantamentoId: c.id }); fotos.push({ ...f, id: nid });
-    }
-    c.fotos = fotos;
-    await DB.salvar(c);
-    S.lista = await DB.listar(); viewLista(); UI.toast('Levantamento duplicado');
-  }
+  /* Só o que o operador criou em campo pode ser excluído; o que veio do cadastro/planejamento do escritório não. */
+  const podeExcluir = l => !['cadastro', 'planejamento'].includes(l.origem) && !l.planejado && l.status !== 'aprovado';
   async function excluir(id) {
     const l = S.lista.find(x => x.id === id);
+    if (l && !podeExcluir(l)) { UI.toast('Este bueiro veio do cadastro do escritório e não pode ser excluído aqui.', 'aviso'); return; }
     const ok = await UI.confirmar(`Excluir o levantamento “${(l && l.codigo) || 'Sem código'}”? Esta ação não pode ser desfeita.`, { titulo: 'Excluir levantamento', ok: 'Excluir', perigo: true });
     if (!ok) return;
-    try { await DB.excluir(id); } catch (err) { UI.toast('Erro ao excluir: ' + err.message, 'erro'); return; }
+    try {
+      const m = BU.Sync.meta(id);
+      if (l && m && !m.local && (m.versao > 0 || m.projetoId)) await BU.Sync.registrarExclusao(id, m.projetoId || BU.Sync.projetoId(), l.codigo, l.fotos); // sai também do servidor
+      await DB.excluir(id);
+    } catch (err) { UI.toast('Erro ao excluir: ' + err.message, 'erro'); return; }
     S.lista = await DB.listar(); viewLista(); UI.toast('Levantamento excluído');
   }
   const backup = () => BU.Export.backupTudo();
@@ -573,7 +584,7 @@
     else if (a === 'reabrir-vistoria') reabrirVistoria();
     else if (a === 'continuar' || a === 'abrir') location.hash = `#/lev/${id}/1`;
     else if (a === 'dados') verDados(id);
-    else if (a === 'duplicar') duplicar(id);
+    else if (a === 'menu') menuBueiro(id);
     else if (a === 'excluir') excluir(id);
     else if (a === 'projeto') { if (BU.Sync.projetoId() !== id) await BU.Sync.escolherProjeto(id); S.lista = await DB.listar(); viewLista(); }
     else if (a === 'backup') backup();
@@ -630,7 +641,7 @@
         // Bueiro vindo do cadastro: data, hora e responsável entram na hora de vistoriar (só gravam quando você editar ou salvar).
         if (!S.cur.data) { S.cur.data = U.hojeISO(); S.cur.hora = U.horaAgora(); }
         await prefillResponsavel(S.cur);
-        if (['a_vistoriar', 'rascunho'].includes(S.cur.status) && !S.cur.rtk.solucao) await prefillRtk(S.cur);
+        if (['a_vistoriar', 'rascunho'].includes(S.cur.status) && S.cur.rtk.alturaAntena == null) await prefillRtk(S.cur);
       }
       try { S.eixo = await BU.Sync.eixoAtivo(); } catch (e) { S.eixo = null; }
       S.etapa = n; renderWizard(); S.hashAtual = h; return;

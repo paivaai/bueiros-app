@@ -100,7 +100,7 @@
     try { await BU.App.prefillNovo(l); } catch (e) { /* segue sem preencher */ }
     await lembrarCodigos(r.ok.map(p => p.codigo));
     try { await DB.salvar(l); } catch (e) { UI.toast('Erro ao salvar: ' + e.message, 'erro'); return; }
-    location.hash = `#/lev/${l.id}/6`;
+    location.hash = `#/lev/${l.id}/${BU.App.E.RTK}`;
   }
 
   /* ---------- exportação ---------- */

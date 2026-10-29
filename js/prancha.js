@@ -151,7 +151,7 @@
   function sincronizarMedicoes(l) {
     let m; try { m = modelo(l); } catch (e) { return false; }
     if (!m) return false;
-    const novos = { comprimentoBueiro: +m.L.toFixed(2), declividade: +m.decl.toFixed(2), cotaEntrada: +m.A.Z.toFixed(3), cotaSaida: +m.B.Z.toFixed(3) };
+    const novos = { comprimentoBueiro: +m.L.toFixed(2), declividade: +m.decl.toFixed(2), cotaEntrada: +m.A.Z.toFixed(3), cotaSaida: +m.B.Z.toFixed(3), recobrimento: m.cob && m.cob.valor > 0 ? +m.cob.valor.toFixed(2) : null };
     l.medicoesAuto = l.medicoesAuto || {};
     let mudou = false;
     for (const k in novos) {
@@ -349,7 +349,7 @@ ${planta(l, m)}${perfil(l, m)}${quadro(l, m)}${tabela(l, m)}${carimbo(l, m)}</sv
     if (!m) {
       return `<div class="card"><h3>Planta, perfil e quadro de dados</h3>
         <p>${n ? `Há <b>${n}</b> ponto(s), mas não foi possível montar o eixo do bueiro (precisa de pelo menos 2 pontos com X, Y e Z válidos).` : 'Importe o TXT do RTK na etapa Pontos: o app monta sozinho a <b>planta</b>, o <b>perfil longitudinal</b> e o <b>quadro de dados</b>.'}</p>
-        <button type="button" class="btn primary" data-etapa="6">Ir para Pontos</button></div>`;
+        <button type="button" class="btn primary" data-etapa="5">Ir para Pontos</button></div>`;
     }
     const aba = (k, t) => `<button type="button" data-pr="foco" data-v="${k}" aria-pressed="${T.foco === k}">${t}</button>`;
     const avisos = [];

@@ -38,13 +38,7 @@
     const vist = logado
       ? `<div class="f"><label>Vistoriador</label><div class="ro">${esc(l.responsavel || logado)}</div></div>`
       : campo({ p: 'responsavel', label: 'Vistoriador', req: true, t: 'resp' });
-    const m = l.meta || {};
-    const metaCampos = [
-      ['cont', 'Nº no cadastro'], ['descricao', 'Descrição (cadastro)'], ['forma', 'Forma (cadastro)'], ['dimMont', 'Dimensão 1 (diâmetro montante)'], ['dimJus', 'Dimensão 2 (diâmetro jusante)'],
-      ['secMont', 'Seção montante (B × H)'], ['secJus', 'Seção jusante (B × H)'], ['estadoCad', 'Estado de conservação (cadastro)'], ['necessitaCad', 'Necessita (cadastro)'],
-      ['obsCad', 'Observação (cadastro)'], ['obs2Cad', 'Observação 2 (cadastro)'], ['obras', 'Obras de arte'], ['verif', 'Verificação'], ['verifCatt', 'Verificação CATT'],
-    ];
-    const temMeta = !!(l.cadastro || Object.values(m).some(v => v));
+    const R = M.RTK_PROJETO, f3 = v => String(v).replace('.', ',');
     return `<div class="card"><h3>Identificação</h3><div class="grid">
         ${campo({ p: 'codigo', label: 'Código (nome no cadastro)', req: true, ph: 'ex.: BU 101 RJ 001+470 N 1', t: 'codigo' })}
         <div class="f"><label>Situação no cadastro</label>${chipsHTML('situacao', Cat.SITUACAO, l.situacao)}</div>
@@ -64,19 +58,11 @@
         { p: 'ambiente', label: 'Ambiente', t: 'select', opts: M.OPCOES.ambiente, half: true }, { p: 'sentido', label: 'Sentido do km', t: 'select', opts: M.OPCOES.sentido, half: true },
         { p: 'pistaGe', label: 'Pista (sentido geográfico)', t: 'select', opts: M.OPCOES.pista, half: true }, { p: 'lado', label: 'Lado da rodovia', t: 'select', opts: M.OPCOES.lado, half: true },
         { p: 'equipe', label: 'Empresa ou equipe', ph: 'GFA' }])}</div>
-      ${temMeta ? `<details class="card cad" ${l.status === 'a_vistoriar' ? 'open' : ''}><summary><b>Metadados do cadastro (KMZ)</b> <span class="muted small">${esc((l.cadastro && l.cadastro.arquivo) || '')}</span></summary>
-        <p class="muted small">Já vêm preenchidos do arquivo importado. Confirme em campo e corrija o que estiver diferente.</p>
-        ${grade(metaCampos.map(([k, r]) => ({ p: 'meta.' + k, label: r })))}</details>` : ''}
+      <div class="card"><h3>RTK do projeto <span class="chip concluido">fixo</span></h3>
+        <p class="small" style="margin:0 0 10px">Solução <b>${esc(R.solucao)}</b> · <b>${R.satelites}</b> satélites · precisão <b>${f3(R.precisaoH)} m</b> (horizontal) e <b>${f3(R.precisaoV)} m</b> (vertical) · altitude ${esc(R.tipoAltitude.toLowerCase())} · modelo geoidal <b>${esc(R.geoide)}</b> · base ${esc(R.base)} · receptor ${esc(R.receptor)}.</p>
+        ${campo({ p: 'rtk.alturaAntena', label: 'Altura da antena', t: 'num', unit: 'm', min: 0 })}
+        <p class="muted small" style="margin:6px 0 0">Esses dados valem para todos os bueiros do projeto. Só a altura da antena é preenchida por você.</p></div>
       <div class="card"><div class="f"><label for="f-observacoes">Observações gerais</label><textarea id="f-observacoes" data-p="observacoes" rows="3">${esc(l.observacoes || '')}</textarea></div></div>`;
-  }
-
-  /* ============================================================ 2. Coordenadas */
-  function coordenadasHTML(l, confHTML) {
-    const C = BU.App.CAMPOS;
-    return `<div class="card"><h3>Coordenadas UTM (SIRGAS 2000)</h3>${grade(C[2])}<p class="muted small">Este = E · Norte = N · Altitude = Z (cota). Metros.</p></div>` + BU.GPS.cartaoHTML(l)
-      + `<div class="card"><h3>Qualidade do RTK</h3>${grade(C['2b'])}<p class="muted small">Preencha com o que o coletor mostrou no ponto. Base, receptor, altura da antena e tipo de altitude ficam como padrão para o próximo bueiro.</p></div>`
-      + `<div class="card"><h3>RN (referência de nível)</h3>${grade([{ p: 'rn.cota', label: 'Cota do RN', t: 'num', unit: 'm', neg: true }, { p: 'rn.descricao', label: 'Descrição do RN' }])}</div>`
-      + (confHTML || '');
   }
 
   /* ============================================================ 3. Corpo */
@@ -84,7 +70,7 @@
     const c = l.caracteristicas, tub = c.tipo === 'Tubular';
     const dims = tub ? [{ p: 'caracteristicas.diametro', label: 'Diâmetro interno na montante', t: 'num', unit: 'm', min: 0, req: true }]
       : [{ p: 'caracteristicas.largura', label: 'Base na montante', t: 'num', unit: 'm', min: 0, req: true }, { p: 'caracteristicas.altura', label: 'Altura na montante', t: 'num', unit: 'm', min: 0, req: true }];
-    return dims.concat([{ p: 'caracteristicas.espessura', label: 'Espessura da parede', t: 'num', unit: 'm', min: 0 }]);
+    return dims;
   }
   function corpoHTML(l) {
     const c = l.caracteristicas, m = l.medicoes, tub = c.tipo === 'Tubular';
@@ -94,14 +80,11 @@
         <label class="chk" style="margin-top:6px"><input type="checkbox" data-fm="mesma" ${c.mesmaSecaoJusante !== false ? 'checked' : ''}> Mesma seção na jusante</label>
         ${c.mesmaSecaoJusante === false ? grade(tub ? [{ p: 'medicoes.larguraSaida', label: 'Diâmetro na jusante', t: 'num', unit: 'm', min: 0 }]
           : [{ p: 'medicoes.larguraSaida', label: 'Base na jusante', t: 'num', unit: 'm', min: 0 }, { p: 'medicoes.alturaSaida', label: 'Altura na jusante', t: 'num', unit: 'm', min: 0 }]) : ''}
-        <div class="grid" style="margin-top:8px">
-          ${campo({ p: 'medicoes.comprimentoBueiro', label: 'Comprimento', t: 'num', unit: 'm', min: 0, req: true })}
-          <div class="f half"><label>&nbsp;</label><button type="button" class="btn" data-fm="medir">📏 Medir entre as bocas</button></div>
-          ${campo({ p: 'medicoes.esconsidade', label: 'Esconsidade', t: 'num', unit: '°', min: 0 })}
-          ${campo({ p: 'medicoes.declividade', label: 'Declividade', t: 'num', unit: '%', neg: true })}
-          ${campo({ p: 'medicoes.recobrimento', label: 'Recobrimento (aterro)', t: 'num', unit: 'm', min: 0 })}</div>
         <div class="f"><label>Estado do corpo</label>${chipsHTML('caracteristicas.estadoCorpo', Cat.ESTADOS, c.estadoCorpo)}</div>
         <div class="f"><label for="f-obstr">Obstrução da seção: <b id="obstr-v">${+c.obstrucaoPct || 0}%</b></label><input id="f-obstr" type="range" min="0" max="100" step="5" value="${+c.obstrucaoPct || 0}" data-fm="obstr"></div></div>
+      <details class="card auto"><summary><b>Medidas calculadas</b> <span class="muted small">automáticas, sem preencher</span></summary>
+        ${[['Comprimento', m.comprimentoBueiro, 'm'], ['Declividade', m.declividade, '%'], ['Esconsidade', m.esconsidade, '°'], ['Recobrimento (aterro)', m.recobrimento, 'm']].map(([r, v, u]) => `<div class="kv"><span>${r}</span><b>${v != null && v !== '' ? esc(U.numTxt(v)) + ' ' + u : '—'}</b></div>`).join('')}
+        <p class="muted small" style="margin:6px 0 0">Calculadas pelas cotas e coordenadas dos pontos de montante e jusante (etapa Levantamento RTK). Aparecem aqui depois de importar os pontos.</p></details>
       ${BU.Secao.croquiHTML(l)}${BU.Fotos.blocoHTML(l, 'secao', 'Fotos da seção', { entradas: true })}`;
   }
   function medirEntreBocas(l) {
@@ -201,11 +184,7 @@
     else if (a === 'prio-auto') { l.diagnostico.prioridadeManual = false; sincDiag(l); }
     else if (a === 'disp') { const k = b.dataset.k; if (l.dispositivos[k]) { delete l.dispositivos[k]; } else l.dispositivos[k] = true; }
     else if (a === 'nec') { const k = b.dataset.k, n = l.diagnostico.necessita || (l.diagnostico.necessita = []), i = n.indexOf(k); if (i >= 0) n.splice(i, 1); else n.push(k); sincDiag(l); }
-    else if (a === 'medir') {
-      const d = medirEntreBocas(l);
-      if (d == null) { UI.toast('Marque a localização das duas bocas (ou importe os pontos do RTK) para medir.', 'aviso'); return; }
-      l.medicoes.comprimentoBueiro = +d.toFixed(2); if (l.medicoesAuto) delete l.medicoesAuto.comprimentoBueiro; UI.toast(`Comprimento: ${U.numTxt(+d.toFixed(2))} m`);
-    } else refaz = false;
+    else refaz = false;
     if (refaz) { App.marcarSujo(); App.renderEtapa(); }
   }
   function aoMudar(e) {
@@ -224,5 +203,5 @@
   document.addEventListener('input', aoMudar);
   document.addEventListener('change', aoMudar);
 
-  BU.Form = { geralHTML, coordenadasHTML, corpoHTML, dispositivosHTML, diagnosticoHTML, aposCampo, aposTipo, sincDiag, prioridadeDe, conservacaoSugerida, ICONES, textoObs, medirEntreBocas };
+  BU.Form = { geralHTML, corpoHTML, dispositivosHTML, diagnosticoHTML, aposCampo, aposTipo, sincDiag, prioridadeDe, conservacaoSugerida, ICONES, textoObs, medirEntreBocas };
 })();

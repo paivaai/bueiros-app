@@ -133,7 +133,6 @@
     const par = (a, b) => (a != null && b != null) ? `${f2(a)} × ${f2(b)} m` : null;
     const leg = [
       [c.formato, c.material, c.tipo, num(c.celulas) > 1 ? c.celulas + ' células' : ''].filter(Boolean).join(' · '),
-      F && F.e ? `Espessura da parede: ${f2(F.e)} m` : (F ? 'Espessura não informada (parede ilustrativa)' : ''),
       par(m.larguraEntrada, m.alturaEntrada) ? `Entrada: ${par(m.larguraEntrada, m.alturaEntrada)}` : '',
       par(m.larguraSaida, m.alturaSaida) ? `Saída: ${par(m.larguraSaida, m.alturaSaida)}` : '',
     ].filter(Boolean).map((t, i) => `<text x="14" y="${272 + i * 14}" font-size="11" fill="${INK}">${esc(t)}</text>`).join('');
@@ -163,18 +162,9 @@ ${corpo}${riscos}${notas}${leg}${fl}</svg>`;
   /* Só o croqui (desenho + ferramentas). As dimensões ficam na etapa Corpo. */
   function croquiHTML(l) {
     sincronizar(l);
-    const s = l.secao || {};
-    const seg = (v, t) => `<button type="button" data-sc="modo" data-v="${v}" aria-pressed="${T.modo === v}">${t}</button>`;
     return `<div class="card croqui-card"><h3>Croqui da seção</h3>
-        <div class="seg-tools" role="group" aria-label="Ferramenta">${seg('ver', 'Ver')}${seg('riscar', '✏️ Riscar')}${seg('anotar', '📝 Anotar')}</div>
-        <div id="croqui-wrap" class="modo-${T.modo}"><div id="croqui">${gerarSVG(l)}</div></div>
-        <p class="muted small" id="sc-dica">${T.modo === 'riscar' ? 'Arraste o dedo sobre o desenho para riscar.' : T.modo === 'anotar' ? 'Toque no desenho onde quer colocar o texto.' : 'Escolha Riscar ou Anotar para complementar o croqui.'}</p>
-        <div class="row"><button type="button" class="btn sm" data-sc="desfazer">↶ Desfazer</button><button type="button" class="btn sm" data-sc="limpar">Limpar desenho</button>
-          <button type="button" class="btn sm" data-sc="fluxo">Fluxo: ${s.fluxo === 'esquerda' ? '← direita para esquerda' : 'esquerda para direita →'}</button></div>
-        <div class="row" style="margin-top:10px"><button type="button" class="btn primary" data-sc="salvar">Salvar seção</button>
-          <button type="button" class="btn" data-sc="png">Gerar imagem (PNG)</button><button type="button" class="btn" data-sc="svg">Baixar SVG</button></div>
-        ${s.salvoEm ? `<p class="muted small">Seção salva em ${esc(U.dataHoraBR(s.salvoEm))}.</p>` : ''}
-      </div>`;
+        <div id="croqui-wrap" class="modo-ver"><div id="croqui">${gerarSVG(l)}</div></div>
+        <p class="muted small" style="margin:6px 0 0">Desenhado automaticamente pelas dimensões do corpo.</p></div>`;
   }
   const etapaHTML = croquiHTML;
 

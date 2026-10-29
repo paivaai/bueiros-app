@@ -150,6 +150,7 @@
     try {
       await carregarProjetos().catch(() => {}); // traz também o eixo atualizado
       await carregarMetas();
+      await enviarExclusoes();
       const env = await enviar();
       await enviarPresencas().catch(e => { if (ehRede(e)) throw e; console.warn('presenças:', e); });
       const rec = await receber();
@@ -193,6 +194,34 @@
     }
     // fotos de bueiros já enviados que ganharam foto/legenda depois
     return enviados;
+  }
+
+  /* Exclusões: o bueiro apagado no aparelho precisa sair também do servidor, senão volta na próxima sincronização.
+     Fica uma lista de "lápides" (ids) no aparelho até o servidor confirmar. Requer o script 13 do servidor. */
+  async function lapides() { try { return (await DB.cfgObter('sincExcluidos')) || []; } catch (e) { return []; } }
+  async function salvarLapides(l) { await DB.cfgSalvar('sincExcluidos', l).catch(() => {}); }
+  async function registrarExclusao(id, projetoId, codigo, fotos) {
+    const l = await lapides();
+    if (!l.some(x => x.id === id)) l.push({ id, projetoId: projetoId || '', codigo: codigo || '', fotos: (fotos || []).map(f => f.id) });
+    await salvarLapides(l); agendar(800);
+  }
+  async function enviarExclusoes() {
+    const l = await lapides(); if (!l.length) return;
+    const resto = [];
+    for (const x of l) {
+      const r = await E.sb.rpc('excluir_bueiro', { p_id: x.id });
+      if (!r.error) {
+        E.msg = '';
+        if (x.projetoId && (x.fotos || []).length) await E.sb.storage.from('fotos').remove(x.fotos.map(f => `${x.projetoId}/${x.id}/${f}.jpg`)).catch(() => {});
+        continue;
+      }
+      if (ehRede(r.error)) throw r.error;
+      const t = String(r.error.code || '') + ' ' + String(r.error.message || '');
+      if (/does not exist|PGRST202|42883/i.test(t)) { E.msg = 'Falta rodar o script 13 no servidor para excluir de verdade.'; resto.push(x); continue; }
+      if (/aprovado|cadastro|outra pessoa|sem acesso/i.test(t)) { E.msg = 'O servidor não permitiu excluir "' + (x.codigo || 'bueiro') + '": ' + (r.error.message || ''); continue; } // recusado: larga a lápide e deixa voltar
+      resto.push(x);
+    }
+    await salvarLapides(resto);
   }
 
   /* "GPS aqui": envia os registros de presença para a tabela própria (script 11 do servidor). */
@@ -255,7 +284,9 @@
     }
     await carregarMetas();
     const cur = BU.App && BU.App.cur && BU.App.cur();
+    const mortos = new Set((await lapides()).map(x => x.id));
     const trazer = leves.filter(s => {
+      if (mortos.has(s.id)) return false; // excluído neste aparelho, ainda não confirmado pelo servidor
       const m = E.metas.get(s.id);
       if (m && m.sujo) return false; // alteração local pendente: o envio resolve (ou aponta conflito)
       if (cur && cur.id === s.id) return false;
@@ -323,14 +354,15 @@
   }
   function pintar() {
     const el = $('#sinc'); if (!el) return;
-    const c = contagens();
-    let t, cls;
-    if (!logado()) { t = 'Entrar'; cls = 'off'; }
+    const c = contagens(), prob = c.conflitos + c.erros;
+    let t, cls, n = 0;
+    if (!logado()) { t = 'Entrar na conta'; cls = 'off'; }
     else if (E.ocupado) { t = 'Sincronizando…'; cls = 'ocupado'; }
-    else if (c.conflitos || c.erros) { t = `${c.conflitos + c.erros} com problema`; cls = 'erro'; }
-    else if (c.aEnviar) { t = `${c.aEnviar} a enviar`; cls = 'pend'; }
-    else { t = 'Sincronizado'; cls = 'on'; }
-    el.textContent = t; el.className = 'conn sinc ' + cls;
+    else if (prob) { t = `${prob} com problema: toque para tentar de novo`; cls = 'erro'; n = prob; }
+    else if (c.aEnviar) { t = `${c.aEnviar} a enviar: toque para sincronizar`; cls = 'pend'; n = c.aEnviar; }
+    else { t = 'Sincronizado: toque para atualizar'; cls = 'on'; }
+    el.className = 'syncbtn ' + cls; el.title = t; el.setAttribute('aria-label', t); el.setAttribute('aria-busy', String(!!E.ocupado));
+    const b = el.querySelector('.b'); if (b) { b.hidden = !n; b.textContent = n > 9 ? '9+' : String(n); }
     if (BU.App && BU.App.S && BU.App.S.hashAtual === '#/' && !E.ocupado) { const h = $('#home-sync'); if (h) h.innerHTML = cartaoHomeInterno(); }
   }
   function selo(id) {
@@ -343,16 +375,15 @@
   function cartaoHomeInterno() {
     const p = projeto(), c = contagens();
     if (!logado()) return `<b>Sem conta</b><p class="muted small">Os dados ficam só neste aparelho. Entre para receber os bueiros do projeto e enviar o que for levantado.</p><a class="btn primary" href="#/sync">Entrar para sincronizar</a>`;
-    return `<b>${esc(p ? p.nome : 'Escolha o projeto')}</b><p class="muted small">${esc(E.perfil ? E.perfil.nome : '')}${E.ultima ? ' · última sincronização ' + esc(U.dataHoraBR(E.ultima)) : ''}${c.aEnviar ? ' · ' + c.aEnviar + ' a enviar' : ''}</p>
-      <div class="row"><button type="button" class="btn primary" data-sync="agora" ${E.ocupado ? 'disabled' : ''}>${E.ocupado ? 'Sincronizando…' : 'Sincronizar agora'}</button><a class="btn" href="#/sync">Conta e projeto</a></div>`;
+    return ''; // com a conta aberta, a sincronização é o ícone do cabeçalho
   }
-  const cartaoHome = () => `<div id="home-sync" class="card">${cartaoHomeInterno()}</div>`;
+  const cartaoHome = () => (logado() ? '' : `<div id="home-sync" class="card">${cartaoHomeInterno()}</div>`);
 
   async function view() {
     const alvo = $('#view'); if (!alvo) return;
     await carregarMetas();
     const c = contagens(), lev = new Map((await DB.listar()).map(l => [l.id, l]));
-    let h = '<section class="page"><div class="page-head"><h1>Conta e sincronização</h1></div>';
+    let h = '<section class="page"><div class="page-head"><h1>Conta e projeto</h1></div>';
     if (!logado()) {
       h += loginHTML();
     } else {
@@ -362,11 +393,7 @@
           ${E.projetos.length ? `<select id="sync-proj">${projeto() ? '' : '<option value="">— escolha o projeto —</option>'}${E.projetos.map(p => `<option value="${esc(p.id)}"${p.id === E.projetoId ? ' selected' : ''}>${esc(p.nome)}${p.rodovia ? ' · ' + esc(p.rodovia) : ''}</option>`).join('')}</select>`
             : '<p class="muted">Nenhum projeto liberado para você. Peça ao escritório para incluir você na equipe do projeto.</p>'}
           <div class="row"><button type="button" class="btn" data-sync="projetos">Atualizar lista de projetos</button></div></div>
-        <div class="card"><h3>Sincronização</h3>
-          <div class="kv"><span>Última</span><b>${E.ultima ? esc(U.dataHoraBR(E.ultima)) : 'ainda não'}</b></div>
-          <div class="kv"><span>A enviar</span><b>${c.aEnviar}</b></div><div class="kv"><span>Com problema</span><b>${c.conflitos + c.erros}</b></div>
-          ${E.msg ? `<p class="pend aviso">${esc(E.msg)}</p>` : ''}${E.progresso ? `<p class="muted small">${esc(E.progresso)}</p>` : ''}
-          <button type="button" class="btn primary" data-sync="agora" ${E.ocupado || !E.projetoId ? 'disabled' : ''}>${E.ocupado ? 'Sincronizando…' : 'Sincronizar agora'}</button></div>`;
+        ${E.msg ? `<div class="card"><p class="pend aviso" style="margin:0">${esc(E.msg)}</p></div>` : ''}`;
       const prob = [...E.metas.values()].filter(m => m.conflito || m.erro);
       if (prob.length) h += `<div class="card"><h3>Precisam de atenção</h3>${prob.map(m => {
         const l = lev.get(m.id); const nome = l ? (l.codigo || 'Sem código') : m.id;
@@ -384,7 +411,7 @@
   document.addEventListener('click', async e => {
     const b = e.target.closest('[data-sync]'); if (!b || b.disabled) return;
     const a = b.dataset.sync;
-    if (a === 'agora') { await sincronizar(); if (location.hash === '#/sync') view(); }
+    if (a === 'agora') { if (!logado()) { location.hash = '#/sync'; return; } await sincronizar(); if (location.hash === '#/sync') view(); }
     else if (a === 'sair') { await sair(); view(); }
     else if (a === 'projetos') { try { await carregarProjetos(); UI.toast('Lista atualizada'); } catch (er) { UI.toast(ehRede(er) ? 'Sem internet' : er.message, 'erro'); } view(); }
     else if (a === 'meu' || a === 'deles') resolver(b.dataset.id, a);
@@ -399,5 +426,5 @@
   }
   function prefillNovo(l) { const p = projeto(); if (p && p.rodovia && !l.estrada) l.estrada = p.rodovia; }
 
-  BU.Sync = { precisaLogin, viewLogin, nomeUsuario, projetos: () => E.projetos, meta: id => E.metas.get(id) || null, escolherProjeto, perfil: () => E.perfil, recarregar: carregarMetas, iniciar, sincronizar, agendar, view, selo, cartaoHome, pintar, projeto, logado, eixoAtivo, prefillNovo, projetoId: () => E.projetoId };
+  BU.Sync = { registrarExclusao, precisaLogin, viewLogin, nomeUsuario, projetos: () => E.projetos, meta: id => E.metas.get(id) || null, escolherProjeto, perfil: () => E.perfil, recarregar: carregarMetas, iniciar, sincronizar, agendar, view, selo, cartaoHome, pintar, projeto, logado, eixoAtivo, prefillNovo, projetoId: () => E.projetoId };
 })();

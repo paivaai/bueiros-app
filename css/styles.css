@@ -286,3 +286,26 @@ details.ferr summary { cursor: pointer; min-height: 44px; display: flex; align-i
 .dados-ponto .kv:last-child { border-bottom: 0; } .dados-ponto .kv span { color: var(--muted); flex: 0 0 42%; } .dados-ponto .kv b { text-align: right; overflow-wrap: anywhere; }
 .progress { height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
 .progress i { display: block; height: 100%; background: var(--accent); }
+
+/* cabeçalho: Online com luz + ícone de sincronização (pessoa) */
+.conn.on { color: #14532D; border-color: #14532D; background: #fff; display: inline-flex; align-items: center; gap: 6px; }
+.conn.on::before, .conn.off::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: #22C55E; box-shadow: 0 0 0 3px rgba(34,197,94,.25); flex: none; }
+.conn.off { display: inline-flex; align-items: center; gap: 6px; }
+.conn.off::before { background: #B42318; box-shadow: 0 0 0 3px rgba(180,35,24,.22); }
+.syncbtn { position: relative; flex: none; width: 44px; height: 44px; display: grid; place-items: center; padding: 0; border-radius: 999px; border: 2px solid #111; background: #fff; color: #111; cursor: pointer; }
+.syncbtn svg { width: 26px; height: 26px; }
+.syncbtn.on { color: var(--accent); border-color: var(--accent); }
+.syncbtn.pend { color: var(--warn); border-color: var(--warn); background: var(--warn-bg); }
+.syncbtn.erro { color: var(--danger); border-color: var(--danger); background: var(--err-bg); }
+.syncbtn.off { color: #444; border-color: #999; }
+.syncbtn.ocupado { color: #0B3D91; border-color: #0B3D91; animation: gira-sinc 1.1s linear infinite; }
+.syncbtn .b { position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: var(--danger); color: #fff; font: 700 11px/18px var(--font); font-style: normal; text-align: center; }
+.syncbtn.pend .b { background: #B45309; }
+@keyframes gira-sinc { from { box-shadow: 0 0 0 0 rgba(11,61,145,.35); } to { box-shadow: 0 0 0 8px rgba(11,61,145,0); } }
+@media (max-width: 440px) { .syncbtn { width: 40px; height: 40px; } }
+/* filtros fixos ao rolar a lista */
+.filtros-fixos { position: sticky; top: var(--topbar-h, 64px); z-index: 40; background: var(--bg); padding: 8px 0 6px; margin: 0 -2px; }
+.filtros-fixos .filtros { padding-bottom: 6px; }
+/* menu de três pontinhos do cartão */
+.btn.mais { min-width: 52px; font-size: 22px; line-height: 1; letter-spacing: 1px; padding: 0 12px; }
+.titulo-proj { margin: 4px 0 2px; font-size: 22px; line-height: 1.2; overflow-wrap: anywhere; }

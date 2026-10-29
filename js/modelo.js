@@ -59,7 +59,7 @@
       situacao: '', classificacao: '', meta: {},
       leste: null, norte: null, zona: '23', hemisferio: 'S', altitude: null,
       latitude: null, longitude: null, // só para o botão Navegar (derivadas do UTM)
-      rtk: { solucao: '', precisaoH: null, precisaoV: null, satelites: null, base: '', receptor: '', alturaAntena: null, tipoAltitude: '', geoide: '' },
+      rtk: { ...RTK_PROJETO, alturaAntena: null },
       naoLocalizado: null, planejado: null, presencas: [],
       caracteristicas: {
         tipo: '', formato: '', celulas: null, material: '', diametro: null, largura: null, altura: null, comprimento: null, espessura: null, larguraTopo: null,
@@ -79,9 +79,13 @@
       criadoEm: agora, atualizadoEm: agora,
     };
   }
+  /* RTK fixo do projeto: vale para todos os bueiros. Só a altura da antena é preenchida pelo operador. */
+  const RTK_PROJETO = { solucao: 'Fixa', precisaoH: 0.015, precisaoV: 0.025, satelites: 15, tipoAltitude: 'Elipsoidal', geoide: 'HheoNor2020', base: 'RTK-Ntrip', receptor: 'Emlid RS3' };
   function novaBoca() {
     return { tipo: '', material: '', estado: '', dissipador: '', estadoDissipador: '', lat: null, lon: null, leste: null, norte: null, cota: null, naoMarcados: {} };
   }
+
+  function aplicarRtkProjeto(rtk) { for (const k in RTK_PROJETO) if (rtk[k] == null || rtk[k] === '') rtk[k] = RTK_PROJETO[k]; return rtk; }
 
   /* Completa registros antigos (e os vindos do servidor/painel) com os campos novos. */
   function normalizar(r) {
@@ -89,7 +93,7 @@
     const l = {
       ...b, ...r,
       caracteristicas: { ...b.caracteristicas, ...(r.caracteristicas || {}) },
-      medicoes: { ...b.medicoes, ...(r.medicoes || {}) }, rtk: { ...b.rtk, ...(r.rtk || {}) },
+      medicoes: { ...b.medicoes, ...(r.medicoes || {}) }, rtk: aplicarRtkProjeto({ ...b.rtk, ...(r.rtk || {}) }),
       prancha: { ...b.prancha, ...(r.prancha || {}) }, medicoesAuto: { ...(r.medicoesAuto || {}) },
       meta: { ...(r.meta || {}) }, rn: { ...b.rn, ...(r.rn || {}) },
       bocas: { montante: { ...novaBoca(), ...((r.bocas || {}).montante || {}) }, jusante: { ...novaBoca(), ...((r.bocas || {}).jusante || {}) } },
@@ -118,5 +122,5 @@
   const formatoDe = tipo => tipo === 'Tubular' ? 'Circular' : tipo === 'Celular' ? 'Retangular' : tipo ? 'Personalizada' : '';
 
   BU.Cat = Cat;
-  BU.Modelo = { SCHEMA, UFS, SN, OPCOES, novo: novoLevantamento, novaBoca, normalizar, formatoDe };
+  BU.Modelo = { RTK_PROJETO, SCHEMA, UFS, SN, OPCOES, novo: novoLevantamento, novaBoca, normalizar, formatoDe };
 })();
