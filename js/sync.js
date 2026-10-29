@@ -356,7 +356,7 @@
     const el = $('#sinc'); if (!el) return;
     const c = contagens(), prob = c.conflitos + c.erros;
     let t, cls, n = 0;
-    if (!logado()) { t = 'Entrar na conta'; cls = 'off'; }
+    if (!logado()) { t = 'Sem conta aberta: toque no bonequinho para entrar'; cls = 'off'; }
     else if (E.ocupado) { t = 'Sincronizando…'; cls = 'ocupado'; }
     else if (prob) { t = `${prob} com problema: toque para tentar de novo`; cls = 'erro'; n = prob; }
     else if (c.aEnviar) { t = `${c.aEnviar} a enviar: toque para sincronizar`; cls = 'pend'; n = c.aEnviar; }

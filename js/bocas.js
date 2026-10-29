@@ -18,29 +18,20 @@
   /* ---------- quais pontos esta boca pede ---------- */
   function perfilBoca(l, lado) {
     const c = l.caracteristicas, b = l.bocas[lado], n = Math.min(4, Math.max(1, +c.celulas || 1));
-    const t = b.tipo, alas = t === 'Muro de testa e alas', muro = alas || t === 'Muro de testa', caixa = t === 'Caixa coletora' || t === 'Boca de lobo';
-    return { n, tub: c.tipo === 'Tubular' || (!c.tipo && !c.largura), tipo: t, alas, muro, caixa };
+    const t = b.tipo, inclinada = t === 'Muro de testa e ala inclinada', reta = t === 'Muro de testa e ala reta', soMuro = t === 'Muro de testa';
+    return { n, tub: c.tipo === 'Tubular' || (!c.tipo && !c.largura), tipo: t, inclinada, reta, soMuro, alas: inclinada || reta, muro: inclinada || reta || soMuro };
   }
-  /* Lista ordenada dos pontos vermelhos: { k, nome, cod, curto } */
+  /* Lista ordenada dos pontos vermelhos: { k, nome, cod } */
   function pontosDaBoca(l, lado) {
     const P = perfilBoca(l, lado), out = [], sufx = k => (P.n > 1 ? ` · linha ${k}` : '');
-    for (let k = 1; k <= P.n; k++) {
-      out.push({ k: `GTZ-${k}`, nome: 'Geratriz da galeria (centro da boca)' + sufx(k), cod: 'OAC-GTZ' });
-    }
-    const cod = P.alas ? 'OAC-ALA' : 'OAC-MURO';
+    for (let k = 1; k <= P.n; k++) out.push({ k: `GTZ-${k}`, nome: 'Geratriz da galeria (centro da boca)' + sufx(k), cod: 'OAC-GTZ' });
+    const cod = P.alas ? 'OAC-ALA' : 'OAC-MURO', quem = P.alas ? 'Ala' : 'Muro';
     if (P.muro) {
       [['AE', 'esquerda'], ['AD', 'direita']].forEach(([s, lado2]) => {
-        out.push({ k: `${s}-JT`, nome: `${P.alas ? 'Ala' : 'Muro'} ${lado2} · junção · topo`, cod });
-        out.push({ k: `${s}-JB`, nome: `${P.alas ? 'Ala' : 'Muro'} ${lado2} · junção · base`, cod });
-        if (P.alas) {
-          out.push({ k: `${s}-PT`, nome: `Ala ${lado2} · ponta · topo`, cod });
-          out.push({ k: `${s}-PB`, nome: `Ala ${lado2} · ponta · base`, cod });
-        }
+        if (P.reta) out.push({ k: `${s}-JT`, nome: `Muro de testa ${lado2} · extremidade`, cod: 'OAC-MURO' });
+        else { out.push({ k: `${s}-JT`, nome: `${quem} ${lado2} · junção · topo`, cod }); out.push({ k: `${s}-JB`, nome: `${quem} ${lado2} · junção · base`, cod }); }
+        if (P.alas) { out.push({ k: `${s}-PT`, nome: `Ala ${lado2} · ponta · topo`, cod }); out.push({ k: `${s}-PB`, nome: `Ala ${lado2} · ponta · base`, cod }); }
       });
-    }
-    if (P.caixa) {
-      out.push({ k: 'CX-TE', nome: 'Caixa · canto superior esquerdo', cod: 'OAC-BOCA' }, { k: 'CX-TD', nome: 'Caixa · canto superior direito', cod: 'OAC-BOCA' },
-        { k: 'CX-BE', nome: 'Caixa · fundo esquerdo', cod: 'OAC-BOCA' }, { k: 'CX-BD', nome: 'Caixa · fundo direito', cod: 'OAC-BOCA' });
     }
     return out;
   }
@@ -57,43 +48,56 @@
     return pontosDaBoca(l, lado).filter(d => { const s = estado(l, lado, d.k); return !s.p && !s.nao; });
   }
 
-  /* ---------- desenho da boca (vista em planta, igual ao modelo): pontos vermelhos clicáveis ---------- */
+  /* ---------- desenho da boca (planta, igual às figuras de referência): estrutura em cinza, alas em dourado, pontos vermelhos clicáveis ---------- */
+  const GR = '#C8C9CB', OURO = '#D9A21B', PASSO = 238; // PASSO = largura de cada linha do bueiro (unidades do desenho)
   function desenho(l, lado) {
-    const P = perfilBoca(l, lado), pts = pontosDaBoca(l, lado), pos = {}, n = P.n;
-    const half = 60 * n, tipX = half + 108, baseX = half + 168, W = 2 * (half + 168) + 40, cx = W / 2, H = 190;
-    const yT = 30, yU = 68, yB = 140, yE = 152, GR = '#C8C9CB', OURO = '#D9A21B';
-    const xl = cx - half, xr = cx + half; // cantos da "U" (junção)
-    let g = '';
-    if (P.muro) {
-      if (P.alas) {
-        const L1 = xl - 108, L0 = xl - 168, R1 = xr + 108, R0 = xr + 168;
-        g += `<g fill="none" stroke="${OURO}" stroke-width="1.2"><path d="M${L1} ${yT} H${R1} M${L1} ${yT} L${L0} ${yB} M${R1} ${yT} L${R0} ${yB} M${L0} ${yB} H${xl - 30} L${xl} ${yU + 6} H${xr} L${xr + 30} ${yB} H${R0}"/>`;
-        for (let x = L1 + 25; x < R1; x += 25) g += `<path d="M${x} ${yT} v${(Math.round(x / 25) % 2) ? 14 : 28}"/>`;
-        g += `<path d="M${L1} ${yT} V${yB} M${L1 + 50} ${yT} V${yB} M${R1} ${yT} V${yB} M${R1 - 50} ${yT} V${yB}"/></g>`;
-        pos['AE-PT'] = [L1, yT]; pos['AE-PB'] = [L0, yB]; pos['AD-PT'] = [R1, yT]; pos['AD-PB'] = [R0, yB];
-      }
-      g += `<path d="M${xl - 24} ${yE} L${xl} ${yU} H${xr} L${xr + 24} ${yE}" fill="none" stroke="${GR}" stroke-width="14" stroke-linejoin="miter"/>`;
-      pos['AE-JT'] = [xl, yU]; pos['AE-JB'] = [xl - 24, yE]; pos['AD-JT'] = [xr, yU]; pos['AD-JB'] = [xr + 24, yE];
+    const P = perfilBoca(l, lado), pts = pontosDaBoca(l, lado), n = P.n, pos = {}, half = n * PASSO / 2;
+    const f = v => Math.round(v * 10) / 10;
+    let g = '', ext, y0, y1;
+    const gx = k => (k - (n + 1) / 2) * PASSO;                     // posição x (relativa ao centro) da geratriz k
+    const traco = d => `<path d="${d}" fill="none" stroke="${OURO}" stroke-width="2" stroke-linejoin="round"/>`;
+    const cel = (x, yTop, h) => `<rect x="${f(x - 40)}" y="${f(yTop)}" width="80" height="${f(h)}" fill="${GR}"/>`;
+    if (P.inclinada) {
+      // alas inclinadas (figuras 3, 4 e 5): trapézio dourado, "U" interno e muro de testa cinza com pernas inclinadas
+      ext = half + 338; y0 = -30; y1 = 262;
+      const tl = -(half + 218), bl = -(half + 338), u1 = -(half + 75), u2 = -(half + 14);
+      let d = `M${f(tl)} 0H${f(-tl)}M${f(tl)} 0L${f(bl)} 208M${f(-tl)} 0L${f(-bl)} 208M${f(bl)} 208H${f(u1)}L${f(u2)} 60H${f(-u2)}L${f(-u1)} 208H${f(-bl)}`;
+      g += traco(d);
+      // marcações verticais: longas e médias perto das pontas, curtas no meio
+      const lin = [], xs = []; for (let x = tl; x <= -tl + 0.1; x += 50) xs.push(x);
+      xs.forEach((x, i) => { const dd = Math.min(i, xs.length - 1 - i), alt = dd === 0 || dd === 2 ? 208 : dd === 1 || dd === 3 ? 103 : 30; lin.push(`M${f(x)} 0v${alt}`); });
+      g += traco(lin.join(''));
+    } else if (P.reta) {
+      // alas retas: trapézio dourado em cima e o muro reto cinza embaixo (figura de referência)
+      ext = half + 219; y0 = -30; y1 = 262;
+      const tl = -(half + 120), bl = -(half + 219);
+      g += traco(`M${f(tl)} 0H${f(-tl)}M${f(tl)} 0L${f(bl)} 100M${f(-tl)} 0L${f(-bl)} 100M${f(bl)} 100H${f(-bl)}`);
+      const lin = []; for (let x = tl + 30, i = 0; x < -tl - 5; x += 50, i++) lin.push(`M${f(x)} 0v${i % 2 ? 100 : 51}`);
+      g += traco(lin.join(''));
+    } else { ext = half + 60; y0 = -30; y1 = P.muro ? 262 : 140; }
+    // aberturas (uma por linha)
+    const yMuro = P.inclinada || P.soMuro ? 80 : P.reta ? 210 : 90, topo = P.inclinada || P.soMuro ? 0 : P.reta ? 121 : 20;
+    for (let k = 1; k <= n; k++) { g += cel(gx(k), topo, yMuro - topo + (P.reta ? 0 : 0)); pos[`GTZ-${k}`] = [gx(k), P.reta ? 201 : yMuro]; }
+    if (P.inclinada || P.soMuro) {
+      g += `<path d="M${f(-half - 50)} 228L${f(-half)} 80H${f(half)}L${f(half + 50)} 228" fill="none" stroke="${GR}" stroke-width="28" stroke-linejoin="miter"/>`;
+      pos['AE-JT'] = [-half, 80]; pos['AE-JB'] = [-half - 50, 228]; pos['AD-JT'] = [half, 80]; pos['AD-JB'] = [half + 50, 228];
+      if (P.inclinada) { pos['AE-PT'] = [-(half + 218), 0]; pos['AE-PB'] = [-(half + 338), 208]; pos['AD-PT'] = [half + 218, 0]; pos['AD-PB'] = [half + 338, 208]; }
+    } else if (P.reta) {
+      g += `<path d="M${f(-half)} 210H${f(half)}" stroke="${GR}" stroke-width="22" fill="none"/>`;
+      pos['AE-JT'] = [-half, 210]; pos['AD-JT'] = [half, 210];
+      pos['AE-PT'] = [-(half + 120), 0]; pos['AE-PB'] = [-(half + 219), 100]; pos['AD-PT'] = [half + 120, 0]; pos['AD-PB'] = [half + 219, 100];
     }
-    if (P.caixa) {
-      g += `<rect x="${xl - 20}" y="${yT + 6}" width="${2 * half + 40}" height="${yE - yT - 6}" fill="#E7ECE8" fill-opacity=".14" stroke="${OURO}" stroke-width="1.4"/>`;
-      pos['CX-TE'] = [xl - 20, yT + 6]; pos['CX-TD'] = [xr + 20, yT + 6]; pos['CX-BE'] = [xl - 20, yE]; pos['CX-BD'] = [xr + 20, yE];
-    }
-    // aberturas (uma por linha), com o ponto da geratriz sobre a linha da boca
-    for (let k = 0; k < n; k++) {
-      const x = cx + (k - (n - 1) / 2) * 120, topY = P.muro || P.caixa ? yT : yU - 34;
-      g += `<rect x="${x - 20}" y="${topY}" width="40" height="${yU - topY}" fill="${GR}"/>`;
-      pos[`GTZ-${k + 1}`] = [x, yU];
-    }
+    ext = Math.max(ext, 420);
+    const W = 2 * ext + 80, H = y1 - y0 + 30, cx = W / 2;
     const bolas = pts.map((d, i) => {
       const p = pos[d.k]; if (!p) return '';
-      const s = estado(l, lado, d.k), cls = s.p ? 'ok' : s.nao ? 'nao' : 'falta';
-      return `<g class="dot ${cls}" data-bc="dot" data-lado="${lado}" data-k="${esc(d.k)}" tabindex="0" role="button" aria-label="${esc(d.nome)}">
-        <circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="19" class="halo"/><circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="11"/>
-        <text x="${p[0].toFixed(1)}" y="${(p[1] + 4).toFixed(1)}" text-anchor="middle">${i + 1}</text></g>`;
+      const s = estado(l, lado, d.k), cls = s.p ? 'ok' : s.nao ? 'nao' : 'falta', x = f(cx + p[0]), y = f(p[1] - y0);
+      return `<g class="dot ${cls}" data-bc="dot" data-lado="${lado}" data-k="${esc(d.k)}" tabindex="0" role="button" aria-label="${esc((i + 1) + '. ' + d.nome)}">
+        <circle cx="${x}" cy="${y}" r="34" class="halo"/><circle cx="${x}" cy="${y}" r="15"/></g>`;
     }).join('');
-    return `<svg class="boca-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Desenho da ${LADOS[lado].toLowerCase()}"><rect width="${W}" height="${H}" fill="#0b0d0c" rx="8"/>${g}${bolas}
-      <text x="${W / 2}" y="${H - 6}" text-anchor="middle" class="leg">planta da boca · toque no ponto vermelho para marcar X, Y e Z</text></svg>`;
+    return `<div class="boca-wrap"><svg class="boca-svg" viewBox="0 0 ${f(W)} ${f(H)}" style="min-width:${Math.round(W * 0.44)}px" role="img" aria-label="Desenho da ${LADOS[lado].toLowerCase()}"><rect width="${f(W)}" height="${f(H)}" fill="#000" rx="10"/>
+      <g transform="translate(${f(cx)} ${f(-y0)})">${g}</g>${bolas}
+      <text x="${f(W / 2)}" y="${f(H - 8)}" text-anchor="middle" class="leg">toque no ponto vermelho para marcar X, Y e Z</text></svg></div>`;
   }
 
   /* ---------- localização da boca ---------- */
@@ -119,26 +123,26 @@
     return `<div class="chips" role="group">${lista.map(o => `<button type="button" class="fchip${o === v ? ' on' : ''}" data-bc-f="${p}" data-lado="${lado}" data-v="${esc(o)}" aria-pressed="${o === v}">${esc(o)}</button>`).join('')}</div>`;
   }
   function etapaHTML(l, lado) {
-    const b = l.bocas[lado], P = perfilBoca(l, lado), pts = pontosDaBoca(l, lado);
+    const b = l.bocas[lado], pts = pontosDaBoca(l, lado);
     const marcados = pts.filter(d => { const s = estado(l, lado, d.k); return s.p || s.nao; }).length, falta = pts.length - marcados;
-    const jus = lado === 'jusante';
+    const ob = +b.obstrucaoPct || 0;
     const lista = pts.map((d, i) => { const s = estado(l, lado, d.k);
       return `<button type="button" class="dotrow ${s.p ? 'ok' : s.nao ? 'nao' : 'falta'}" data-bc="dot" data-lado="${lado}" data-k="${esc(d.k)}">
         <span class="n">${i + 1}</span><span class="t"><b>${esc(d.nome)}</b><small>${s.p ? `X ${esc(s.p.x)} · Y ${esc(s.p.y)} · Z ${esc(s.p.z)}` : s.nao ? 'Não levantado: ' + esc(s.nao) : 'toque para marcar'}</small></span><span class="st">${s.p ? '✔' : s.nao ? '—' : '●'}</span></button>`; }).join('');
-    const aviso = !b.tipo ? '<p class="pend aviso" style="display:block">Escolha o <b>tipo de boca</b> acima para o desenho mostrar os pontos certos. Enquanto isso valem só os pontos da galeria.</p>' : '';
+    const aviso = !b.tipo ? '<p class="pend aviso" style="display:block">Escolha o <b>tipo de boca</b> acima para o desenho mostrar a estrutura e os pontos certos. Enquanto isso valem só os pontos da galeria.</p>' : '';
     return `${localizacaoHTML(l, lado)}
       <div class="card"><h3>${LADOS[lado]}</h3><div class="grid">
         <div class="f"><label for="bc-tipo-${lado}">Tipo de boca <span class="req">*</span></label>${sel('bc-tipo-' + lado, 'tipo', Cat.BOCA_TIPOS, b.tipo, '— escolha —', lado)}</div>
         <div class="f"><label for="bc-mat-${lado}">Material da boca</label>${sel('bc-mat-' + lado, 'material', Cat.BOCA_MATERIAIS, b.material, '—', lado)}</div>
-        ${jus ? `<div class="f"><label for="bc-dis-${lado}">Dissipador de energia</label>${sel('bc-dis-' + lado, 'dissipador', Cat.DISSIPADORES, b.dissipador, '—', lado)}</div>
-          ${b.dissipador && b.dissipador !== 'Nenhum' ? `<div class="f"><label>Estado do dissipador <span class="req">*</span></label>${chips('estadoDissipador', Cat.ESTADOS, b.estadoDissipador, lado)}</div>` : ''}` : ''}
-        <div class="f"><label>Estado da boca <span class="req">*</span></label>${chips('estado', Cat.ESTADOS, b.estado, lado)}</div></div></div>
+        <div class="f"><label>Estado da boca <span class="req">*</span></label>${chips('estado', Cat.ESTADOS, b.estado, lado)}</div>
+        <div class="f"><label for="f-obstr-${lado}">Obstrução da seção: <b id="obstr-v-${lado}">${ob}%</b></label><input id="f-obstr-${lado}" type="range" min="0" max="100" step="5" value="${ob}" data-fm="obstr" data-lado="${lado}"></div></div></div>
       <div class="card boca"><h3>Pontos a levantar <span class="chip ${falta ? 'rascunho' : 'concluido'}">${marcados}/${pts.length}</span></h3>
         <p class="muted small" style="margin:0 0 6px">Cada ponto vermelho é uma posição que o topógrafo precisa marcar (X, Y e Z). Toque no ponto para preencher. Com todos marcados o app monta a planta (2D), o perfil e o modelo 3D.</p>
         ${aviso}${desenho(l, lado)}
-        <div class="row" style="margin-top:8px"><button type="button" class="btn" data-bc="importar" data-lado="${lado}">⬆️ Importar lista do RTK (TXT)</button>${falta && l.pontos.some(p => !p.ref) ? `<button type="button" class="btn" data-bc="distribuir" data-lado="${lado}">Distribuir pelos códigos</button>` : ''}</div>
-        <input type="file" id="bc-file" accept=".txt,.csv,.dat,.xyz,text/*" hidden>
-        <div class="dotlist">${lista}</div></div>`;
+        <div class="dotlist">${lista}</div></div>
+      ${BU.Form.dispositivosHTML(l, lado)}
+      ${BU.Patologias.blocoHTML(l, lado === 'montante' ? 'mont' : 'jus')}
+      ${BU.Fotos.blocoHTML(l, 'foto:' + lado, 'Foto da boca de ' + lado, { entradas: true })}`;
   }
 
   /* ---------- editor de um ponto ---------- */
@@ -350,8 +354,6 @@
     else if (a === 'gps') gpsAqui(lado);
     else if (a === 'mapa') marcarNoMapa(lado);
     else if (a === 'digitar') digitar(lado);
-    else if (a === 'importar') { window.__bocaLado = lado; const f = document.getElementById('bc-file'); if (f) f.click(); }
-    else if (a === 'distribuir') { const l = BU.App.cur(); if (!l) return; const n = distribuir(l); BU.App.marcarSujo(); BU.App.renderEtapa(); UI.toast(n ? `${n} ponto(s) colocado(s) nos pontos vermelhos.` : 'Nenhum ponto da lista combinou. Toque num ponto vermelho para escolher.', n ? '' : 'aviso'); }
   });
   document.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('g[data-bc=dot]')) { e.preventDefault(); abrirDot(e.target.dataset.lado, e.target.dataset.k); } });
   function aoMudar(e) {

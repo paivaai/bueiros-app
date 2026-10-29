@@ -21,10 +21,16 @@
     FORMAS: ['Tubular', 'Celular', 'Lenticular', 'Arco', 'Outra'],
     MATERIAIS: ['Concreto', 'Metálico', 'PEAD', 'PVC', 'Alvenaria / pedra', 'Outro'],
     ESTADOS: ['Bom', 'Regular', 'Precário'],
-    BOCA_TIPOS: ['Muro de testa e alas', 'Muro de testa', 'Caixa coletora', 'Boca de lobo', 'Sem boca (ponta livre)', 'Outra'],
+    BOCA_TIPOS: ['Muro de testa e ala inclinada', 'Muro de testa e ala reta', 'Muro de testa', 'Sem boca, ponta livre (tipo III)'],
     BOCA_MATERIAIS: ['Concreto', 'Concreto ciclópico', 'Alvenaria / pedra', 'Metálica', 'Outro'],
     DISSIPADORES: ['Nenhum', 'Bacia de amortecimento', 'Enrocamento / rachão', 'Dissipador de concreto', 'Descida em degraus', 'Outro'],
-    DISPOSITIVOS: [['caixa_coletora', 'Caixa coletora'], ['descida_agua', 'Descida d’água em aterro'], ['valeta_montante', 'Valeta / canal a montante'], ['canal_jusante', 'Canal a jusante'], ['sarjeta', 'Sarjeta / meio-fio afluente'], ['entrada_agua', 'Entrada d’água']],
+    /* Dispositivos associados: ficam dentro da etapa de cada boca. */
+    DISP_MONTANTE: [['caixa_coletora', 'Caixa coletora'], ['valeta_montante', 'Canal a montante']],
+    DISP_JUSANTE: [['dis_enrocamento', 'Bacia de enrocamento (rip-rap)'], ['dis_impacto', 'Dissipador de impacto (ex.: USBR tipo VI)'], ['dis_bacia', 'Bacia de dissipação / amortecimento'], ['dis_escada', 'Escada hidráulica / degraus'], ['dis_outros', 'Outros']],
+    DISPOSITIVOS: [['caixa_coletora', 'Caixa coletora'], ['valeta_montante', 'Canal a montante'], ['dis_enrocamento', 'Bacia de enrocamento (rip-rap)'], ['dis_impacto', 'Dissipador de impacto (ex.: USBR tipo VI)'], ['dis_bacia', 'Bacia de dissipação / amortecimento'], ['dis_escada', 'Escada hidráulica / degraus'], ['dis_outros', 'Outros'], ['descida_agua', 'Descida d’água em aterro'], ['canal_jusante', 'Canal a jusante'], ['sarjeta', 'Sarjeta / meio-fio afluente'], ['entrada_agua', 'Entrada d’água']],
+    /* Patologias por lugar: cada lugar (boca de montante, boca de jusante, corpo) tem a sua lista. */
+    PAT_BOCA: [['assoreamento', 'Assoreamento por sedimento'], ['vegetacao', 'Vegetação / entulho na boca'], ['erosao', 'Erosão'], ['armadura', 'Armadura exposta'], ['bocas_danificadas', 'Boca ou alas danificadas']],
+    PAT_CORPO: [['trincas', 'Trincas / fissuras no corpo'], ['armadura', 'Armadura exposta'], ['deformacao', 'Deformação / ovalização'], ['recalque', 'Recalque / abatimento na pista'], ['outros', 'Outros']],
     PATOLOGIAS: [['assoreamento', 'Assoreamento por sedimento'], ['vegetacao', 'Vegetação / entulho na boca'], ['trincas', 'Trincas / fissuras no corpo'], ['ruptura', 'Ruptura de tubo ou laje'], ['juntas', 'Juntas abertas ou desalinhadas'], ['armadura', 'Armadura exposta'], ['deformacao', 'Deformação / ovalização'], ['erosao_mont', 'Erosão a montante'], ['erosao_jus', 'Erosão / solapamento a jusante'], ['bocas_danificadas', 'Boca ou alas danificadas'], ['piping', 'Piping / infiltração no aterro'], ['recalque', 'Recalque / abatimento na pista'], ['agua_pista', 'Água transpondo a pista'], ['colapso', 'Colapso total ou parcial'], ['orificio', 'Trabalha em condição de orifício']],
     NECESSITA: [['desobstrucao', 'Desobstrução'], ['limpeza', 'Limpeza'], ['rocada', 'Roçada'], ['tampa', 'Reparo/Substituição na Tampa'], ['bocas_alas', 'Recuperação de bocas e alas'], ['estrutural', 'Recuperação estrutural'], ['dissipador', 'Implantação de dissipador'], ['prolongamento', 'Prolongamento'], ['substituicao', 'Substituição'], ['hidraulico', 'Estudo hidráulico']],
     PRIORIDADES: ['Baixa', 'Média', 'Alta', 'Urgente'],
@@ -32,6 +38,13 @@
     OBS2: ['OAC trabalha em condição de orifício.', 'Elemento à montante não localizado.', 'Elemento à jusante não localizado.', 'Passagem de fauna.'],
     FOTOS: [['montante', 'Boca de montante'], ['jusante', 'Boca de jusante'], ['corpo', 'Corpo / interior'], ['pista', 'Pista sobre o bueiro'], ['rn', 'RN'], ['patologia', 'Patologia'], ['geral', 'Vista geral']],
   };
+  /* Rótulo da patologia pelo lugar: 'mont:erosao', 'jus:erosao', 'corpo:trincas'. */
+  Cat.patRotulo = (grupo, k) => {
+    if (k === 'erosao') return grupo === 'jus' ? 'Erosão / solapamento a jusante' : 'Erosão a montante';
+    const lista = grupo === 'corpo' ? Cat.PAT_CORPO : Cat.PAT_BOCA, x = lista.find(a => a[0] === k);
+    return x ? x[1] : (Cat.PATOLOGIAS.find(a => a[0] === k) || [0, k])[1];
+  };
+  Cat.PAT_LOCAL = { mont: 'Montante (boca de entrada)', jus: 'Jusante (boca de saída)', corpo: 'Galeria (interior)' };
   const rot = (lista, k) => { const x = lista.find(a => a[0] === k); return x ? x[1] : k; };
   Cat.rotulo = rot;
 
@@ -74,7 +87,7 @@
       },
       bocas: { montante: novaBoca(), jusante: novaBoca() },
       rn: { lat: null, lon: null, leste: null, norte: null, cota: null, descricao: '' },
-      dispositivos: {}, diagnostico: { necessita: [], prioridade: '', prioridadeManual: false, obs: '', obs2: '', obsPadrao: [], obs2Padrao: [] },
+      dispositivos: {}, diagnostico: { necessita: [], onde: {}, prioridade: '', prioridadeManual: false, obs: '', obs2: '', obsPadrao: [], obs2Padrao: [] }, semPatGrupo: {},
       secao: null, prancha: { inverter: false }, medicoesAuto: {}, pontosArquivo: '', pontos: [], fotos: [], patologias: [], semPatologias: false,
       criadoEm: agora, atualizadoEm: agora,
     };
@@ -82,7 +95,7 @@
   /* RTK fixo do projeto: vale para todos os bueiros. Só a altura da antena é preenchida pelo operador. */
   const RTK_PROJETO = { solucao: 'Fixa', precisaoH: 0.015, precisaoV: 0.025, satelites: 15, tipoAltitude: 'Elipsoidal', geoide: 'HheoNor2020', base: 'RTK-Ntrip', receptor: 'Emlid RS3' };
   function novaBoca() {
-    return { tipo: '', material: '', estado: '', dissipador: '', estadoDissipador: '', lat: null, lon: null, leste: null, norte: null, cota: null, naoMarcados: {} };
+    return { tipo: '', material: '', estado: '', obstrucaoPct: 0, dispOutro: '', dissipador: '', estadoDissipador: '', lat: null, lon: null, leste: null, norte: null, cota: null, naoMarcados: {} };
   }
 
   function aplicarRtkProjeto(rtk) { for (const k in RTK_PROJETO) if (rtk[k] == null || rtk[k] === '') rtk[k] = RTK_PROJETO[k]; return rtk; }
@@ -101,6 +114,25 @@
       pontos: r.pontos || [], fotos: r.fotos || [], patologias: r.patologias || [], presencas: r.presencas || [],
     };
     ['montante', 'jusante'].forEach(k => { l.bocas[k].naoMarcados = { ...(l.bocas[k].naoMarcados || {}) }; });
+    l.diagnostico.onde = { ...(l.diagnostico.onde || {}) }; l.semPatGrupo = { ...(l.semPatGrupo || {}) };
+    if (l.semPatologias && !Object.keys(l.semPatGrupo).length) l.semPatGrupo = { mont: true, jus: true, corpo: true };
+    // Necessidades de versões anteriores não tinham local: sem local marcado, o diagnóstico pede que se escolha.
+    // Tipos de boca de versões anteriores viram os da lista atual.
+    const TB = { 'Muro de testa e alas': 'Muro de testa e ala inclinada', 'Sem boca (ponta livre)': 'Sem boca, ponta livre (tipo III)' };
+    ['montante', 'jusante'].forEach(k => {
+      const bc = l.bocas[k];
+      if (TB[bc.tipo]) bc.tipo = TB[bc.tipo];
+      else if (bc.tipo && !Cat.BOCA_TIPOS.includes(bc.tipo)) { if (bc.tipo === 'Caixa coletora' && k === 'montante') l.dispositivos.caixa_coletora = true; bc.tipo = ''; }
+      if (!(+bc.obstrucaoPct > 0) && +r.caracteristicas?.obstrucaoPct > 0 && !(+((r.bocas || {}).montante || {}).obstrucaoPct > 0) && !(+((r.bocas || {}).jusante || {}).obstrucaoPct > 0) && k === 'montante') bc.obstrucaoPct = +r.caracteristicas.obstrucaoPct;
+    });
+    l.caracteristicas.obstrucaoPct = Math.max(+l.bocas.montante.obstrucaoPct || 0, +l.bocas.jusante.obstrucaoPct || 0);
+    // Patologias de versões anteriores passam a pertencer a um lugar (montante, jusante ou corpo).
+    l.patologias = l.patologias.map(p => {
+      if (String(p.id).includes(':') && /^(mont|jus|corpo):/.test(p.id)) return p;
+      const g = /Montante/i.test(p.local || '') || p.id === 'erosao_mont' ? 'mont' : /Jusante/i.test(p.local || '') || p.id === 'erosao_jus' ? 'jus' : 'corpo', novo = g + ':' + (p.id === 'erosao_mont' || p.id === 'erosao_jus' ? 'erosao' : p.id);
+      (l.fotos || []).forEach(f => { if (f.ctx === 'pat:' + p.id) f.ctx = 'pat:' + novo; });
+      return { ...p, id: novo, local: p.local || Cat.PAT_LOCAL[g] };
+    });
     if (!String(l.equipe || '').trim()) l.equipe = 'GFA';
     // Formatos antigos (versões anteriores) viram os atuais.
     const c = l.caracteristicas;

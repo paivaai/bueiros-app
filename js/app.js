@@ -15,11 +15,11 @@
 
   /* Etapas do formulário (a ordem segue o HTML de referência). */
   const ETAPAS = [
-    { n: 1, nome: 'Informação geral' }, { n: 2, nome: 'Corpo' }, { n: 3, nome: 'Boca de montante' }, { n: 4, nome: 'Boca de jusante' },
-    { n: 5, nome: 'Levantamento RTK' }, { n: 6, nome: 'Dispositivos associados' }, { n: 7, nome: 'Patologias' }, { n: 8, nome: 'Diagnóstico' }, { n: 9, nome: 'Fotos' }, { n: 10, nome: 'Revisão' },
+    { n: 1, nome: 'Informação geral' }, { n: 2, nome: 'Corpo' }, { n: 3, nome: 'Boca de montante' }, { n: 4, nome: 'Boca de jusante' }, { n: 5, nome: 'Diagnóstico' }, { n: 6, nome: 'Revisão' },
   ];
-  const E = { GERAL: 1, COORD: 1, CORPO: 2, MONT: 3, JUS: 4, RTK: 5, DISP: 6, PATO: 7, DIAG: 8, FOTOS: 9, REV: 10 }; // a antiga etapa "Coordenadas e RTK" foi retirada
-  const ETAPAS_FOTO = [E.CORPO, E.DISP, E.PATO, E.DIAG, E.FOTOS];
+  /* Os pontos do RTK, os dispositivos, as patologias e as fotos agora ficam dentro de cada etapa (montante, jusante e corpo); os apelidos abaixo apontam para onde foram parar. */
+  const E = { GERAL: 1, COORD: 1, CORPO: 2, MONT: 3, JUS: 4, DIAG: 5, REV: 6, RTK: 3, DISP: 3, PATO: 2 };
+  const ETAPAS_FOTO = [E.GERAL, E.CORPO, E.MONT, E.JUS];
 
   /* Cada campo: p = caminho dentro do levantamento; t = tipo; half = ocupa meia largura. */
   const CAMPOS = {};
@@ -105,31 +105,31 @@
     if (!l.classificacao) av('Classificação (grota ou greide) não informada', E.GERAL);
     if (!c.celulas || !c.tipo || !c.material) av('Tipo de bueiro incompleto (nº de linhas, forma e material)', E.GERAL);
     if (l.rtk && l.rtk.alturaAntena == null) av('Altura da antena do RTK não informada', E.GERAL);
-    if (!BU.GPS.utmDe(l)) av('Coordenadas não definidas: importe os pontos do RTK', E.RTK);
-    else if (l.coordOrigem === 'cadastro') av('Coordenadas ainda são as do cadastro: serão substituídas ao importar os pontos do RTK', E.RTK);
+    if (!BU.GPS.utmDe(l)) av('Coordenadas não definidas: marque os pontos vermelhos das bocas', E.MONT);
+    else if (l.coordOrigem === 'cadastro') av('Coordenadas ainda são as do cadastro: serão substituídas quando os pontos das bocas forem marcados', E.MONT);
     const dimOk = c.tipo === 'Tubular' ? c.diametro != null : (c.largura != null && c.altura != null);
     if (c.tipo && !dimOk) av(c.tipo === 'Tubular' ? 'Diâmetro do corpo não informado' : 'Base e altura do corpo não informadas', E.CORPO);
-    if (m.comprimentoBueiro == null) av('Comprimento e declividade são calculados: importe os pontos de montante e jusante', E.RTK);
+    if (m.comprimentoBueiro == null) av('Comprimento e declividade são calculados: marque os pontos das bocas de montante e de jusante', E.MONT);
     if (!c.estadoCorpo) av('Estado do corpo não informado', E.CORPO);
     ['montante', 'jusante'].forEach(k => {
       const bc = l.bocas[k], e = k === 'montante' ? E.MONT : E.JUS;
       if (!bc.tipo) ob(`Tipo da boca de ${nomeBoca(k)} não informado`, e);
       if (!bc.estado) av(`Estado da boca de ${nomeBoca(k)} não informado`, e);
-      if (k === 'jusante' && bc.dissipador && bc.dissipador !== 'Nenhum' && !bc.estadoDissipador) av('Estado do dissipador não informado', e);
       const f = B.faltando(l, k);
       if (f.length) ob(`Boca de ${nomeBoca(k)}: ${f.length} ponto(s) vermelho(s) sem marcar (${f.slice(0, 3).map(x => x.nome.split(' (')[0]).join('; ')}${f.length > 3 ? '…' : ''})`, e);
     });
-    if (!l.pontos.length) av('Nenhum ponto cadastrado', E.RTK);
-    if (!BU.Prancha.croquiPronto(l)) av('Croqui ainda não gerado (importe os pontos do RTK ou informe as dimensões)', E.RTK);
-    BU.Cat.DISPOSITIVOS.forEach(([k, r]) => { if (l.dispositivos[k] && !l.fotos.some(f => f.ctx === 'disp:' + k)) av(`Dispositivo “${r}” sem foto`, E.DISP); });
-    if (!l.semPatologias && !l.patologias.length) av('Patologias não registradas (marque ou use “sem patologias”)', E.PATO);
-    for (const p of l.patologias) {
-      if (!l.semPatologias && !l.fotos.some(f => f.ctx === 'pat:' + p.id)) { av(`Patologia “${p.tipo || 'sem tipo'}” sem foto`, E.PATO); break; }
-    }
+    if (!l.pontos.length) av('Nenhum ponto cadastrado', E.MONT);
+    if (!BU.Prancha.croquiPronto(l)) av('Croqui ainda não gerado (marque os pontos das bocas ou informe as dimensões)', E.MONT);
+    [['mont', E.MONT], ['jus', E.JUS], ['corpo', E.CORPO]].forEach(([g, e]) => {
+      const nome = BU.Patologias.GRUPOS[g], pats = BU.Patologias.doGrupo(l, g);
+      if (!(l.semPatGrupo || {})[g] && !pats.length) av(`Patologias ${g === 'corpo' ? 'do corpo' : 'da ' + nome} não registradas (marque ou use “sem patologias”)`, e);
+      for (const p of pats) if (!l.fotos.some(f => f.ctx === 'pat:' + p.id)) { av(`Patologia “${BU.Patologias.rotuloDe(p) || 'sem tipo'}” (${nome}) sem foto`, e); break; }
+    });
     if (!c.conservacao) av('Estado de conservação não informado', E.DIAG);
-    (l.diagnostico.necessita || []).forEach(k => { if (!l.fotos.some(f => f.ctx === 'diag:' + k)) av(`Serviço “${BU.Cat.rotulo(BU.Cat.NECESSITA, k)}” sem foto`, E.DIAG); });
+    (l.diagnostico.necessita || []).forEach(k => { if (!((l.diagnostico.onde || {})[k] || []).length) av(`Serviço “${BU.Cat.rotulo(BU.Cat.NECESSITA, k)}”: informe onde aplicar (montante, corpo ou jusante)`, E.DIAG); });
     if (!l.fotos.some(f => f.ctx === 'secao')) av('Nenhuma foto da seção', E.CORPO);
-    if (!l.fotos.length) av('Nenhuma foto adicionada', E.FOTOS);
+    if (!l.fotos.some(f => f.ctx === 'foto:montante')) av('Nenhuma foto da boca de montante', E.MONT);
+    if (!l.fotos.some(f => f.ctx === 'foto:jusante')) av('Nenhuma foto da boca de jusante', E.JUS);
     for (const cf of BU.Conf.analisar(l, S.eixo)) P.push({ n: cf.n, t: cf.t, e: cf.e });
     return P;
   }
@@ -403,7 +403,7 @@
         ${linha('Tipo de bueiro', [l.meta && l.meta.sigla, l.meta && l.meta.descricaoTipo].filter(Boolean).join(' · ') || [c.tipo, c.formato].filter(Boolean).join(' / '))}${linha('Dimensões', dim)}${linha('Material', c.material)}
         ${linha('Conservação', c.conservacao)}${linha('Cota entrada / saída', (m.cotaEntrada != null || m.cotaSaida != null) ? `${N(m.cotaEntrada) || '—'} / ${N(m.cotaSaida) || '—'}` : '')}
         ${BU.Prancha.miniatura(l)}</div>
-      <div class="card"><h3>Registros</h3>${linha('Pontos', String(l.pontos.length))}${linha('Patologias', l.semPatologias ? 'sem patologias aparentes' : String(l.patologias.length))}${linha('Fotos', `${l.fotos.length} (seção ${l.fotos.filter(f => f.ctx === 'secao').length} · patologias ${l.fotos.filter(f => (f.ctx || '').startsWith('pat:')).length} · dispositivos/diagnóstico ${l.fotos.filter(f => /^(disp|diag):/.test(f.ctx || '')).length})`)}</div>
+      <div class="card"><h3>Registros</h3>${linha('Pontos', String(l.pontos.length))}${linha('Patologias', l.semPatologias ? 'sem patologias aparentes' : String(l.patologias.length))}${linha('Fotos', `${l.fotos.length} (seção ${l.fotos.filter(f => f.ctx === 'secao').length} · bocas ${l.fotos.filter(f => /^foto:(montante|jusante)$/.test(f.ctx || '')).length} · patologias ${l.fotos.filter(f => (f.ctx || '').startsWith('pat:')).length})`)}</div>
       <div class="card"><h3>Pendências <span class="chip ${P.length ? 'rascunho' : 'concluido'}">${P.length || 'nenhuma'}</span></h3>
         ${P.length ? P.map(p => `<div class="pend ${p.n}"><span>${p.n === 'erro' ? '⛔' : '⚠️'} ${esc(p.t)}</span><button type="button" class="btn sm" data-etapa="${p.e}">Ir</button></div>`).join('') : '<p class="muted">Tudo preenchido.</p>'}
         <p class="muted small">Pendências são avisos: você pode salvar mesmo assim.</p></div>
@@ -439,11 +439,7 @@
     else if (n === E.CORPO) corpo = F.corpoHTML(l);
     else if (n === E.MONT) corpo = BU.Bocas.etapaHTML(l, 'montante');
     else if (n === E.JUS) corpo = BU.Bocas.etapaHTML(l, 'jusante');
-    else if (n === E.RTK) corpo = BU.Pontos.etapaHTML(l) + BU.Prancha.etapaHTML(l);
-    else if (n === E.DISP) corpo = F.dispositivosHTML(l);
-    else if (n === E.PATO) corpo = BU.Patologias.etapaHTML(l);
     else if (n === E.DIAG) corpo = F.diagnosticoHTML(l);
-    else if (n === E.FOTOS) corpo = BU.Fotos.etapaHTML(l);
     else corpo = revisaoHTML();
     if (!ETAPAS_FOTO.includes(n)) BU.Fotos.limpar();
 
@@ -556,7 +552,7 @@
     else { l.atualizadoEm = U.agoraISO(); await DB.salvar(l); }
     if (BU.Sync) BU.Sync.agendar();
     UI.toast('Marcado como não localizado. Se quiser, anexe uma foto do local.');
-    location.hash = `#/lev/${id}/${E.FOTOS}`; if (S.hashAtual === `#/lev/${id}/${E.FOTOS}`) rotear();
+    location.hash = `#/lev/${id}/${E.GERAL}`; if (S.hashAtual === `#/lev/${id}/${E.GERAL}`) rotear();
   }
   async function reabrirVistoria() {
     if (!S.cur) return; S.cur.status = 'rascunho'; S.cur.naoLocalizado = null; S.dirty = true; S.rev++;

@@ -10,7 +10,7 @@
   function rotuloCtx(ctx) {
     const Cat = BU.Cat; ctx = ctx || '';
     if (ctx === 'secao') return ['secao', 'Seção do bueiro'];
-    if (ctx.startsWith('pat:')) return ['patologia', Cat.rotulo(Cat.PATOLOGIAS, ctx.slice(4))];
+    if (ctx.startsWith('pat:')) { const id = ctx.slice(4), g = id.split(':')[0], k = id.slice(g.length + 1); return ['patologia', /^(mont|jus|corpo)$/.test(g) ? `Patologia (${BU.Patologias.GRUPOS[g]}): ${Cat.patRotulo(g, k)}` : Cat.rotulo(Cat.PATOLOGIAS, id)]; }
     if (ctx.startsWith('disp:')) return ['dispositivo', Cat.rotulo(Cat.DISPOSITIVOS, ctx.slice(5))];
     if (ctx.startsWith('diag:')) return ['diagnostico', Cat.rotulo(Cat.NECESSITA, ctx.slice(5))];
     if (ctx.startsWith('foto:')) { const k = ctx.slice(5); return [{ montante: 'entrada', jusante: 'saida' }[k] || k, Cat.rotulo(Cat.FOTOS, k)]; }
@@ -96,7 +96,7 @@
     ctx = ctx || '';
     const App = BU.App, l = App.cur(), st = document.getElementById('fo-status'); if (!l) return;
     let n = 0;
-    if (CFG.ativo && !BU.GPS.utmDe(l)) UI.toast('Coordenadas UTM não informadas (Etapa 2): as fotos ficam só com a logo.', 'aviso');
+    if (CFG.ativo && !BU.GPS.utmDe(l)) UI.toast('Coordenadas UTM ainda não definidas: as fotos ficam só com a logo.', 'aviso');
     for (const f of files) {
       n++; if (st) st.textContent = `Processando foto ${n} de ${files.length}…`;
       try {
