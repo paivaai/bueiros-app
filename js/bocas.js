@@ -51,7 +51,8 @@
   /* ---------- desenho da boca (planta, igual às figuras de referência): estrutura em cinza, alas em dourado, pontos vermelhos clicáveis ---------- */
   const GR = '#C8C9CB', OURO = '#D9A21B', PASSO = 238; // PASSO = largura de cada linha do bueiro (unidades do desenho)
   function desenho(l, lado) {
-    const P = perfilBoca(l, lado), pts = pontosDaBoca(l, lado), n = P.n, pos = {}, half = n * PASSO / 2;
+    const P = perfilBoca(l, lado), pts = pontosDaBoca(l, lado), n = P.n, pos = {}, half = n * PASSO / 2, previa = !P.tipo;
+    if (previa) { P.inclinada = true; P.muro = true; P.alas = true; } // sem tipo escolhido: mostra a estrutura completa esmaecida, só com os pontos da galeria ativos
     const f = v => Math.round(v * 10) / 10;
     let g = '', ext, y0, y1;
     const gx = k => (k - (n + 1) / 2) * PASSO;                     // posição x (relativa ao centro) da geratriz k
@@ -96,7 +97,7 @@
         <circle cx="${x}" cy="${y}" r="34" class="halo"/><circle cx="${x}" cy="${y}" r="15"/></g>`;
     }).join('');
     return `<div class="boca-wrap"><svg class="boca-svg" viewBox="0 0 ${f(W)} ${f(H)}" style="min-width:${Math.round(W * 0.44)}px" role="img" aria-label="Desenho da ${LADOS[lado].toLowerCase()}"><rect width="${f(W)}" height="${f(H)}" fill="#000" rx="10"/>
-      <g transform="translate(${f(cx)} ${f(-y0)})">${g}</g>${bolas}
+      <g transform="translate(${f(cx)} ${f(-y0)})"${previa ? ' opacity=".35"' : ''}>${g}</g>${bolas}
       <text x="${f(W / 2)}" y="${f(H - 8)}" text-anchor="middle" class="leg">toque no ponto vermelho para marcar X, Y e Z</text></svg></div>`;
   }
 
@@ -129,7 +130,7 @@
     const lista = pts.map((d, i) => { const s = estado(l, lado, d.k);
       return `<button type="button" class="dotrow ${s.p ? 'ok' : s.nao ? 'nao' : 'falta'}" data-bc="dot" data-lado="${lado}" data-k="${esc(d.k)}">
         <span class="n">${i + 1}</span><span class="t"><b>${esc(d.nome)}</b><small>${s.p ? `X ${esc(s.p.x)} · Y ${esc(s.p.y)} · Z ${esc(s.p.z)}` : s.nao ? 'Não levantado: ' + esc(s.nao) : 'toque para marcar'}</small></span><span class="st">${s.p ? '✔' : s.nao ? '—' : '●'}</span></button>`; }).join('');
-    const aviso = !b.tipo ? '<p class="pend aviso" style="display:block">Escolha o <b>tipo de boca</b> acima para o desenho mostrar a estrutura e os pontos certos. Enquanto isso valem só os pontos da galeria.</p>' : '';
+    const aviso = !b.tipo ? '<p class="pend aviso" style="display:block">Escolha o <b>tipo de boca</b> acima para ver a estrutura certa e todos os pontos a levantar. Por enquanto só aparecem os pontos da galeria.</p>' : '';
     return `${localizacaoHTML(l, lado)}
       <div class="card"><h3>${LADOS[lado]}</h3><div class="grid">
         <div class="f"><label for="bc-tipo-${lado}">Tipo de boca <span class="req">*</span></label>${sel('bc-tipo-' + lado, 'tipo', Cat.BOCA_TIPOS, b.tipo, '— escolha —', lado)}</div>
