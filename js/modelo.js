@@ -94,8 +94,9 @@
   }
   /* RTK fixo do projeto: vale para todos os bueiros. Só a altura da antena é preenchida pelo operador. */
   const RTK_PROJETO = { solucao: 'Fixa', precisaoH: 0.015, precisaoV: 0.025, satelites: 15, tipoAltitude: 'Elipsoidal', geoide: 'HheoNor2020', base: 'RTK-Ntrip', receptor: 'Emlid RS3' };
+  const TIPO_BOCA_PADRAO = 'Muro de testa e ala inclinada'; // montante e jusante começam com os mesmos pontos
   function novaBoca() {
-    return { tipo: '', material: '', estado: '', obstrucaoPct: 0, dispOutro: '', dissipador: '', estadoDissipador: '', lat: null, lon: null, leste: null, norte: null, cota: null, naoMarcados: {} };
+    return { tipo: TIPO_BOCA_PADRAO, material: '', estado: '', obstrucaoPct: 0, dispOutro: '', dissipador: '', estadoDissipador: '', lat: null, lon: null, leste: null, norte: null, cota: null, naoMarcados: {} };
   }
 
   function aplicarRtkProjeto(rtk) { for (const k in RTK_PROJETO) if (rtk[k] == null || rtk[k] === '') rtk[k] = RTK_PROJETO[k]; return rtk; }
@@ -121,8 +122,9 @@
     const TB = { 'Muro de testa e alas': 'Muro de testa e ala inclinada', 'Sem boca (ponta livre)': 'Sem boca, ponta livre (tipo III)' };
     ['montante', 'jusante'].forEach(k => {
       const bc = l.bocas[k];
-      if (TB[bc.tipo]) bc.tipo = TB[bc.tipo];
-      else if (bc.tipo && !Cat.BOCA_TIPOS.includes(bc.tipo)) { if (bc.tipo === 'Caixa coletora' && k === 'montante') l.dispositivos.caixa_coletora = true; bc.tipo = ''; }
+      if (!bc.tipo) bc.tipo = TIPO_BOCA_PADRAO;
+      else if (TB[bc.tipo]) bc.tipo = TB[bc.tipo];
+      else if (bc.tipo && !Cat.BOCA_TIPOS.includes(bc.tipo)) { if (bc.tipo === 'Caixa coletora' && k === 'montante') l.dispositivos.caixa_coletora = true; bc.tipo = TIPO_BOCA_PADRAO; }
       if (!(+bc.obstrucaoPct > 0) && +r.caracteristicas?.obstrucaoPct > 0 && !(+((r.bocas || {}).montante || {}).obstrucaoPct > 0) && !(+((r.bocas || {}).jusante || {}).obstrucaoPct > 0) && k === 'montante') bc.obstrucaoPct = +r.caracteristicas.obstrucaoPct;
     });
     l.caracteristicas.obstrucaoPct = Math.max(+l.bocas.montante.obstrucaoPct || 0, +l.bocas.jusante.obstrucaoPct || 0);
