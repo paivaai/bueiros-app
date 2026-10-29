@@ -58,7 +58,7 @@
     const gx = k => (k - (n + 1) / 2) * PASSO;                     // posição x (relativa ao centro) da geratriz k
     const traco = d => `<path d="${d}" fill="none" stroke="${OURO}" stroke-width="2" stroke-linejoin="round"/>`;
     const cel = (x, yTop, h) => `<rect x="${f(x - 40)}" y="${f(yTop)}" width="80" height="${f(h)}" fill="${GR}"/>`;
-    if (P.inclinada) {
+    if (P.inclinada || P.soMuro) {
       // alas inclinadas (figuras 3, 4 e 5): trapézio dourado, "U" interno e muro de testa cinza com pernas inclinadas
       ext = half + 338; y0 = -30; y1 = 262;
       const tl = -(half + 218), bl = -(half + 338), u1 = -(half + 75), u2 = -(half + 14);
@@ -75,7 +75,7 @@
       g += traco(`M${f(tl)} 0H${f(-tl)}M${f(tl)} 0L${f(bl)} 100M${f(-tl)} 0L${f(-bl)} 100M${f(bl)} 100H${f(-bl)}`);
       const lin = []; for (let x = tl + 30, i = 0; x < -tl - 5; x += 50, i++) lin.push(`M${f(x)} 0v${i % 2 ? 100 : 51}`);
       g += traco(lin.join(''));
-    } else { ext = half + 60; y0 = -30; y1 = P.muro ? 262 : 140; }
+    } else { ext = half + 60; y0 = -30; y1 = 140; }
     // aberturas (uma por linha)
     const yMuro = P.inclinada || P.soMuro ? 80 : P.reta ? 210 : 90, topo = P.inclinada || P.soMuro ? 0 : P.reta ? 121 : 20;
     for (let k = 1; k <= n; k++) { g += cel(gx(k), topo, yMuro - topo + (P.reta ? 0 : 0)); pos[`GTZ-${k}`] = [gx(k), P.reta ? 201 : yMuro]; }
