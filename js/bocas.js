@@ -52,7 +52,7 @@
   const GR = '#C8C9CB', OURO = '#D9A21B', PASSO = 238; // PASSO = largura de cada linha do bueiro (unidades do desenho)
   function desenho(l, lado) {
     const P = perfilBoca(l, lado), pts = pontosDaBoca(l, lado), n = P.n, pos = {}, half = n * PASSO / 2, previa = !P.tipo;
-    if (previa) { P.inclinada = true; P.muro = true; P.alas = true; } // sem tipo escolhido: mostra a estrutura completa esmaecida, só com os pontos da galeria ativos
+    if (previa) { P.soMuro = true; P.muro = true; } // sem tipo escolhido: mostra a estrutura completa esmaecida, só com os pontos da galeria ativos
     const f = v => Math.round(v * 10) / 10;
     let g = '', ext, y0, y1;
     const gx = k => (k - (n + 1) / 2) * PASSO;                     // posição x (relativa ao centro) da geratriz k
@@ -96,7 +96,7 @@
       return `<g class="dot ${cls}" data-bc="dot" data-lado="${lado}" data-k="${esc(d.k)}" tabindex="0" role="button" aria-label="${esc((i + 1) + '. ' + d.nome)}">
         <circle cx="${x}" cy="${y}" r="34" class="halo"/><circle cx="${x}" cy="${y}" r="18"/><text x="${x}" y="${f(y + 7)}" text-anchor="middle">${i + 1}</text></g>`;
     }).join('');
-    const extras = previa ? Object.entries(pos).filter(([k]) => !pts.some(d => d.k === k)).map(([k, p]) => `<g class="dot falta" style="pointer-events:none"><circle cx="${f(cx + p[0])}" cy="${f(p[1] - y0)}" r="18"/></g>`).join('') : '';
+    const extras = false ? Object.entries(pos).filter(([k]) => !pts.some(d => d.k === k)).map(([k, p]) => `<g class="dot falta" style="pointer-events:none"><circle cx="${f(cx + p[0])}" cy="${f(p[1] - y0)}" r="18"/></g>`).join('') : '';
     return `<div class="boca-wrap"><svg class="boca-svg" viewBox="0 0 ${f(W)} ${f(H)}" style="min-width:${Math.round(W * 0.44)}px" role="img" aria-label="Desenho da ${LADOS[lado].toLowerCase()}"><rect width="${f(W)}" height="${f(H)}" fill="#000" rx="10"/>
       <g transform="translate(${f(cx)} ${f(-y0)})">${g}</g>${extras}${bolas}</svg></div>`;
   }
