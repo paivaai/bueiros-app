@@ -252,7 +252,7 @@ details.cad summary { cursor: pointer; min-height: 44px; display: flex; align-it
 .boca-svg .dot.nao circle:not(.halo) { fill: #7A7F7B; }
 .boca-svg .dot .halo { fill: transparent; stroke: none; }
 .boca-svg .dot:focus .halo, .boca-svg .dot:hover .halo { fill: rgba(217,45,32,.22); }
-.boca-svg .dot text { fill: #fff; font: 800 21px var(--font); pointer-events: none; }
+.boca-svg .dot text { fill: #fff; font: 800 29px var(--font); pointer-events: none; }
 .boca-svg .leg { fill: #9aa59d; font: 600 15px var(--font); }
 .dotlist { display: grid; gap: 6px; margin-top: 10px; }
 .dotrow { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 6px 10px; text-align: left; border: 2px solid var(--line); background: var(--surface); border-radius: 12px; }
@@ -330,3 +330,4 @@ a.syncbtn { text-decoration: none; }
 
 .icobtn span { max-width: 100%; overflow-wrap: anywhere; hyphens: auto; padding: 0 2px; }
 .icobtn { padding: 8px 8px; }
+.dotrow { box-sizing: border-box; }

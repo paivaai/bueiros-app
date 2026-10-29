@@ -94,10 +94,10 @@
       const p = pos[d.k]; if (!p) return '';
       const s = estado(l, lado, d.k), cls = s.p ? 'ok' : s.nao ? 'nao' : 'falta', x = f(cx + p[0]), y = f(p[1] - y0);
       return `<g class="dot ${cls}" data-bc="dot" data-lado="${lado}" data-k="${esc(d.k)}" tabindex="0" role="button" aria-label="${esc((i + 1) + '. ' + d.nome)}">
-        <circle cx="${x}" cy="${y}" r="34" class="halo"/><circle cx="${x}" cy="${y}" r="18"/><text x="${x}" y="${f(y + 7)}" text-anchor="middle">${i + 1}</text></g>`;
+        <circle cx="${x}" cy="${y}" r="46" class="halo"/><circle cx="${x}" cy="${y}" r="25"/><text x="${x}" y="${f(y + 10)}" text-anchor="middle">${i + 1}</text></g>`;
     }).join('');
-    const extras = false ? Object.entries(pos).filter(([k]) => !pts.some(d => d.k === k)).map(([k, p]) => `<g class="dot falta" style="pointer-events:none"><circle cx="${f(cx + p[0])}" cy="${f(p[1] - y0)}" r="18"/></g>`).join('') : '';
-    return `<div class="boca-wrap"><svg class="boca-svg" viewBox="0 0 ${f(W)} ${f(H)}" style="min-width:${Math.round(W * 0.44)}px" role="img" aria-label="Desenho da ${LADOS[lado].toLowerCase()}"><rect width="${f(W)}" height="${f(H)}" fill="#000" rx="10"/>
+    const extras = false ? Object.entries(pos).filter(([k]) => !pts.some(d => d.k === k)).map(([k, p]) => `<g class="dot falta" style="pointer-events:none"><circle cx="${f(cx + p[0])}" cy="${f(p[1] - y0)}" r="25"/></g>`).join('') : '';
+    return `<div class="boca-wrap"><svg class="boca-svg" viewBox="0 0 ${f(W)} ${f(H)}" role="img" aria-label="Desenho da ${LADOS[lado].toLowerCase()}"><rect width="${f(W)}" height="${f(H)}" fill="#000" rx="10"/>
       <g transform="translate(${f(cx)} ${f(-y0)})">${g}</g>${extras}${bolas}</svg></div>`;
   }
 
