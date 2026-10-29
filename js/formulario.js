@@ -13,6 +13,11 @@
     canal_jusante: ic('<path d="M3 12h26M3 12v10h26V12"/><path d="M8 17h5l-2-2m2 2l-2 2M19 17h5l-2-2m2 2l-2 2"/>'),
     sarjeta: ic('<path d="M3 22h26M3 22v-7l8-3h18"/><path d="M8 26c2 2 4-2 6 0s4-2 6 0"/>'),
     entrada_agua: ic('<path d="M16 4c4 6 6 9 6 12a6 6 0 0 1-12 0c0-3 2-6 6-12z"/><path d="M6 28h20"/>'),
+    dis_enrocamento: ic('<path d="M3 24h26"/><path d="M5 24l3-6 4 2 3-5 4 4 3-3 3 8"/><circle cx="10" cy="22" r="1.5"/><circle cx="20" cy="22" r="1.5"/>'),
+    dis_impacto: ic('<path d="M3 24h26M3 12h8v12M11 12h4v8h4v-4h4v8"/><path d="M17 6l4 4m0-4l-4 4"/>'),
+    dis_bacia: ic('<path d="M3 10h6l3 12h8l3-12h6"/><path d="M10 17c2 2 4-2 6 0s4-2 6 0"/>'),
+    dis_escada: ic('<path d="M4 7h6v6h6v6h6v6h6M4 7v21h24"/>'),
+    dis_outros: ic('<circle cx="8" cy="16" r="2"/><circle cx="16" cy="16" r="2"/><circle cx="24" cy="16" r="2"/>'),
     desobstrucao: ic('<rect x="3" y="11" width="26" height="10" rx="5"/><path d="M10 14l5 4m0-4l-5 4M20 14l4 4m0-4l-4 4"/>'),
     limpeza: ic('<path d="M22 4l-7 12M9 18l6-2 8 6-3 7H8z"/><path d="M12 22l-1 5M17 24l-1 4"/>'),
     rocada: ic('<path d="M6 28c0-8 2-14 4-20 1 7 2 12 2 20M14 28c0-6 2-12 5-18 0 6 0 12-1 18M22 28c0-7 1-11 4-16"/>'),
@@ -62,7 +67,8 @@
         <p class="small" style="margin:0 0 10px">Solução <b>${esc(R.solucao)}</b> · <b>${R.satelites}</b> satélites · precisão <b>${f3(R.precisaoH)} m</b> (horizontal) e <b>${f3(R.precisaoV)} m</b> (vertical) · altitude ${esc(R.tipoAltitude.toLowerCase())} · modelo geoidal <b>${esc(R.geoide)}</b> · base ${esc(R.base)} · receptor ${esc(R.receptor)}.</p>
         ${campo({ p: 'rtk.alturaAntena', label: 'Altura da antena', t: 'num', unit: 'm', min: 0 })}
         <p class="muted small" style="margin:6px 0 0">Esses dados valem para todos os bueiros do projeto. Só a altura da antena é preenchida por você.</p></div>
-      <div class="card"><div class="f"><label for="f-observacoes">Observações gerais</label><textarea id="f-observacoes" data-p="observacoes" rows="3">${esc(l.observacoes || '')}</textarea></div></div>`;
+      <div class="card"><div class="f"><label for="f-observacoes">Observações gerais</label><textarea id="f-observacoes" data-p="observacoes" rows="3">${esc(l.observacoes || '')}</textarea></div></div>
+      ${BU.Fotos.blocoHTML(l, 'foto:geral', 'Foto de vista geral', { entradas: true })}`;
   }
 
   /* ============================================================ 3. Corpo */
@@ -81,11 +87,12 @@
         ${c.mesmaSecaoJusante === false ? grade(tub ? [{ p: 'medicoes.larguraSaida', label: 'Diâmetro na jusante', t: 'num', unit: 'm', min: 0 }]
           : [{ p: 'medicoes.larguraSaida', label: 'Base na jusante', t: 'num', unit: 'm', min: 0 }, { p: 'medicoes.alturaSaida', label: 'Altura na jusante', t: 'num', unit: 'm', min: 0 }]) : ''}
         <div class="f"><label>Estado do corpo</label>${chipsHTML('caracteristicas.estadoCorpo', Cat.ESTADOS, c.estadoCorpo)}</div>
-        <div class="f"><label for="f-obstr">Obstrução da seção: <b id="obstr-v">${+c.obstrucaoPct || 0}%</b></label><input id="f-obstr" type="range" min="0" max="100" step="5" value="${+c.obstrucaoPct || 0}" data-fm="obstr"></div></div>
+        </div>
       <details class="card auto"><summary><b>Medidas calculadas</b> <span class="muted small">automáticas, sem preencher</span></summary>
         ${[['Comprimento', m.comprimentoBueiro, 'm'], ['Declividade', m.declividade, '%'], ['Esconsidade', m.esconsidade, '°'], ['Recobrimento (aterro)', m.recobrimento, 'm']].map(([r, v, u]) => `<div class="kv"><span>${r}</span><b>${v != null && v !== '' ? esc(U.numTxt(v)) + ' ' + u : '—'}</b></div>`).join('')}
         <p class="muted small" style="margin:6px 0 0">Calculadas pelas cotas e coordenadas dos pontos de montante e jusante (etapa Levantamento RTK). Aparecem aqui depois de importar os pontos.</p></details>
-      ${BU.Secao.croquiHTML(l)}${BU.Fotos.blocoHTML(l, 'secao', 'Fotos da seção', { entradas: true })}`;
+      ${BU.Secao.croquiHTML(l)}${BU.Patologias.blocoHTML(l, 'corpo')}
+      ${BU.Fotos.blocoHTML(l, 'secao', 'Foto da seção (corpo / interior)', { entradas: true })}${BU.Fotos.blocoHTML(l, 'foto:pista', 'Pista sobre o bueiro')}`;
   }
   function medirEntreBocas(l) {
     const a = l.bocas.montante, b = l.bocas.jusante;
@@ -95,14 +102,18 @@
     return d;
   }
 
-  /* ============================================================ 7. Dispositivos associados */
-  function dispositivosHTML(l) {
-    const marc = Cat.DISPOSITIVOS.filter(([k]) => l.dispositivos[k]);
-    return `<div class="card"><h3>Dispositivos associados <span class="chip ${marc.length ? 'concluido' : ''}">${marc.length || 'nenhum'}</span></h3>
-        <p class="muted small" style="margin:0 0 8px">Marque o que existe no local. Para cada dispositivo marcado, tire a foto.</p>
-        <div class="icogrid">${Cat.DISPOSITIVOS.map(([k, r]) => `<button type="button" class="icobtn${l.dispositivos[k] ? ' on' : ''}" data-fm="disp" data-k="${k}" aria-pressed="${!!l.dispositivos[k]}">${ICONES[k] || ''}<span>${esc(r)}</span>${l.dispositivos[k] ? `<i class="cam${l.fotos.some(f => f.ctx === 'disp:' + k) ? ' ok' : ''}">📷</i>` : ''}</button>`).join('')}</div></div>
-      ${marc.map(([k, r]) => BU.Fotos.blocoHTML(l, 'disp:' + k, 'Foto · ' + r)).join('')}
-      ${BU.Fotos.entradasHTML()}`;
+  /* ============================================================ Dispositivos associados (dentro de cada boca) */
+  function dispositivosHTML(l, lado) {
+    const jus = lado === 'jusante', lista = jus ? Cat.DISP_JUSANTE : Cat.DISP_MONTANTE, marc = lista.filter(([k]) => l.dispositivos[k]);
+    return `<div class="card"><h3>${jus ? 'Dispositivo de amortecimento de energia' : 'Dispositivos associados'} <span class="chip ${marc.length ? 'concluido' : ''}">${marc.length || 'nenhum'}</span></h3>
+        <p class="muted small" style="margin:0 0 8px">Marque ${jus ? 'o que existe na saída do bueiro' : 'o que existe no local'}.</p>
+        <div class="icogrid">${lista.map(([k, r]) => `<button type="button" class="icobtn${l.dispositivos[k] ? ' on' : ''}" data-fm="disp" data-k="${k}" aria-pressed="${!!l.dispositivos[k]}">${ICONES[k] || ''}<span>${esc(r)}</span></button>`).join('')}</div>
+        ${jus && l.dispositivos.dis_outros ? `<div class="f" style="margin-top:8px"><label for="f-disp-outro">Qual dispositivo?</label><input id="f-disp-outro" type="text" data-fm="dispOutro" value="${esc(l.bocas.jusante.dispOutro || '')}" placeholder="Descreva o dispositivo"></div>` : ''}</div>`;
+  }
+  /* o campo "dissipador" da boca de jusante acompanha os dispositivos marcados (relatórios e painel) */
+  function sincDispositivos(l) {
+    const j = l.bocas.jusante, nomes = Cat.DISP_JUSANTE.filter(([k]) => l.dispositivos[k]).map(([k, r]) => (k === 'dis_outros' && j.dispOutro ? j.dispOutro : r));
+    j.dissipador = nomes.join('; ') || 'Nenhum';
   }
 
   /* ============================================================ 9. Diagnóstico */
@@ -126,11 +137,20 @@
   function textoObs(l) { const d = l.diagnostico; return [...(d.obsPadrao || []), d.obs, ...(d.obs2Padrao || []), d.obs2].map(x => String(x || '').trim()).filter(Boolean).join(' '); }
   function sincDiag(l) {
     const d = l.diagnostico, c = l.caracteristicas;
-    c.necessita = (d.necessita || []).map(k => Cat.rotulo(Cat.NECESSITA, k)).join(', ');
+    c.necessita = (d.necessita || []).map(k => { const o = ((d.onde || {})[k] || []).map(g => ONDE_CURTO[g]).filter(Boolean); return Cat.rotulo(Cat.NECESSITA, k) + (o.length ? ' (' + o.join(', ') + ')' : ''); }).join(', ');
     l.observacoes = textoObs(l) || l.observacoes || '';
     d.prioridade = prioridadeDe(l);
   }
   const marcaOpc = (lista, sel, tipo) => `<div class="checks">${lista.map(t => `<label class="chk"><input type="checkbox" data-fm="${tipo}" data-v="${esc(t)}" ${sel.includes(t) ? 'checked' : ''}> ${esc(t)}</label>`).join('')}</div>`;
+  const ONDE = [['mont', 'Boca de montante'], ['corpo', 'Corpo'], ['jus', 'Boca de jusante']], ONDE_CURTO = { mont: 'montante', corpo: 'corpo', jus: 'jusante' };
+  /* Orientação de serviço: o que fazer em cada lugar. */
+  function resumoServicos(l) {
+    const d = l.diagnostico, nec = d.necessita || [];
+    const por = g => nec.filter(k => ((d.onde || {})[k] || []).includes(g)).map(k => Cat.rotulo(Cat.NECESSITA, k));
+    const linhas = ONDE.map(([g, r]) => [r, por(g)]).filter(x => x[1].length);
+    if (!linhas.length) return '';
+    return `<div class="orienta"><h4>Orientação para a equipe de obra</h4>${linhas.map(([r, v]) => `<div class="kv"><span>${esc(r)}</span><b>${esc(v.join(', '))}</b></div>`).join('')}</div>`;
+  }
   function diagnosticoHTML(l) {
     const c = l.caracteristicas, d = l.diagnostico, sug = conservacaoSugerida(l), pr = prioridadeDe(l), nec = d.necessita || [];
     const corP = { Baixa: 'baixa', Média: 'media', Alta: 'alta', Urgente: 'urgente' }[pr] || 'baixa';
@@ -138,9 +158,13 @@
         <div class="f"><label>Estado de conservação <span class="req">*</span></label>${chipsHTML('caracteristicas.conservacao', Cat.ESTADOS, c.conservacao)}
           <p class="muted small" style="margin:6px 0 0">${sug ? `Sugestão pelo corpo e pelas bocas: <b>${esc(sug)}</b>${c.conservacao ? '' : ' (toque para aceitar)'}.` : 'Classifique o corpo e as bocas para ter uma sugestão.'}</p>
           ${sug && !c.conservacao ? `<button type="button" class="btn sm" data-fm="aceitar-cons" data-v="${esc(sug)}">Usar ${esc(sug)}</button>` : ''}</div>
-        <div class="f"><label>Necessita</label><p class="muted small" style="margin:0 0 6px">Cada serviço marcado pede uma foto do que precisa ser feito.</p>
-          <div class="icogrid">${Cat.NECESSITA.map(([k, r]) => `<button type="button" class="icobtn${nec.includes(k) ? ' on' : ''}" data-fm="nec" data-k="${k}" aria-pressed="${nec.includes(k)}">${ICONES[k] || ''}<span>${esc(r)}</span>${nec.includes(k) ? `<i class="cam${l.fotos.some(f => f.ctx === 'diag:' + k) ? ' ok' : ''}">📷</i>` : ''}</button>`).join('')}</div></div></div>
-      ${nec.map(k => BU.Fotos.blocoHTML(l, 'diag:' + k, 'Foto · ' + Cat.rotulo(Cat.NECESSITA, k))).join('')}
+        <div class="f"><label>Necessita</label><p class="muted small" style="margin:0 0 6px">Marque o que precisa ser feito e, para cada serviço, onde aplicar.</p>
+          <div class="icogrid">${Cat.NECESSITA.map(([k, r]) => `<button type="button" class="icobtn${nec.includes(k) ? ' on' : ''}" data-fm="nec" data-k="${k}" aria-pressed="${nec.includes(k)}">${ICONES[k] || ''}<span>${esc(r)}</span></button>`).join('')}</div></div></div>
+      ${nec.length ? `<div class="card"><h3>Onde aplicar cada serviço</h3>
+        ${nec.map(k => { const on = (d.onde && d.onde[k]) || [];
+          return `<div class="onde"><b>${esc(Cat.rotulo(Cat.NECESSITA, k))}</b><div class="chips" role="group">${ONDE.map(([g, r]) => `<button type="button" class="fchip${on.includes(g) ? ' on' : ''}" data-fm="onde" data-k="${k}" data-g="${g}" aria-pressed="${on.includes(g)}">${r}</button>`).join('')}</div></div>`; }).join('')}
+        <p class="muted small" style="margin:8px 0 0">Escolha uma ou mais opções para cada serviço.</p>
+        ${resumoServicos(l)}</div>` : ''}
       <div class="card"><h3>Prioridade</h3>
         <div class="prio ${corP}"><b>${esc(pr)}</b><span>${d.prioridadeManual ? 'definida por você' : 'sugerida pelo app'}</span></div>
         <p class="muted small" style="margin:6px 0">Calculada por estado, obstrução, patologias e serviços necessários.</p>
@@ -150,7 +174,7 @@
         <div class="f"><label for="f-dobs">Texto livre</label><textarea id="f-dobs" data-fm="obs" rows="3" placeholder="Escreva o que for preciso.">${esc(d.obs || '')}</textarea></div></div>
       <div class="card"><h3>Observação 2 (funcionamento e técnica)</h3>${marcaOpc(Cat.OBS2, d.obs2Padrao || [], 'obs2')}
         <div class="f"><label for="f-dobs2">Texto livre</label><textarea id="f-dobs2" data-fm="obs2t" rows="3">${esc(d.obs2 || '')}</textarea></div></div>
-      ${BU.Fotos.entradasHTML()}`;
+`;
   }
 
   /* ============================================================ eventos */
@@ -182,8 +206,9 @@
       if (p === 'caracteristicas.conservacao' || p === 'caracteristicas.estadoCorpo') sincDiag(l);
     } else if (a === 'aceitar-cons') { l.caracteristicas.conservacao = b.dataset.v; sincDiag(l); }
     else if (a === 'prio-auto') { l.diagnostico.prioridadeManual = false; sincDiag(l); }
-    else if (a === 'disp') { const k = b.dataset.k; if (l.dispositivos[k]) { delete l.dispositivos[k]; } else l.dispositivos[k] = true; }
-    else if (a === 'nec') { const k = b.dataset.k, n = l.diagnostico.necessita || (l.diagnostico.necessita = []), i = n.indexOf(k); if (i >= 0) n.splice(i, 1); else n.push(k); sincDiag(l); }
+    else if (a === 'disp') { const k = b.dataset.k; if (l.dispositivos[k]) { delete l.dispositivos[k]; } else l.dispositivos[k] = true; sincDispositivos(l); }
+    else if (a === 'nec') { const k = b.dataset.k, n = l.diagnostico.necessita || (l.diagnostico.necessita = []), i = n.indexOf(k); if (i >= 0) { n.splice(i, 1); if (l.diagnostico.onde) delete l.diagnostico.onde[k]; } else n.push(k); sincDiag(l); }
+    else if (a === 'onde') { const d = l.diagnostico, k = b.dataset.k, g = b.dataset.g, o = (d.onde = d.onde || {}), arr = (o[k] = o[k] || []), i = arr.indexOf(g); if (i >= 0) arr.splice(i, 1); else arr.push(g); sincDiag(l); }
     else refaz = false;
     if (refaz) { App.marcarSujo(); App.renderEtapa(); }
   }
@@ -191,7 +216,12 @@
     const el = e.target, l = BU.App.cur(); if (!l || !el.dataset || !el.dataset.fm) return;
     const a = el.dataset.fm;
     if (a === 'mesma') { l.caracteristicas.mesmaSecaoJusante = el.checked; sincronizarSecao(l); BU.App.marcarSujo(); BU.App.renderEtapa(); }
-    else if (a === 'obstr') { l.caracteristicas.obstrucaoPct = +el.value; const v = document.getElementById('obstr-v'); if (v) v.textContent = el.value + '%'; if (e.type === 'change') { sincDiag(l); } BU.App.marcarSujo(); }
+    else if (a === 'obstr') {
+      const lado = el.dataset.lado === 'jusante' ? 'jusante' : 'montante'; l.bocas[lado].obstrucaoPct = +el.value;
+      l.caracteristicas.obstrucaoPct = Math.max(+l.bocas.montante.obstrucaoPct || 0, +l.bocas.jusante.obstrucaoPct || 0); // a obstrução do bueiro é a maior das duas bocas
+      const v = document.getElementById('obstr-v-' + lado); if (v) v.textContent = el.value + '%'; if (e.type === 'change') sincDiag(l); BU.App.marcarSujo();
+    }
+    else if (a === 'dispOutro') { l.bocas.jusante.dispOutro = el.value; sincDispositivos(l); BU.App.marcarSujo(); }
     else if (a === 'obs1' || a === 'obs2') {
       const k = a === 'obs1' ? 'obsPadrao' : 'obs2Padrao', arr = l.diagnostico[k] || (l.diagnostico[k] = []), i = arr.indexOf(el.dataset.v);
       if (el.checked && i < 0) arr.push(el.dataset.v); else if (!el.checked && i >= 0) arr.splice(i, 1);
@@ -203,5 +233,5 @@
   document.addEventListener('input', aoMudar);
   document.addEventListener('change', aoMudar);
 
-  BU.Form = { geralHTML, corpoHTML, dispositivosHTML, diagnosticoHTML, aposCampo, aposTipo, sincDiag, prioridadeDe, conservacaoSugerida, ICONES, textoObs, medirEntreBocas };
+  BU.Form = { geralHTML, corpoHTML, dispositivosHTML, sincDispositivos, diagnosticoHTML, aposCampo, aposTipo, sincDiag, prioridadeDe, conservacaoSugerida, ICONES, textoObs, medirEntreBocas };
 })();

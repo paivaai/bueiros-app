@@ -5,7 +5,7 @@
   'use strict';
   const BU = window.BU, U = BU.U, UI = BU.UI, esc = U.esc;
 
-  const VBW = 400, VBH = 380, AREA = { x: 34, y: 38, w: 236, h: 168 };
+  const VBW = 400, VBH = 316, AREA = { x: 34, y: 38, w: 236, h: 168 };
   const INK = '#16201A', COTA = '#0B3D91', NOTA = '#9A2A0B';
   const FORMATOS = ['Circular', 'Retangular', 'Personalizada'];
   const CAMPOS_TIPO = {
@@ -136,16 +136,11 @@
       par(m.larguraEntrada, m.alturaEntrada) ? `Entrada: ${par(m.larguraEntrada, m.alturaEntrada)}` : '',
       par(m.larguraSaida, m.alturaSaida) ? `Saída: ${par(m.larguraSaida, m.alturaSaida)}` : '',
     ].filter(Boolean).map((t, i) => `<text x="14" y="${272 + i * 14}" font-size="11" fill="${INK}">${esc(t)}</text>`).join('');
-    const L = fluxo === 'direita', ax1 = L ? 60 : 340, ax2 = L ? 340 : 60, hd = L ? -8 : 8;
-    const fl = `<text x="${VBW / 2}" y="334" text-anchor="middle" font-size="10" fill="#56635A">SENTIDO DO FLUXO</text>`
-      + `<line x1="${ax1}" y1="348" x2="${ax2}" y2="348" stroke="${INK}" stroke-width="2.5"/><polygon points="${ax2},348 ${ax2 + hd},343 ${ax2 + hd},353" fill="${INK}"/>`
-      + `<text x="${ax1 + (L ? -6 : 6)}" y="368" text-anchor="${L ? 'start' : 'end'}" font-size="11" font-weight="700" fill="${INK}" transform="translate(${L ? 0 : 0},0)">MONTANTE</text>`
-      + `<text x="${ax2 + (L ? 6 : -6)}" y="368" text-anchor="${L ? 'end' : 'start'}" font-size="11" font-weight="700" fill="${INK}">JUSANTE</text>`;
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${VBW} ${VBH}" width="${VBW}" height="${VBH}" font-family="Arial, Helvetica, sans-serif" role="img" aria-label="Croqui da seção do bueiro">
 <defs><pattern id="hach" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#E9EEE9"/><line x1="0" y1="0" x2="0" y2="6" stroke="#9AA79D" stroke-width="1"/></pattern></defs>
 <rect width="${VBW}" height="${VBH}" fill="#fff"/>
 <text x="10" y="16" font-size="12" font-weight="700" fill="${INK}">${esc(l.codigo || 'Sem código')}${l.estrada ? ' · ' + esc(l.estrada) : ''}</text>
-${corpo}${riscos}${notas}${leg}${fl}</svg>`;
+${corpo}${riscos}${notas}${leg}</svg>`;
   }
 
   /* ---------- tela ---------- */
