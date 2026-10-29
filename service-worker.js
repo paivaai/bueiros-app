@@ -5,7 +5,7 @@ const VERSAO = 'v7';
 const CACHE = 'bueiros-' + VERSAO;
 const ARQUIVOS = [
   './', 'index.html', 'offline.html', 'manifest.webmanifest', 'css/styles.css',
-  'js/vendor/supabase.js', 'js/vendor/leaflet/leaflet.js', 'js/vendor/leaflet/leaflet.css', 'js/vendor/leaflet/images/layers.png', 'js/vendor/leaflet/images/layers-2x.png', 'js/config.js', 'js/ui.js', 'js/codigo.js', 'js/db.js', 'js/gps.js', 'js/modelo.js', 'js/points.js', 'js/section-drawing.js', 'js/prancha.js', 'js/photos.js', 'js/patologias.js', 'js/bocas.js', 'js/formulario.js', 'js/export.js', 'js/kmz.js', 'js/conferencias.js', 'js/mapa.js', 'js/sync.js', 'js/app.js',
+  'js/vendor/supabase.js', 'js/vendor/leaflet/leaflet.js', 'js/vendor/leaflet/leaflet.css', 'js/vendor/leaflet/images/layers.png', 'js/vendor/leaflet/images/layers-2x.png', 'js/config.js', 'js/ui.js', 'js/codigo.js', 'js/db.js', 'js/gps.js', 'js/modelo.js', 'js/points.js', 'js/section-drawing.js', 'js/prancha.js', 'js/photos.js', 'js/patologias.js', 'js/bocas.js', 'js/formulario.js', 'js/export.js', 'js/antt.js', 'assets/logo-antt.png', 'assets/logo-arteris.png', 'js/kmz.js', 'js/conferencias.js', 'js/mapa.js', 'js/sync.js', 'js/app.js',
   'assets/logo-gfa.png', 'assets/icon-192.png', 'assets/icon-512.png', 'assets/icon-maskable-512.png',
 ];
 
