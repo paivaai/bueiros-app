@@ -96,8 +96,9 @@
       return `<g class="dot ${cls}" data-bc="dot" data-lado="${lado}" data-k="${esc(d.k)}" tabindex="0" role="button" aria-label="${esc((i + 1) + '. ' + d.nome)}">
         <circle cx="${x}" cy="${y}" r="34" class="halo"/><circle cx="${x}" cy="${y}" r="15"/></g>`;
     }).join('');
+    const extras = previa ? Object.entries(pos).filter(([k]) => !pts.some(d => d.k === k)).map(([k, p]) => `<g class="dot falta" style="pointer-events:none"><circle cx="${f(cx + p[0])}" cy="${f(p[1] - y0)}" r="15"/></g>`).join('') : '';
     return `<div class="boca-wrap"><svg class="boca-svg" viewBox="0 0 ${f(W)} ${f(H)}" style="min-width:${Math.round(W * 0.44)}px" role="img" aria-label="Desenho da ${LADOS[lado].toLowerCase()}"><rect width="${f(W)}" height="${f(H)}" fill="#000" rx="10"/>
-      <g transform="translate(${f(cx)} ${f(-y0)})"${previa ? ' opacity=".35"' : ''}>${g}</g>${bolas}
+      <g transform="translate(${f(cx)} ${f(-y0)})">${g}</g>${extras}${bolas}
       <text x="${f(W / 2)}" y="${f(H - 8)}" text-anchor="middle" class="leg">toque no ponto vermelho para marcar X, Y e Z</text></svg></div>`;
   }
 
@@ -130,7 +131,7 @@
     const lista = pts.map((d, i) => { const s = estado(l, lado, d.k);
       return `<button type="button" class="dotrow ${s.p ? 'ok' : s.nao ? 'nao' : 'falta'}" data-bc="dot" data-lado="${lado}" data-k="${esc(d.k)}">
         <span class="n">${i + 1}</span><span class="t"><b>${esc(d.nome)}</b><small>${s.p ? `X ${esc(s.p.x)} · Y ${esc(s.p.y)} · Z ${esc(s.p.z)}` : s.nao ? 'Não levantado: ' + esc(s.nao) : 'toque para marcar'}</small></span><span class="st">${s.p ? '✔' : s.nao ? '—' : '●'}</span></button>`; }).join('');
-    const aviso = !b.tipo ? '<p class="pend aviso" style="display:block">Escolha o <b>tipo de boca</b> acima para ver a estrutura certa e todos os pontos a levantar. Por enquanto só aparecem os pontos da galeria.</p>' : '';
+    const aviso = !b.tipo ? '<p class="pend aviso" style="display:block">Escolha o <b>tipo de boca</b> acima para a estrutura e os pontos ficarem certos. O desenho abaixo é um exemplo; por enquanto só dá para marcar os pontos da galeria.</p>' : '';
     return `${localizacaoHTML(l, lado)}
       <div class="card"><h3>${LADOS[lado]}</h3><div class="grid">
         <div class="f"><label for="bc-tipo-${lado}">Tipo de boca <span class="req">*</span></label>${sel('bc-tipo-' + lado, 'tipo', Cat.BOCA_TIPOS, b.tipo, '— escolha —', lado)}</div>
