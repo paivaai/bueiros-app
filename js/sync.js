@@ -341,7 +341,10 @@
       await DB.sincAtualizar(id, { conflito: null, erro: '', versao: -1 }); // força receber
       await DB.sincAtualizar(id, { sujo: false });
     }
-    await carregarMetas(); view(); sincronizar();
+    await carregarMetas();
+    if (location.hash === '#/sync') { view(); sincronizar(); return; }
+    const A = BU.App; if (A && A.S) { A.S.dirty = false; A.S.cur = null; } // o bueiro aberto será recarregado do aparelho
+    sincronizar(); location.hash = '#/lista'; UI.toast(escolha === 'meu' ? 'Mantida a sua versão. Enviando…' : 'Versão do escritório recebida');
   }
 
   /* ---------- aparência ---------- */
@@ -423,7 +426,10 @@
     if (a === 'agora') {
       if (!logado()) { location.hash = '#/sync'; return; }
       const c = contagens();
-      if (c.conflitos + c.erros > 0 && location.hash !== '#/sync') { location.hash = '#/sync'; return; } // com problema, o ícone leva até ele
+      if (c.conflitos + c.erros > 0) { // com problema, o ícone leva até ele: o bueiro em conflito (se for um só) ou a lista
+        const ids = [...E.metas.values()].filter(m => m.conflito || m.erro).map(m => m.id), alvo = ids.length === 1 ? `#/lev/${ids[0]}/1` : '#/sync';
+        if (location.hash !== alvo) { location.hash = alvo; return; }
+      }
       await sincronizar(); if (location.hash === '#/sync') view();
     }
     else if (a === 'sair') { await sair(); view(); }
@@ -440,5 +446,12 @@
   }
   function prefillNovo(l) { const p = projeto(); if (p && p.rodovia && !l.estrada) l.estrada = p.rodovia; }
 
-  BU.Sync = { registrarExclusao, precisaLogin, viewLogin, nomeUsuario, projetos: () => E.projetos, meta: id => E.metas.get(id) || null, escolherProjeto, perfil: () => E.perfil, recarregar: carregarMetas, iniciar, sincronizar, agendar, view, selo, cartaoHome, pintar, projeto, logado, eixoAtivo, prefillNovo, projetoId: () => E.projetoId };
+  /* Aviso de problema de sincronização de um bueiro (conflito ou erro), para a tela do bueiro. */
+  function avisoProblema(id) {
+    const m = E.metas.get(id); if (!m || !(m.conflito || m.erro) || !logado()) return '';
+    return `<div class="card atencao"><h3>⚠️ ${m.conflito ? 'Conflito de sincronização' : 'Não sincronizou'}</h3><p class="small" style="margin:0 0 6px">${m.conflito ? 'O escritório (ou outra pessoa) alterou este bueiro enquanto você também alterava. Escolha qual versão vale:' : esc(m.erro)}</p>
+      ${m.conflito ? `<p class="small rec"><b>O que fazer:</b> se o que você fez em campo é o mais atual, toque em <b>Manter o meu</b>. Se o escritório já corrigiu e o seu é antigo, toque em <b>Usar o do escritório</b>.</p><div class="row"><button type="button" class="btn sm" data-sync="meu" data-id="${esc(id)}">Manter o meu</button><button type="button" class="btn sm" data-sync="deles" data-id="${esc(id)}">Usar o do escritório</button></div>` : `<p class="small rec"><b>O que fazer:</b> confira a internet e toque em Tentar de novo. Se continuar, avise o escritório.</p><div class="row"><button type="button" class="btn sm" data-sync="tentar" data-id="${esc(id)}">Tentar de novo</button></div>`}</div>`;
+  }
+
+  BU.Sync = { avisoProblema, registrarExclusao, precisaLogin, viewLogin, nomeUsuario, projetos: () => E.projetos, meta: id => E.metas.get(id) || null, escolherProjeto, perfil: () => E.perfil, recarregar: carregarMetas, iniciar, sincronizar, agendar, view, selo, cartaoHome, pintar, projeto, logado, eixoAtivo, prefillNovo, projetoId: () => E.projetoId };
 })();

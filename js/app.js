@@ -449,6 +449,7 @@
           <div class="r-txt"><b id="r-cod">${esc(l.codigo || 'Novo levantamento')}</b><span id="r-sub">${esc(resumoTxt())}</span></div>
           <span id="save-state" class="chip save ${S.saveState}">${SAVE_TXT[S.saveState]}</span>
         </div>
+        ${BU.Sync.avisoProblema(l.id)}
         ${l.status === 'devolvido' ? `<div class="card devolvido"><b>↩ Devolvido pelo escritório</b><p>${esc(l.comentarioRevisao || 'Sem comentário.')}</p><p class="muted small">Corrija e salve de novo: ele volta para revisão.</p></div>` : ''}
         ${l.status === 'nao_localizado' ? `<div class="card naoloc"><b>Não localizado</b><p>${esc((l.naoLocalizado && l.naoLocalizado.motivo) || '')}${l.naoLocalizado && l.naoLocalizado.obs ? ' — ' + esc(l.naoLocalizado.obs) : ''}</p><button type="button" class="btn sm" data-a="reabrir-vistoria">Voltar a vistoriar</button></div>` : ''}
         ${l.status === 'aprovado' ? '<div class="card aprovado"><b>✔ Aprovado pelo escritório</b><p class="muted small">Não é mais enviado ao servidor. Alterações ficam só neste aparelho.</p></div>' : ''}
