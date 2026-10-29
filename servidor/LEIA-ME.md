@@ -67,3 +67,9 @@ Cria a situação `nao_localizado`, a coluna `fotos.ctx`, atualiza `v_andamento`
 
 ## 12 — Mudar o papel de uma pessoa (rodar UMA vez, depois do 11)
 Cria `definir_papel`: o **administrador** troca o papel (Operador, Gestor, Administrador) pela lista na tela Equipe e acessos. Gestor e administrador adicionam pessoas; o gestor só adiciona operadores.
+
+## 13. Excluir bueiro de verdade (`13_excluir_bueiro.sql`)
+Rode no SQL Editor depois do 12. Sem ele, o app apaga o rascunho só no celular e o servidor devolve o bueiro na próxima sincronização.
+- O operador e o gestor só excluem o que eles mesmos criaram em campo (nunca o que veio do cadastro ou do planejamento do escritório).
+- O administrador exclui qualquer bueiro que ainda não foi aprovado. Bueiro aprovado nunca é excluído.
+- A exclusão fica registrada no histórico do projeto. Se o celular estiver sem internet, o app guarda o pedido e envia na próxima sincronização.

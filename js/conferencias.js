@@ -52,7 +52,7 @@
     const P = [], rtk = l.rtk || {}, u = BU.GPS.utmDe(l);
     if (l.status === 'nao_localizado' || l.status === 'a_vistoriar') return P;
     if (!u) return P; // sem coordenadas: já é pendência do formulário
-    const add = (n, cod, t, e) => P.push({ n, cod, t, e: e || 2 });
+    const add = (n, cod, t, e) => P.push({ n, cod, t, e: e || 1 });
     if (!rtk.solucao || rtk.solucao === 'Não informado') add('aviso', 'rtk_sem_solucao', 'Solução do RTK (fixa/flutuante) não informada');
     else if (!SOLUCOES_FIXAS.includes(rtk.solucao)) add('aviso', 'rtk_nao_fixa', `Solução do RTK “${rtk.solucao}” não é fixa: a precisão pode não atender`);
     const ph = num(rtk.precisaoH);
