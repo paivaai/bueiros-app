@@ -27,7 +27,7 @@
     return E.sb;
   }
   async function iniciar() {
-    try { E.perfil = await DB.cfgObter('sincPerfil'); E.projetos = (await DB.cfgObter('sincProjetos')) || []; E.projetoId = (await DB.cfgObter('sincProjetoAtivo')) || ''; E.ultima = await DB.cfgObter('sincUltima'); E.semConta = !!(await DB.cfgObter('semConta')); E.enviadas = new Set((await DB.cfgObter('presencasEnviadas')) || []); } catch (e) { /* segue vazio */ }
+    try { E.perfil = await DB.cfgObter('sincPerfil'); E.projetos = (await DB.cfgObter('sincProjetos')) || []; E.projetoId = (await DB.cfgObter('sincProjetoAtivo')) || ''; E.ultima = await DB.cfgObter('sincUltima'); E.semConta = !!(await DB.cfgObter('semConta')); E.enviadas = new Set((await DB.cfgObter('presencasEnviadas')) || []); E.resetado = await DB.cfgObter('resetadoProjeto'); } catch (e) { /* segue vazio */ }
     const sb = cliente();
     if (sb) { try { const { data } = await sb.auth.getSession(); E.sessao = data && data.session || null; } catch (e) { /* offline: sem sessão lida */ } }
     if (!logado()) E.perfil = E.perfil && E.perfil.saiu ? null : E.perfil;
@@ -97,12 +97,12 @@
     ligarLogin(async () => { location.hash = '#/'; if (BU.App && BU.App.rotear) BU.App.rotear(); if (E.projetoId) sincronizar(); });
   }
   /* Zera a cópia deste aparelho (todos os bueiros, fotos e controles) e baixa de novo o projeto escolhido. */
-  async function zerarAparelho() {
+  async function resetarProjeto() {
     if (!projeto()) { UI.toast('Escolha o projeto primeiro', 'aviso'); return; }
     if (!navigator.onLine) { UI.toast('Precisa de internet para baixar o projeto de novo', 'aviso'); return; }
     await carregarMetas();
     const lev = await DB.listar(), nEnv = [...E.metas.values()].filter(m => m.sujo && !m.local).length;
-    const ok = await UI.confirmar(`Apaga os ${lev.length} bueiro(s) guardados neste aparelho e baixa de novo o projeto “${projeto().nome}” do escritório.${nEnv ? ` ATENÇÃO: ${nEnv} ainda não foram enviados e serão perdidos.` : ' Tudo o que foi feito aqui já está no escritório.'}`, { titulo: 'Zerar este aparelho', ok: 'Apagar e baixar de novo', perigo: true });
+    const ok = await UI.confirmar(`Apaga os ${lev.length} bueiro(s) guardados neste aparelho e baixa de novo o projeto “${projeto().nome}” do escritório.${nEnv ? ` ATENÇÃO: ${nEnv} ainda não foram enviados e serão perdidos.` : ' Tudo o que foi feito aqui já está no escritório.'}`, { titulo: 'Resetar projeto', ok: 'Resetar', perigo: true });
     if (!ok) return;
     try {
       for (const l of lev) await DB.excluir(l.id);
@@ -111,11 +111,15 @@
       await carregarMetas();
       if (BU.App && BU.App.refrescar) await BU.App.refrescar();
       await sincronizar();
+      if (E.msg) throw new Error(E.msg);
+      E.resetado = { id: E.projetoId, em: new Date().toISOString() }; await DB.cfgSalvar('resetadoProjeto', E.resetado).catch(() => {});
       if (BU.App && BU.App.refrescar) await BU.App.refrescar();
-    } catch (e) { UI.toast('Não foi possível zerar: ' + (e && e.message || e), 'erro'); }
+      UI.toast('Projeto resetado e atualizado com o escritório');
+    } catch (e) { UI.toast('Não foi possível resetar: ' + (e && e.message || e), 'erro'); }
     view();
   }
   async function sair() {
+    E.resetado = null; DB.cfgSalvar('resetadoProjeto', null).catch(() => {});
     const n = [...E.metas.values()].filter(m => m.sujo && !m.local).length;
     if (n && !(await UI.confirmar(`${n} levantamento(s) ainda não foram enviados. Eles continuam neste aparelho e serão enviados quando você entrar de novo. Sair mesmo assim?`, { titulo: 'Sair da conta', ok: 'Sair' }))) return;
     try { await E.sb.auth.signOut(); } catch (e) { /* offline: limpa só o local */ try { await E.sb.auth.signOut({ scope: 'local' }); } catch (e2) { /* ignora */ } }
@@ -415,7 +419,7 @@
           ${E.projetos.length ? `<select id="sync-proj">${projeto() ? '' : '<option value="">— escolha o projeto —</option>'}${E.projetos.map(p => `<option value="${esc(p.id)}"${p.id === E.projetoId ? ' selected' : ''}>${esc(p.nome)}${p.rodovia ? ' · ' + esc(p.rodovia) : ''}</option>`).join('')}</select>`
             : '<p class="muted">Nenhum projeto liberado para você. Peça ao escritório para incluir você na equipe do projeto.</p>'}
           <div class="row"><button type="button" class="btn" data-sync="projetos">Atualizar lista de projetos</button></div>
-          ${projeto() ? '<div class="row"><button type="button" class="btn" data-sync="zerar">Zerar este aparelho e baixar o projeto de novo</button></div><p class="muted small">Use quando o projeto mudou no escritório (por exemplo, um KMZ novo) e a lista do celular ficou com bueiros antigos.</p>' : ''}</div>
+          ${projeto() ? `<div class="row"><button type="button" class="btn" data-sync="zerar"${E.resetado && E.resetado.id === E.projetoId ? ' disabled' : ''}>${E.resetado && E.resetado.id === E.projetoId ? 'Projeto resetado em ' + esc(U.dataHoraBR(E.resetado.em)) : 'Resetar'}</button></div><p class="muted small">${E.resetado && E.resetado.id === E.projetoId ? 'O celular já está igual ao projeto do escritório. Para resetar de novo, troque de projeto ou saia da conta.' : 'Apaga os bueiros guardados neste aparelho e baixa de novo o projeto do escritório. Use quando o projeto foi refeito no painel (por exemplo, um KMZ novo).'}</p>` : ''}</div>
         ${E.msg ? `<div class="card"><p class="pend aviso" style="margin:0">${esc(E.msg)}</p></div>` : ''}`;
       const prob = [...E.metas.values()].filter(m => m.conflito || m.erro);
       if (prob.length) {
@@ -452,7 +456,7 @@
       }
       await sincronizar(); if (location.hash === '#/sync') view();
     }
-    else if (a === 'zerar') await zerarAparelho();
+    else if (a === 'zerar') await resetarProjeto();
     else if (a === 'sair') { await sair(); view(); }
     else if (a === 'projetos') { try { await carregarProjetos(); UI.toast('Lista atualizada'); } catch (er) { UI.toast(ehRede(er) ? 'Sem internet' : er.message, 'erro'); } view(); }
     else if (a === 'meu' || a === 'deles') resolver(b.dataset.id, a);
