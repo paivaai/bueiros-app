@@ -243,7 +243,11 @@
      Renderização — Início
      ========================================================= */
   /* Bueiros do projeto aberto: os do projeto escolhido e os que ainda são só deste aparelho. */
-  const doProjeto = l => { const pid = BU.Sync.projetoId(), m = BU.Sync.meta(l.id); return !pid || !m || !m.projetoId || m.projetoId === pid; };
+  const doProjeto = l => {
+    const pid = BU.Sync.projetoId(), m = BU.Sync.meta(l.id);
+    if (pid && BU.Sync.logado() && l.status === 'a_vistoriar' && (!m || !m.projetoId)) return false; // sobra de cadastro (KMZ) antigo feito no aparelho: não é do projeto
+    return !pid || !m || !m.projetoId || m.projetoId === pid;
+  };
   function cartaoProjeto(p, ativo) {
     const mine = S.lista.filter(l => { const m = BU.Sync.meta(l.id); return m && m.projetoId === p.id; });
     const feitos = mine.filter(l => l.status !== 'a_vistoriar').length, n = mine.length, pc = n ? Math.round(100 * feitos / n) : 0;
