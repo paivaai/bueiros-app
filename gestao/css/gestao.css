@@ -27,7 +27,7 @@ a { color: var(--accent); }
 .abas a { padding: 10px 14px; text-decoration: none; color: var(--muted); font-weight: 600; border-bottom: 3px solid transparent; white-space: nowrap; }
 .abas a[aria-current="page"] { color: var(--fg); border-bottom-color: var(--marca); }
 
-main { max-width: 1300px; margin: 0 auto; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+main { max-width: none; width: 100%; margin: 0 auto; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
 .crumb { font-size: 13px; color: var(--muted); } .crumb a { color: var(--muted); }
 .linha { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; } .linha .esp { flex: 1; }
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; }
