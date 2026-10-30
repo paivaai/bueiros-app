@@ -103,7 +103,7 @@
   const nomeGenerico = n => !String(n || '').trim() || /^(sem t[ií]tulo|untitled|marcador|placemark|ponto|pin|point)\b/i.test(String(n).trim());
 
   function aplicarImportacao() {
-    const I = P.imp, g = id => document.getElementById(id), usarLinha = g('imp-linha') && g('imp-linha').checked, nomearKm = g('imp-km') && g('imp-km').checked, trazer = g('imp-pts').checked;
+    const I = P.imp, g = id => document.getElementById(id), usarLinha = g('imp-linha') && g('imp-linha').checked, nomearKm = g('imp-km') && g('imp-km').checked, trazer = g('imp-pts').checked, comCad = !!(g('imp-cad') && g('imp-cad').checked);
     if (usarLinha && I.linha) {
       P.eixo.pts = I.linha.pts.map(p => [+p[0].toFixed(7), +p[1].toFixed(7)]); P.eixoSujo = true;
       if (!P.eixo.rodovia) P.eixo.rodovia = (P.ctx.S.projeto.rodovia || '').trim();
@@ -112,7 +112,7 @@
     if (trazer) for (const q of I.pontos) {
       if (P.pins.some(p => Math.abs(p.lat - q.lat) < 3e-5 && Math.abs(p.lon - q.lon) < 3e-5)) { dup++; continue; } // ~3 m: já existe
       const usaNome = (q.dados || !nomearKm) && !nomeGenerico(q.nome); // nome completo do cadastro vale sempre
-      const pin = novoPin(q.lat, q.lon, usaNome ? q.nome : ''); if (q.dados) { pin.dados = q.dados; pin.auto = false; } n++;
+      const pin = novoPin(q.lat, q.lon, usaNome ? q.nome : ''); if (q.dados) { if (comCad) pin.dados = q.dados; pin.auto = false; } n++;
     }
     if (usarLinha && P.pins.length) P.pins.forEach(p => { if (editavel(p) && p.auto) { nomear(p); p.dirty = true; } });
     P.imp = null; render();
@@ -176,6 +176,7 @@
         <input type="file" id="pl-arq" accept=".kmz,.kml" hidden><button class="btn sm" data-pl="arquivo">Escolher arquivo…</button>
         ${I ? `<div class="aviso" style="margin-top:8px"><b>${esc(I.arquivo)}</b>: ${I.pontos.length} ponto(s)${I.linha ? `, ${I.nLinhas} linha(s) (a maior tem ${I.linha.pts.length} vértices)` : ', nenhuma linha'}.
             <label style="display:flex;gap:6px;margin-top:6px"><input type="checkbox" id="imp-pts" checked> Trazer os ${I.pontos.length} ponto(s)</label>
+            <label style="display:flex;gap:6px"><input type="checkbox" id="imp-cad"> Trazer também os dados do cadastro do arquivo (tipo, dimensões, estado, observações)</label><p class="muted small" style="margin:0 0 4px 22px">Desmarcado: entram só o nome e a posição de cada bueiro, sem nada preenchido para a equipe.</p>
             ${I.linha ? `<label style="display:flex;gap:6px"><input type="checkbox" id="imp-linha" ${temEixo() ? '' : 'checked'}> Usar a linha como eixo da rodovia${temEixo() ? ' (substitui o eixo atual)' : ''}</label>` : ''}
             <label style="display:flex;gap:6px"><input type="checkbox" id="imp-km" ${(temEixo() || I.linha) ? 'checked' : ''}> Nomear pelo km (se o arquivo não trouxer um nome útil)</label>
             <div class="linha" style="margin-top:8px"><button class="btn pri sm" data-pl="imp-ok">Importar</button><button class="btn sm" data-pl="imp-cancel">Cancelar</button></div></div>` : ''}</div>
