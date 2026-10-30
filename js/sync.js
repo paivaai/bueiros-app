@@ -96,6 +96,25 @@
       ${loginHTML('<button type="button" class="btn linkbtn" id="sl-sem">Continuar sem conta (dados só neste aparelho)</button>')}</section>`;
     ligarLogin(async () => { location.hash = '#/'; if (BU.App && BU.App.rotear) BU.App.rotear(); if (E.projetoId) sincronizar(); });
   }
+  /* Zera a cópia deste aparelho (todos os bueiros, fotos e controles) e baixa de novo o projeto escolhido. */
+  async function zerarAparelho() {
+    if (!projeto()) { UI.toast('Escolha o projeto primeiro', 'aviso'); return; }
+    if (!navigator.onLine) { UI.toast('Precisa de internet para baixar o projeto de novo', 'aviso'); return; }
+    await carregarMetas();
+    const lev = await DB.listar(), nEnv = [...E.metas.values()].filter(m => m.sujo && !m.local).length;
+    const ok = await UI.confirmar(`Apaga os ${lev.length} bueiro(s) guardados neste aparelho e baixa de novo o projeto “${projeto().nome}” do escritório.${nEnv ? ` ATENÇÃO: ${nEnv} ainda não foram enviados e serão perdidos.` : ' Tudo o que foi feito aqui já está no escritório.'}`, { titulo: 'Zerar este aparelho', ok: 'Apagar e baixar de novo', perigo: true });
+    if (!ok) return;
+    try {
+      for (const l of lev) await DB.excluir(l.id);
+      for (const m of await DB.sincListar()) await DB.excluir(m.id).catch(() => {});
+      await DB.cfgSalvar('sincExcluidos', []).catch(() => {}); await DB.cfgSalvar('presencasEnviadas', []).catch(() => {}); E.enviadas = new Set();
+      await carregarMetas();
+      if (BU.App && BU.App.refrescar) await BU.App.refrescar();
+      await sincronizar();
+      if (BU.App && BU.App.refrescar) await BU.App.refrescar();
+    } catch (e) { UI.toast('Não foi possível zerar: ' + (e && e.message || e), 'erro'); }
+    view();
+  }
   async function sair() {
     const n = [...E.metas.values()].filter(m => m.sujo && !m.local).length;
     if (n && !(await UI.confirmar(`${n} levantamento(s) ainda não foram enviados. Eles continuam neste aparelho e serão enviados quando você entrar de novo. Sair mesmo assim?`, { titulo: 'Sair da conta', ok: 'Sair' }))) return;
@@ -395,7 +414,8 @@
         <div class="card"><h3>Projeto</h3>
           ${E.projetos.length ? `<select id="sync-proj">${projeto() ? '' : '<option value="">— escolha o projeto —</option>'}${E.projetos.map(p => `<option value="${esc(p.id)}"${p.id === E.projetoId ? ' selected' : ''}>${esc(p.nome)}${p.rodovia ? ' · ' + esc(p.rodovia) : ''}</option>`).join('')}</select>`
             : '<p class="muted">Nenhum projeto liberado para você. Peça ao escritório para incluir você na equipe do projeto.</p>'}
-          <div class="row"><button type="button" class="btn" data-sync="projetos">Atualizar lista de projetos</button></div></div>
+          <div class="row"><button type="button" class="btn" data-sync="projetos">Atualizar lista de projetos</button></div>
+          ${projeto() ? '<div class="row"><button type="button" class="btn" data-sync="zerar">Zerar este aparelho e baixar o projeto de novo</button></div><p class="muted small">Use quando o projeto mudou no escritório (por exemplo, um KMZ novo) e a lista do celular ficou com bueiros antigos.</p>' : ''}</div>
         ${E.msg ? `<div class="card"><p class="pend aviso" style="margin:0">${esc(E.msg)}</p></div>` : ''}`;
       const prob = [...E.metas.values()].filter(m => m.conflito || m.erro);
       if (prob.length) {
@@ -432,6 +452,7 @@
       }
       await sincronizar(); if (location.hash === '#/sync') view();
     }
+    else if (a === 'zerar') await zerarAparelho();
     else if (a === 'sair') { await sair(); view(); }
     else if (a === 'projetos') { try { await carregarProjetos(); UI.toast('Lista atualizada'); } catch (er) { UI.toast(ehRede(er) ? 'Sem internet' : er.message, 'erro'); } view(); }
     else if (a === 'meu' || a === 'deles') resolver(b.dataset.id, a);
