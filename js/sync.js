@@ -301,7 +301,9 @@
   async function receber() {
     const pid = E.projetoId, uid = E.sessao.user.id, leves = [];
     for (let de = 0; ; de += 1000) {
-      const r = await E.sb.from('bueiros').select('id,versao,status,atribuido_a').eq('projeto_id', pid).or(`atribuido_a.is.null,atribuido_a.eq.${uid}`).order('id').range(de, de + 999);
+      let q = E.sb.from('bueiros').select('id,versao,status,atribuido_a').eq('projeto_id', pid);
+      if (!['admin', 'gestor'].includes(E.perfil && E.perfil.papel)) q = q.or(`atribuido_a.is.null,atribuido_a.eq.${uid}`); // campo só vê o que é dele ou de ninguém; administrador e gestor veem tudo
+      const r = await q.order('id').range(de, de + 999);
       if (r.error) throw r.error;
       leves.push(...r.data); if (r.data.length < 1000) break;
     }
