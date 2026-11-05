@@ -21,7 +21,7 @@
     FORMAS: ['Tubular', 'Celular', 'Lenticular', 'Arco', 'Outra'],
     MATERIAIS: ['Concreto', 'Metálico', 'PEAD', 'PVC', 'Alvenaria / pedra', 'Outro'],
     ESTADOS: ['Bom', 'Regular', 'Precário'],
-    BOCA_TIPOS: ['Muro de testa e ala inclinada', 'Muro de testa e ala reta', 'Muro de testa', 'Sem boca, ponta livre (tipo III)'],
+    BOCA_TIPOS: ['Muro de testa e ala inclinada', 'Muro de testa e ala reta', 'Muro de testa', 'Caixa', 'Sem boca, ponta livre (tipo III)'],
     BOCA_MATERIAIS: ['Concreto', 'Concreto ciclópico', 'Alvenaria / pedra', 'Metálica', 'Outro'],
     DISSIPADORES: ['Nenhum', 'Bacia de amortecimento', 'Enrocamento / rachão', 'Dissipador de concreto', 'Descida em degraus', 'Outro'],
     /* Dispositivos associados: ficam dentro da etapa de cada boca. */

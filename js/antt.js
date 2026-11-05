@@ -29,6 +29,7 @@
     const t = b.tipo || '';
     if (/ala/i.test(t)) return 'BA';
     if (/Sem boca|ponta livre/i.test(t)) return 'Ponta livre';
+    if (t === 'Caixa') return 'Caixa';
     return t ? 'Muro de testa' : '';
   }
   function dims(c, m, jus) {

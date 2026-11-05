@@ -18,8 +18,8 @@
   /* ---------- quais pontos esta boca pede ---------- */
   function perfilBoca(l, lado) {
     const c = l.caracteristicas, b = l.bocas[lado], n = Math.min(4, Math.max(1, +c.celulas || 1));
-    const t = b.tipo, inclinada = t === 'Muro de testa e ala inclinada', reta = t === 'Muro de testa e ala reta', soMuro = t === 'Muro de testa';
-    return { n, tub: c.tipo === 'Tubular' || (!c.tipo && !c.largura), tipo: t, inclinada, reta, soMuro, alas: inclinada || reta, muro: inclinada || reta || soMuro };
+    const t = b.tipo, inclinada = t === 'Muro de testa e ala inclinada', reta = t === 'Muro de testa e ala reta', soMuro = t === 'Muro de testa', caixa = t === 'Caixa';
+    return { n, tub: c.tipo === 'Tubular' || (!c.tipo && !c.largura), tipo: t, inclinada, reta, soMuro, caixa, alas: inclinada || reta, muro: inclinada || reta || soMuro };
   }
   /* Lista ordenada dos pontos vermelhos: { k, nome, cod } */
   function pontosDaBoca(l, lado) {
@@ -33,6 +33,9 @@
         if (P.alas) { out.push({ k: `${s}-PT`, nome: `Ala · lado ${lado2} · ponta · topo`, cod: 'OAC-ALA' }); out.push({ k: `${s}-PB`, nome: `Ala · lado ${lado2} · ponta · base`, cod: 'OAC-ALA' }); }
       });
     }
+    if (P.caixa) [['E', 'esquerda'], ['D', 'direita']].forEach(([s, lado2]) => {
+      out.push({ k: `CX-T${s}`, nome: `Caixa · lado ${lado2} · topo`, cod: 'OAC-CX' }); out.push({ k: `CX-B${s}`, nome: `Caixa · lado ${lado2} · base`, cod: 'OAC-CX' });
+    });
     return out;
   }
   const refDe = (lado, k) => `${lado}:${k}`;
@@ -75,14 +78,18 @@
       g += traco(`M${f(tl)} 0H${f(-tl)}M${f(tl)} 0L${f(bl)} 100M${f(-tl)} 0L${f(-bl)} 100M${f(bl)} 100H${f(-bl)}`);
       const lin = []; for (let x = tl + 30, i = 0; x < -tl - 5; x += 50, i++) lin.push(`M${f(x)} 0v${i % 2 ? 100 : 51}`);
       g += traco(lin.join(''));
+    } else if (P.caixa) { ext = half + 60; y0 = -30; y1 = 350; // caixa: retângulo cinza com as aberturas (tubos ou células) encostadas no lado de cima
     } else { ext = half + 60; y0 = -30; y1 = 140; }
     // aberturas (uma por linha)
-    const yMuro = P.inclinada || P.soMuro ? 80 : P.reta ? 210 : 90, topo = P.inclinada || P.soMuro ? 0 : P.reta ? 121 : 20;
+    const yMuro = P.inclinada || P.soMuro || P.caixa ? 80 : P.reta ? 210 : 90, topo = P.inclinada || P.soMuro || P.caixa ? 0 : P.reta ? 121 : 20;
     for (let k = 1; k <= n; k++) { g += cel(gx(k), topo, yMuro - topo + (P.reta ? 0 : 0)); pos[`GTZ-${k}`] = [gx(k), P.reta ? 201 : yMuro]; }
     if (P.inclinada || P.soMuro) {
       g += `<path d="M${f(-half - 50)} 228L${f(-half)} 80H${f(half)}L${f(half + 50)} 228" fill="none" stroke="${GR}" stroke-width="28" stroke-linejoin="miter"/>`;
       pos['AE-JT'] = [-half, 80]; pos['AE-JB'] = [-half - 50, 228]; pos['AD-JT'] = [half, 80]; pos['AD-JB'] = [half + 50, 228];
       if (P.inclinada) { pos['AE-PT'] = [-(half + 218), 0]; pos['AE-PB'] = [-(half + 338), 208]; pos['AD-PT'] = [half + 218, 0]; pos['AD-PB'] = [half + 338, 208]; }
+    } else if (P.caixa) {
+      g += `<path d="M${f(-half)} 80H${f(half)}V310H${f(-half)}Z" fill="none" stroke="${GR}" stroke-width="28" stroke-linejoin="miter"/>`;
+      pos['CX-TE'] = [-half, 80]; pos['CX-TD'] = [half, 80]; pos['CX-BE'] = [-half, 310]; pos['CX-BD'] = [half, 310];
     } else if (P.reta) {
       g += `<path d="M${f(-half)} 210H${f(half)}" stroke="${GR}" stroke-width="22" fill="none"/>`;
       pos['AE-JT'] = [-half, 210]; pos['AD-JT'] = [half, 210];
