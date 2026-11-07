@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Recuperar fotos entre projetos</title>
+<style>
+body{font:15px system-ui,sans-serif;max-width:760px;margin:24px auto;padding:0 16px;color:#1b2a1f}
+input,button{font:inherit;padding:8px 10px;margin:4px 0}input{width:100%;box-sizing:border-box}
+button{cursor:pointer;border:0;background:#1f6f43;color:#fff;border-radius:6px}button:disabled{opacity:.5}
+pre{background:#f3f5f3;padding:12px;border-radius:6px;white-space:pre-wrap;max-height:380px;overflow:auto}
+.box{border:1px solid #cfd8d1;border-radius:8px;padding:12px;margin:12px 0}
+</style></head><body>
+<h2>Recuperar fotos entre projetos</h2>
+<p>Copia as fotos dos bueiros do projeto <b>antigo</b> para os bueiros de mesmo código do projeto <b>novo</b>.
+Não apaga nada do antigo. Rode <b>depois</b> do script SQL 15. Use um login de <b>administrador</b>.</p>
+<div class="box">
+<label>Usuário ou e-mail do admin<input id="u" autocomplete="username"></label>
+<label>Senha<input id="s" type="password" autocomplete="current-password"></label>
+<label>Início do id do projeto ANTIGO<input id="ant" value="257e6ac6"></label>
+<label>Início do id do projeto NOVO<input id="nov" value="b9c0397c"></label>
+<button id="b1">1) Entrar e conferir (não copia nada)</button>
+<button id="b2" disabled>2) Copiar fotos que faltam</button>
+</div>
+<pre id="log">Aguardando…</pre>
+<script src="../js/vendor/supabase.js"></script>
+<script src="../js/config.js"></script>
+<script>
+const C = window.BU.CONFIG, $ = id => document.getElementById(id);
+const sb = window.supabase.createClient(C.SUPABASE_URL, C.SUPABASE_ANON_KEY, { auth: { persistSession: false } });
+let plano = [], uid = null, pAnt, pNov;
+const log = t => { $('log').textContent += '\n' + t; $('log').scrollTop = 1e9; };
+const limpar = () => { $('log').textContent = ''; };
+async function projeto(pref) {
+  const r = await sb.from('projetos').select('id,nome').order('criado_em');
+  if (r.error) throw r.error;
+  const m = r.data.filter(p => p.id.startsWith(pref));
+  if (m.length !== 1) throw new Error('Projeto "' + pref + '" não encontrado ou ambíguo (' + m.length + ')');
+  return m[0];
+}
+async function todos(q) { // pagina de 1000 em 1000
+  let out = [], de = 0;
+  for (;;) { const r = await q.range(de, de + 999); if (r.error) throw r.error; out = out.concat(r.data); if (r.data.length < 1000) return out; de += 1000; }
+}
+$('b1').onclick = async () => {
+  limpar(); $('b2').disabled = true;
+  try {
+    let em = $('u').value.trim(); if (!em.includes('@')) em += '@' + C.USUARIO_DOMINIO;
+    const a = await sb.auth.signInWithPassword({ email: em, password: $('s').value });
+    if (a.error) throw a.error; uid = a.data.user.id;
+    pAnt = await projeto($('ant').value.trim()); pNov = await projeto($('nov').value.trim());
+    log('Antigo: ' + pAnt.nome + ' (' + pAnt.id + ')\nNovo:   ' + pNov.nome + ' (' + pNov.id + ')');
+    const bA = await todos(sb.from('bueiros').select('id,codigo').eq('projeto_id', pAnt.id).order('id'));
+    const bN = await todos(sb.from('bueiros').select('id,codigo').eq('projeto_id', pNov.id).order('id'));
+    const fA = await todos(sb.from('fotos').select('id,bueiro_id,storage_path,categoria,legenda,tirada_em,bytes,largura,altura').eq('projeto_id', pAnt.id).order('id'));
+    const fN = await todos(sb.from('fotos').select('id,bueiro_id,storage_path').eq('projeto_id', pNov.id).order('id'));
+    log('Fotos no antigo: ' + fA.length + ' | fotos no novo: ' + fN.length);
+    const novoPorCod = new Map(bN.map(b => [b.codigo, b.id])), codPorAnt = new Map(bA.map(b => [b.id, b.codigo]));
+    const jaNovo = new Set(fN.map(f => f.storage_path));
+    plano = []; let semPar = 0, jaTem = 0;
+    for (const f of fA) {
+      const cod = codPorAnt.get(f.bueiro_id), nid = cod && novoPorCod.get(cod);
+      if (!nid) { semPar++; continue; }
+      const arq = f.storage_path.split('/').pop();
+      const destino = pNov.id + '/' + nid + '/' + arq;
+      if (jaNovo.has(destino)) { jaTem++; continue; }
+      plano.push({ f, nid, destino });
+    }
+    log('Já existem no novo: ' + jaTem + '\nSem bueiro correspondente no novo (não copia): ' + semPar + '\nA copiar: ' + plano.length);
+    $('b2').disabled = plano.length === 0;
+  } catch (e) { log('ERRO: ' + (e.message || JSON.stringify(e))); }
+};
+$('b2').onclick = async () => {
+  $('b2').disabled = true; $('b1').disabled = true;
+  let ok = 0, falha = 0, i = 0;
+  for (const p of plano) {
+    i++;
+    try {
+      let c = await sb.storage.from('fotos').copy(p.f.storage_path, p.destino);
+      if (c.error && !/exist|duplicate/i.test(c.error.message || '')) throw c.error;
+      const row = { id: crypto.randomUUID(), bueiro_id: p.nid, projeto_id: pNov.id, storage_path: p.destino,
+        categoria: p.f.categoria, legenda: p.f.legenda, tirada_em: p.f.tirada_em, bytes: p.f.bytes, largura: p.f.largura, altura: p.f.altura, enviado_por: uid };
+      const r = await sb.from('fotos').insert(row);
+      if (r.error) throw r.error;
+      ok++;
+    } catch (e) { falha++; log('Falhou ' + p.f.storage_path + ': ' + (e.message || JSON.stringify(e))); }
+    if (i % 20 === 0) log('Progresso ' + i + '/' + plano.length);
+  }
+  log('\nConcluído. Copiadas: ' + ok + ' | falhas: ' + falha + (falha ? ' (rode a conferência e copie de novo: ele pula as já feitas)' : ''));
+  $('b1').disabled = false;
+};
+</script></body></html>
