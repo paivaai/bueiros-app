@@ -4,6 +4,8 @@
 (function () {
   'use strict';
   const BU = window.BU, U = BU.U, esc = U.esc;
+  /* raiz do app (funciona no app de campo e no painel /gestao/): as logos ficam em assets/ */
+  const RAIZ = (document.currentScript && document.currentScript.src) ? new URL('../', document.currentScript.src).href : '';
 
   const logoDataURL = async url => {
     try {
@@ -64,7 +66,7 @@
 
   async function gerarHTML(l) {
     const c = l.caracteristicas, m = l.medicoes, mo = l.bocas.montante, ju = l.bocas.jusante;
-    const [logoA, logoB, fotos] = await Promise.all([logoDataURL('assets/logo-antt.png'), logoDataURL('assets/logo-arteris.png'), fotosPor(l)]);
+    const [logoA, logoB, fotos] = await Promise.all([logoDataURL(RAIZ + 'assets/logo-antt.png'), logoDataURL(RAIZ + 'assets/logo-arteris.png'), fotosPor(l)]);
     const cm = latLon(l, mo), cj = latLon(l, ju), ext = m.comprimentoBueiro;
     const kmI = l.km ? String(l.km) : '', mI = kmMetros(kmI), kmF = mI != null && ext != null ? kmPara(mI + (+ext)) : kmI;
     const sigla = (l.meta && l.meta.sigla) || BU.Cat.siglaDe(c) || '';

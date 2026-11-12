@@ -111,6 +111,7 @@
       async bueiro(id) { const b = bueiros.find(x => x.id === id); return b ? JSON.parse(JSON.stringify(b)) : null; },
       async bueirosCompletos(projetoId, ids) { const s = ids ? new Set(ids) : null; return JSON.parse(JSON.stringify(bueiros.filter(b => b.projeto_id === projetoId && (!s || s.has(b.id))))); },
       async historico(id) { return hist[id] || []; },
+      async fotoBlobs() { return new Map(); },
       async fotos(id) {
         const b = bueiros.find(x => x.id === id);
         if (!b || b.status === 'a_vistoriar') return [];
@@ -292,6 +293,15 @@
           out.push({ id: f.id, categoria: f.categoria, legenda: f.legenda, url: s ? s.signedUrl : '' });
         }
         return out;
+      },
+      /* Baixa os arquivos das fotos do bueiro (para a ficha ANTT e o relatório): Map id → Blob. */
+      async fotoBlobs(id) {
+        const { data, error } = await sb.from('fotos').select('id,storage_path').eq('bueiro_id', id); erro(error);
+        const mapa = new Map(), fila = (data || []).slice();
+        await Promise.all(Array.from({ length: 4 }, async () => {
+          for (let f = fila.shift(); f; f = fila.shift()) { const r = await sb.storage.from('fotos').download(f.storage_path); if (!r.error && r.data) mapa.set(f.id, r.data); }
+        }));
+        return mapa;
       },
       async usuarios() { const { data, error } = await sb.from('perfis').select('id,nome,email,papel,ativo').order('nome'); erro(error); return data; },
       async membros(projetoId) { const { data, error } = await sb.from('projeto_membros').select('usuario_id').eq('projeto_id', projetoId); erro(error); return (data || []).map(r => r.usuario_id); },
