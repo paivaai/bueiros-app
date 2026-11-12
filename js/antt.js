@@ -75,6 +75,7 @@
       if (Math.abs(dN) >= Math.abs(dE)) { ladoM = dN > 0 ? 'Norte' : 'Sul'; ladoJ = dN > 0 ? 'Sul' : 'Norte'; }
       else { ladoM = dE > 0 ? 'Leste' : 'Oeste'; ladoJ = dE > 0 ? 'Oeste' : 'Leste'; }
     }
+    const privada = ((l.diagnostico && l.diagnostico.obsPadrao) || []).some(t => /[áa]rea particular|[áa]rea privada/i.test(t));
     const vm = verificacoes(l, 'mont'), vj = verificacoes(l, 'jus');
     const x = v => v ? 'X' : '';
     const ed = t => `<span class="ed" contenteditable="true">${esc(t == null ? '' : t)}</span>`;
@@ -99,7 +100,7 @@ td,th{border:1px solid #000;padding:2px 4px;text-align:center;vertical-align:mid
 .sep{border:0!important;background:#fff!important;height:7px;padding:0!important}
 .vert{writing-mode:vertical-rl;transform:rotate(180deg);background:#fff;font-weight:700;font-size:10px;line-height:1.25;text-align:center}
 .lin{background:#fff;height:7mm;font-size:10.5px}.cab th{background:#fff}.cab td,.cab th{height:7mm}
-.foto{height:62mm;padding:2px;background:#fff}.foto img{width:100%;height:100%;object-fit:cover;display:block}
+.foto{height:62mm;padding:2px;background:#fff}.foto img{width:100%;height:100%;object-fit:contain;display:block}
 .ed{display:block;min-height:1em;outline:none}.ed:focus{background:rgba(255,255,255,.7)}
 .btn{position:fixed;top:8px;right:8px;background:#C2410C;color:#fff;border:0;border-radius:8px;padding:10px 14px;font-size:15px;font-weight:700;z-index:9}
 .dica{max-width:190mm;margin:0 auto 8px;color:#56635A;font-size:12px}
@@ -125,6 +126,7 @@ ${par('Lado:', ladoM, 'Lado:', ladoJ)}
 ${par('Estrutura de entrada:', estrutura(mo), 'Estrutura de saída:', estrutura(ju))}
 ${par('Material:', mo.material || c.material, 'Material:', ju.material || c.material)}
 ${par('Estado de Conservação:', mo.estado, 'Estado de Conservação:', ju.estado)}
+${privada ? `<tr>${lab('Área privada:')}<td class="v" colspan="9">${ed('SIM — bueiro (ou parte dele) em área particular')}</td></tr>` : ''}
 <tr><td class="sep" colspan="12"></td></tr>
 </table>
 <table><colgroup><col style="width:8%"><col style="width:26%"><col style="width:8%"><col style="width:8%"><col style="width:8%"><col style="width:26%"><col style="width:8%"><col style="width:8%"></colgroup>

@@ -16,32 +16,64 @@
     return out;
   }
 
-  /* Valor legível de um campo do formulário */
-  function valorTxt(l, c) {
-    const v = U.getPath(l, c.p);
-    if (v == null || v === '') return '';
-    if (c.t === 'date') return U.dataBR(v);
-    if (c.t === 'num' || c.t === 'int') return U.numTxt(v) + (c.unit ? ' ' + c.unit : '');
-    return String(v);
-  }
-  /* [{grupo, itens:[[rotulo, valor]]}] a partir das etapas 1 a 4 */
+  /* [{grupo, itens:[[rotulo, valor]]}] lidos direto do levantamento (o formulário agora é montado por etapas, sem lista central de campos). */
   function secoes(l) {
-    const C = BU.App.CAMPOS, nomes = { 1: 'Identificação', 2: 'Localização', 3: 'Características', 4: 'Medições' }, out = [];
-    for (const n of [1, 2, 3, 4]) {
-      let grupo = nomes[n], itens = [];
-      const fecha = () => { if (itens.length) out.push({ grupo, itens }); itens = []; };
-      for (const c of C[n]) {
-        if (c.h) { fecha(); grupo = nomes[n] + ' — ' + c.h; continue; }
-        const v = valorTxt(l, c); if (v) itens.push([c.label, v]);
-      }
-      if (n === 2) {
-        const ori = { cadastro: 'Do cadastro (confirmar com o RTK)', manual: 'Digitadas', rtk: 'Centro do bueiro (pontos do RTK)', gps: 'GPS do aparelho (versão antiga)' }[l.coordOrigem];
-        if (ori) itens.push(['Origem das coordenadas', ori]);
-        if (BU.GPS.utmDe(l)) itens.push(['Referencial', BU.GPS.rotuloUTM(BU.GPS.utmDe(l))]);
-        if (l.latitude != null && l.longitude != null) itens.push(['Latitude / Longitude (derivadas)', `${U.numTxt(l.latitude)} / ${U.numTxt(l.longitude)}`]);
-      }
-      fecha();
+    const out = [], C = BU.Cat, c = l.caracteristicas || {}, m = l.medicoes || {}, d = l.diagnostico || {};
+    const num = (v, u) => (v == null || v === '' || !isFinite(+v)) ? '' : U.numTxt(v) + (u ? ' ' + u : '');
+    const txt = v => (v == null ? '' : String(v)).trim();
+    const sec = (grupo, pares) => { const itens = pares.filter(([, v]) => v != null && String(v).trim() !== ''); if (itens.length) out.push({ grupo, itens }); };
+    const sn = v => v === true ? 'Sim' : v === false ? 'Não' : '';
+
+    sec('Identificação', [
+      ['Código', txt(l.codigo)], ['Situação', txt(l.situacao)], ['Classificação', txt(l.classificacao)], ['Rodovia', txt(l.estrada)],
+      ['Município / UF', [l.municipio, l.estado].filter(Boolean).join(' / ')], ['Km', txt(l.km)], ['Ambiente', txt(l.ambiente)], ['Sentido', txt(l.sentido)],
+      ['Pista', txt(l.pistaGe)], ['Lado', txt(l.lado)], ['Data da inspeção', l.data ? U.dataBR(l.data) + (l.hora ? ' ' + l.hora : '') : ''],
+      ['Responsável', txt(l.responsavel)], ['Equipe', txt(l.equipe)], ['Observações', txt(l.observacoes)],
+    ]);
+    const loc = [];
+    const ori = { cadastro: 'Do cadastro (confirmar com o RTK)', manual: 'Digitadas', rtk: 'Centro do bueiro (pontos do RTK)', gps: 'GPS do aparelho (versão antiga)' }[l.coordOrigem];
+    if (ori) loc.push(['Origem das coordenadas', ori]);
+    try { if (BU.GPS.utmDe(l)) loc.push(['Referencial', BU.GPS.rotuloUTM(BU.GPS.utmDe(l))]); } catch (e) { /* segue */ }
+    loc.push(['Leste (E)', num(l.leste)], ['Norte (N)', num(l.norte)], ['Altitude', num(l.altitude, 'm')]);
+    if (l.latitude != null && l.longitude != null) loc.push(['Latitude / Longitude (derivadas)', `${U.numTxt(l.latitude)} / ${U.numTxt(l.longitude)}`]);
+    sec('Localização', loc);
+
+    let sigla = ''; try { sigla = C.siglaDe(c) ? C.siglaDe(c) + ' — ' + C.descricaoDe(c) : ''; } catch (e) { /* segue */ }
+    sec('Corpo do bueiro', [
+      ['Tipo (sigla DNIT)', sigla], ['Forma', txt(c.tipo)], ['Formato da seção', txt(c.formato)], ['Linhas (células)', c.celulas ? ((C.LINHAS.find(x => x[0] === +c.celulas) || [])[1] || c.celulas) : ''],
+      ['Material', txt(c.material)], ['Diâmetro', num(c.diametro, 'm')], ['Largura', num(c.largura, 'm')], ['Altura', num(c.altura, 'm')],
+      ['Comprimento', num(c.comprimento, 'm')], ['Espessura', num(c.espessura, 'm')], ['Largura do topo', num(c.larguraTopo, 'm')],
+      ['Mesma seção na jusante', c.mesmaSecaoJusante === false ? 'Não' : (c.tipo ? 'Sim' : '')], ['Estado do corpo', txt(c.estadoCorpo || c.conservacao)], ['Observações do corpo', txt(c.observacoes)],
+    ]);
+    sec('Medições', [
+      ['Largura da pista', num(m.larguraPista, 'm')], ['Largura do acostamento', num(m.larguraAcostamento, 'm')], ['Comprimento do bueiro', num(m.comprimentoBueiro, 'm')],
+      ['Altura de entrada', num(m.alturaEntrada, 'm')], ['Largura de entrada', num(m.larguraEntrada, 'm')], ['Altura de saída', num(m.alturaSaida, 'm')], ['Largura de saída', num(m.larguraSaida, 'm')],
+      ['Profundidade a montante', num(m.profMontante, 'm')], ['Profundidade a jusante', num(m.profJusante, 'm')], ['Declividade', num(m.declividade, '%')],
+      ['Cota de entrada', num(m.cotaEntrada, 'm')], ['Cota de saída', num(m.cotaSaida, 'm')], ['Nível d’água', num(m.nivelAgua, 'm')], ['Vazão estimada', num(m.vazaoEstimada)],
+      ['Esconsidade', num(m.esconsidade, '°')], ['Recobrimento', num(m.recobrimento, 'm')], ['Observações', txt(m.observacoes)],
+    ]);
+    const disp = [].concat(C.DISPOSITIVOS || []);
+    for (const [lado, nome] of [['montante', 'Boca de montante'], ['jusante', 'Boca de jusante']]) {
+      const b = (l.bocas || {})[lado] || {};
+      const marcados = disp.filter(x => (l.dispositivos || {})[x[0]]).map(x => x[1]);
+      sec(nome, [
+        ['Tipo de boca', txt(b.tipo)], ['Material', txt(b.material)], ['Estado', txt(b.estado)], ['Obstrução', +b.obstrucaoPct > 0 ? num(b.obstrucaoPct, '%') : ''],
+        ['Dissipador', txt(b.dissipador)], ['Estado do dissipador', txt(b.estadoDissipador)],
+        ...(lado === 'montante' ? [['Dispositivos associados (montante e jusante)', marcados.join('; ')]] : []),
+        ['Outro dispositivo', txt(b.dispOutro)],
+      ]);
     }
+    const nec = (d.necessita || []).map(k => {
+      const onde = ((d.onde || {})[k] || []).map(g => ({ mont: 'montante', jus: 'jusante', corpo: 'corpo' }[g] || g)).join(', ');
+      return (C.rotulo(C.NECESSITA || [], k)) + (onde ? ' (' + onde + ')' : '');
+    });
+    sec('Diagnóstico', [
+      ['Serviços necessários', nec.join('; ')], ['Prioridade', txt(d.prioridade)], ['Observação (local e acesso)', [].concat(d.obsPadrao || [], d.obs ? [d.obs] : []).join(' ')],
+      ['Observação (funcionamento)', [].concat(d.obs2Padrao || [], d.obs2 ? [d.obs2] : []).join(' ')],
+    ]);
+    if (l.naoLocalizado) sec('Não localizado em campo', [['Motivo', txt(l.naoLocalizado.motivo)], ['Observação', txt(l.naoLocalizado.obs)]]);
+    sec('Referência de nível (RN)', [['Descrição', txt(l.rn && l.rn.descricao)], ['Leste', num(l.rn && l.rn.leste)], ['Norte', num(l.rn && l.rn.norte)], ['Cota', num(l.rn && l.rn.cota, 'm')]]);
+    sec('RTK', [['Altura da antena', num(l.rtk && l.rtk.alturaAntena, 'm')], ['Solução', txt(l.rtk && l.rtk.solucao)], ['Receptor', txt(l.rtk && l.rtk.receptor)]]);
     if (l.cadastro && l.cadastro.itens && l.cadastro.itens.length) out.push({ grupo: 'Dados do cadastro de origem' + (l.cadastro.arquivo ? ' (' + l.cadastro.arquivo + ')' : ''), itens: l.cadastro.itens });
     return out;
   }
@@ -187,5 +219,5 @@ ${sec}${croqui}${prancha}${pts}${fts}${pe}
     UI.toast(`${n} levantamento(s) restaurado(s)`); BU.App.irParaLista();
   }
 
-  BU.Export = { painelHTML, backupTudo, restaurar };
+  BU.Export = { painelHTML, backupTudo, restaurar, gerar };
 })();
