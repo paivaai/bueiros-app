@@ -238,6 +238,8 @@
         ${revisavel ? `<label class="f" style="margin-top:8px">Comentário (obrigatório para devolver)<textarea id="r-com" placeholder="Ex.: faltou a foto da boca de jusante"></textarea></label>
           <div class="linha" style="margin-top:10px"><button class="btn ok" data-a="aprovar" data-id="${b.id}">Aprovar</button><button class="btn dev" data-a="devolver" data-id="${b.id}">Devolver ao campo</button></div><div id="r-erro"></div>`
         : `<p class="muted" style="margin:8px 0 0">${b.status === 'aprovado' ? 'Bueiro aprovado. Não pode mais ser editado pelo campo.' : b.status === 'devolvido' ? 'Devolvido: aguardando o campo corrigir e concluir de novo.' : 'A revisão fica disponível quando o campo conclui o levantamento.'}</p>`}</div>
+      <div class="card"><h3>Documentos para o cliente</h3><p class="muted small" style="margin:6px 0 10px">Gerados na hora com os dados e as fotos enviados pelo campo. Abrem em outra aba: use “Imprimir / salvar PDF”.</p>
+        <div class="linha"><button class="btn" data-a="doc" data-tipo="antt" data-id="${b.id}">Ficha padrão ANTT</button><button class="btn" data-a="doc" data-tipo="relatorio" data-id="${b.id}">Relatório geral</button><button class="btn" data-a="doc" data-tipo="prancha" data-id="${b.id}">Prancha (PNG)</button></div><div id="doc-msg" class="muted small" style="margin-top:8px"></div></div>
       <div class="card"><h3>Prancha (gerada dos pontos RTK)</h3><div style="margin-top:10px">${prancha ? `<div class="prancha">${prancha}</div>` : '<p class="muted" style="margin:0">Sem pontos RTK enviados ainda.</p>'}</div></div>
       <div class="card"><h3>Fotos</h3><div style="margin-top:10px">${fotos.length ? `<div class="fotos">${fotos.map(f => `<figure><a href="${esc(f.url)}" target="_blank" rel="noopener"><img src="${esc(f.url)}" alt="${esc(f.categoria || 'Foto')}" loading="lazy"></a><figcaption>${esc(f.legenda || f.categoria || '')}</figcaption></figure>`).join('')}</div>` : '<p class="muted" style="margin:0">Sem fotos.</p>'}</div></div>
       <div class="card"><h3>Histórico</h3><ul class="hist" style="margin-top:10px">${hist.map(h => `<li><b>${esc(TXT_ACAO(h))}</b><small>${esc(h.usuario_nome || '—')} · ${quando(h.em)}</small>${h.detalhe && h.detalhe.comentario ? `<small>“${esc(h.detalhe.comentario)}”</small>` : ''}</li>`).join('') || '<li>Sem registros.</li>'}</ul></div>`);
@@ -346,6 +348,16 @@
       const k = a.dataset.a;
       try {
         if (k === 'sair') { await D.sair(); S.perfil = null; S.projeto = null; S.usuarios = []; location.hash = '#/'; telaLogin(); }
+        else if (k === 'doc') {
+          const msg = document.getElementById('doc-msg'), rot = a.textContent; a.disabled = true; a.textContent = 'Gerando…'; msg.textContent = '';
+          const janela = a.dataset.tipo === 'prancha' ? null : window.open('', '_blank');
+          if (janela) janela.document.write('<p style="font:16px Arial;padding:20px">Gerando o documento…</p>');
+          try {
+            const b = await D.bueiro(a.dataset.id), r = await window.Documentos.gerar(a.dataset.tipo, b, D, janela);
+            if (r && r.faltam) msg.innerHTML = `<span style="color:#9A6700">${r.faltam} de ${r.total} foto(s) não puderam ser baixadas e ficaram de fora.</span>`;
+          } catch (e) { msg.innerHTML = '<span class="erro">' + esc(e.message || e) + '</span>'; }
+          finally { a.disabled = false; a.textContent = rot; }
+        }
         else if (k === 'csv') csv();
         else if (k === 'exportar') { const eixo = await D.eixo(S.projeto.id).catch(() => null); window.Exportacao.abrir({ projeto: S.projeto, bueiros: S.bueiros, filtrados: filtrados(), nomeDe, D, eixo }); }
         else if (k === 'salvar-equipe') {
