@@ -20,6 +20,7 @@
     const usuarios = [
       { id: 'u-arthur', nome: 'Arthur', email: 'arthur@gfa.demo', papel: 'admin', ativo: true },
       { id: 'u-marina', nome: 'Marina Souza', email: 'marina@gfa.demo', papel: 'gestor', ativo: true },
+      { id: 'u-cliente', nome: 'Cliente ANTT', email: 'cliente@gfa.demo', papel: 'visualizador', ativo: true },
       { id: 'u-joao', nome: 'João Pereira', email: 'joao@gfa.demo', papel: 'campo', ativo: true },
       { id: 'u-carlos', nome: 'Carlos Lima', email: 'carlos@gfa.demo', papel: 'campo', ativo: true },
       { id: 'u-bia', nome: 'Bia Nunes', email: 'bia@gfa.demo', papel: 'campo', ativo: true },
@@ -92,7 +93,7 @@
     });
 
     const ouvintes = [];
-    let timer = null;
+    let timer = null; const comentariosDemo = [];
     const D = {
       modo: 'demo', usuarioAtual: null,
       async iniciar() { return null; },
@@ -112,6 +113,8 @@
       async bueirosCompletos(projetoId, ids) { const s = ids ? new Set(ids) : null; return JSON.parse(JSON.stringify(bueiros.filter(b => b.projeto_id === projetoId && (!s || s.has(b.id))))); },
       async historico(id) { return hist[id] || []; },
       async fotoBlobs() { return new Map(); },
+      async comentarios(id) { return comentariosDemo.filter(c => c.bueiro_id === id); },
+      async comentar(id, texto) { const u = D.usuarioAtual; comentariosDemo.push({ id: 'c' + Date.now(), bueiro_id: id, texto, usuario_nome: u.nome, papel: u.papel, criado_em: new Date().toISOString() }); },
       async fotos(id) {
         const b = bueiros.find(x => x.id === id);
         if (!b || b.status === 'a_vistoriar') return [];
@@ -294,6 +297,11 @@
         }
         return out;
       },
+      async comentarios(id) {
+        const { data, error } = await sb.from('comentarios').select('id,texto,usuario_nome,papel,criado_em').eq('bueiro_id', id).order('criado_em'); 
+        if (error) throw error; return data || [];
+      },
+      async comentar(id, texto) { const { error } = await sb.rpc('comentar_bueiro', { p_bueiro: id, p_texto: texto }); erro(error); },
       /* Baixa os arquivos das fotos do bueiro (para a ficha ANTT e o relatório): Map id → Blob. */
       async fotoBlobs(id) {
         const { data, error } = await sb.from('fotos').select('id,storage_path').eq('bueiro_id', id); erro(error);

@@ -44,11 +44,19 @@
       </header>
       <nav class="abas" aria-label="Seções">
         ${aba('#/', 'Projetos', 'projetos')}
-        ${p ? aba(`#/p/${p.id}`, 'Visão geral', 'geral') + aba(`#/p/${p.id}/planejamento`, 'Planejamento', 'planejamento') + aba(`#/p/${p.id}/bueiros`, 'Bueiros (mapa e tabela)', 'bueiros') : ''}
-        ${aba('#/equipe', 'Equipe e acessos', 'equipe')}
+        ${p ? aba(`#/p/${p.id}`, 'Visão geral', 'geral') + (soVer() ? '' : aba(`#/p/${p.id}/planejamento`, 'Planejamento', 'planejamento')) + aba(`#/p/${p.id}/bueiros`, 'Bueiros (mapa e tabela)', 'bueiros') : ''}
+        ${soVer() ? '' : aba('#/equipe', 'Equipe e acessos', 'equipe')}
       </nav>`;
   }
-  function pagina(aba, corpo) { raiz.innerHTML = topo(aba) + `<main>${corpo}</main>`; }
+  /* Perfil "Visualização": o servidor já bloqueia qualquer gravação; aqui some também o que seria inútil na tela. */
+  const SO_VER_OCULTAR = ['#barra-atrib', '[data-sel]', '#d-atrib', '#r-com', '[data-a=aprovar]', '[data-a=atribuir]', '[data-a=devolver]', '[data-a=salvar-equipe]', '[data-a=arquivar]', '[href$="/editar"]', '[href="#/novo"]'];
+  function pagina(aba, corpo) {
+    raiz.innerHTML = topo(aba) + `<main>${corpo}</main>`;
+    if (soVer()) {
+      SO_VER_OCULTAR.forEach(q => raiz.querySelectorAll(q).forEach(el => { const alvo = el.closest('label.f, th, td') && /^(r-com)$/.test(el.id) ? el.closest('label') : el; alvo.remove(); }));
+      raiz.querySelectorAll('.card.revisao h3').forEach(h => h.insertAdjacentHTML('afterend', '<p class="muted small" style="margin:6px 0 0">Seu acesso é de acompanhamento: você vê tudo e pode comentar, mas não edita nem revisa.</p>'));
+    }
+  }
 
   /* ---------------------------------------------------------------- login */
   function telaLogin(msg, email) {
@@ -81,6 +89,7 @@
   }
 
   /* ---------------------------------------------------------------- projetos */
+  const soVer = () => !!(S.perfil && S.perfil.papel === 'visualizador');
   const podeCriar = () => S.perfil && (S.perfil.papel === 'admin' || S.perfil.papel === 'gestor');
   function barra(r) {
     const t = r.total || 1;
@@ -205,7 +214,7 @@
 
   /* ---------------------------------------------------------------- detalhe */
   async function viewDetalhe(id) {
-    const [b, hist, fotos, eixo, pres] = await Promise.all([D.bueiro(id), D.historico(id), D.fotos(id), D.eixo(S.projeto.id).catch(() => null), (D.presencas ? D.presencas(id) : Promise.resolve([])).catch(() => [])]);
+    const [b, hist, fotos, eixo, pres, coms] = await Promise.all([D.bueiro(id), D.historico(id), D.fotos(id), D.eixo(S.projeto.id).catch(() => null), (D.presencas ? D.presencas(id) : Promise.resolve([])).catch(() => []), D.comentarios(id).catch(e => ({ erro: e }))]);
     if (!b) { pagina('bueiros', '<div class="erro">Bueiro não encontrado.</div>'); return; }
     const d = b.dados || {}, c = d.caracteristicas || {}, campo = S.usuarios.filter(u => u.papel === 'campo');
     let prancha = '';
@@ -238,6 +247,9 @@
         ${revisavel ? `<label class="f" style="margin-top:8px">Comentário (obrigatório para devolver)<textarea id="r-com" placeholder="Ex.: faltou a foto da boca de jusante"></textarea></label>
           <div class="linha" style="margin-top:10px"><button class="btn ok" data-a="aprovar" data-id="${b.id}">Aprovar</button><button class="btn dev" data-a="devolver" data-id="${b.id}">Devolver ao campo</button></div><div id="r-erro"></div>`
         : `<p class="muted" style="margin:8px 0 0">${b.status === 'aprovado' ? 'Bueiro aprovado. Não pode mais ser editado pelo campo.' : b.status === 'devolvido' ? 'Devolvido: aguardando o campo corrigir e concluir de novo.' : 'A revisão fica disponível quando o campo conclui o levantamento.'}</p>`}</div>
+      <div class="card" id="comentarios"><h3>Comentários</h3>${Array.isArray(coms) ? `<ul class="hist" style="margin-top:10px">${coms.map(c => `<li><b>${esc(c.texto)}</b><small>${esc(c.usuario_nome || '—')}${c.papel ? ' · ' + esc(PAPEL[c.papel] || c.papel) : ''} · ${quando(c.criado_em)}</small></li>`).join('') || '<li class="muted">Nenhum comentário ainda.</li>'}</ul>
+        <label class="f" style="margin-top:10px">Novo comentário<textarea id="com-txt" rows="2" maxlength="2000" placeholder="Escreva uma observação sobre este bueiro"></textarea></label>
+        <div class="linha" style="margin-top:8px"><button class="btn pri sm" data-a="comentar" data-id="${b.id}">Comentar</button><span id="com-msg" class="small"></span></div>` : '<p class="muted" style="margin:8px 0 0">Comentários ainda não habilitados neste servidor (falta rodar o script servidor/17_perfil_visualizacao.sql).</p>'}</div>
       <div class="card"><h3>Documentos para o cliente</h3><p class="muted small" style="margin:6px 0 10px">Gerados na hora com os dados e as fotos enviados pelo campo. Abrem em outra aba: use “Imprimir / salvar PDF”.</p>
         <div class="linha"><button class="btn" data-a="doc" data-tipo="antt" data-id="${b.id}">Ficha padrão ANTT</button><button class="btn" data-a="doc" data-tipo="relatorio" data-id="${b.id}">Relatório geral</button><button class="btn" data-a="doc" data-tipo="prancha" data-id="${b.id}">Prancha (PNG)</button></div><div id="doc-msg" class="muted small" style="margin-top:8px"></div></div>
       <div class="card"><h3>Prancha (gerada dos pontos RTK)</h3><div style="margin-top:10px">${prancha ? `<div class="prancha">${prancha}</div>` : '<p class="muted" style="margin:0">Sem pontos RTK enviados ainda.</p>'}</div></div>
@@ -251,7 +263,7 @@
   }
 
   /* ---------------------------------------------------------------- criar / editar projeto */
-  const PAPEL = { admin: 'Administrador', gestor: 'Gestor (escritório)', campo: 'Operador (campo)' };
+  const PAPEL = { admin: 'Administrador (Master)', gestor: 'Gestor (escritório)', campo: 'Operador (campo)', visualizador: 'Visualização (cliente)' };
   const podeEquipe = () => S.perfil && ['admin', 'gestor'].includes(S.perfil.papel);
   const SENHA_CH = 'abcdefghjkmnpqrstuvwxyz23456789';
   function gerarSenha(n = 8) { const a = new Uint32Array(n); (window.crypto || { getRandomValues: x => x.forEach((_, i) => (x[i] = Math.random() * 4e9)) }).getRandomValues(a); return [...a].map(v => SENHA_CH[v % SENHA_CH.length]).join(''); }
@@ -294,10 +306,10 @@
     const dom = DOM;
     const gerencia = u => pode && u.id !== S.perfil.id && (admin || u.papel === 'campo');
     const projChecks = S.projetos.map(p => `<label class="memb"><input type="checkbox" name="proj" value="${esc(p.id)}"> <span>${esc(p.nome)}</span></label>`).join('') || '<span class="muted small">Nenhum projeto ainda.</span>';
-    const papeis = admin ? '<option value="campo">Operador (usa o app do celular)</option><option value="gestor">Gestor (escritório: revisa e atribui)</option><option value="admin">Administrador</option>' : '<option value="campo">Operador (usa o app do celular)</option>';
+    const papeis = admin ? '<option value="campo">Operador (usa o app do celular)</option><option value="gestor">Gestor (escritório: revisa e atribui)</option><option value="admin">Administrador (Master: acesso total)</option><option value="visualizador">Visualização (cliente: vê e comenta, não edita)</option>' : '<option value="campo">Operador (usa o app do celular)</option>';
     pagina('equipe', `<div class="linha"><h1>Equipe e acessos</h1></div>
       <div class="grid g2"><div class="card"><h3>Quem tem acesso <span class="muted small">(${S.usuarios.length})</span></h3><div class="tab-wrap" style="margin-top:10px;max-height:none"><table><thead><tr><th>Nome</th><th>Usuário / e-mail</th><th>Papel</th><th></th></tr></thead><tbody>
-        ${S.usuarios.map(u => `<tr style="cursor:default${u.ativo === false ? ';opacity:.55' : ''}"><td><b>${esc(u.nome)}</b>${u.ativo === false ? ' <span class="muted small">(desativado)</span>' : ''}</td><td>${esc(mostraUsuario(u.email))}</td><td>${admin && u.id !== S.perfil.id ? `<select data-papel="${esc(u.id)}" aria-label="Papel de ${esc(u.nome)}" style="max-width:170px">${['campo', 'gestor', 'admin'].map(k => `<option value="${k}"${k === u.papel ? ' selected' : ''}>${esc(PAPEL[k])}</option>`).join('')}</select>` : esc(PAPEL[u.papel] || u.papel)}${u.convite ? ' <span class="muted small">(convidado)</span>' : ''}</td>
+        ${S.usuarios.map(u => `<tr style="cursor:default${u.ativo === false ? ';opacity:.55' : ''}"><td><b>${esc(u.nome)}</b>${u.ativo === false ? ' <span class="muted small">(desativado)</span>' : ''}</td><td>${esc(mostraUsuario(u.email))}</td><td>${admin && u.id !== S.perfil.id ? `<select data-papel="${esc(u.id)}" aria-label="Papel de ${esc(u.nome)}" style="max-width:170px">${['campo', 'gestor', 'admin', 'visualizador'].map(k => `<option value="${k}"${k === u.papel ? ' selected' : ''}>${esc(PAPEL[k])}</option>`).join('')}</select>` : esc(PAPEL[u.papel] || u.papel)}${u.convite ? ' <span class="muted small">(convidado)</span>' : ''}</td>
           <td style="white-space:nowrap">${gerencia(u) ? `<button class="btn sm" data-a="pw-reset" data-id="${esc(u.id)}" data-nome="${esc(u.nome)}">Nova senha</button> <button class="btn sm" data-a="pessoa-ativo" data-id="${esc(u.id)}" data-ativo="${u.ativo === false ? '1' : '0'}">${u.ativo === false ? 'Reativar' : 'Desativar'}</button>` : ''}</td></tr>`).join('')}</tbody></table></div></div>
       <div>${pode ? `<div class="card"><h3>Adicionar pessoa</h3><form id="f-pessoa" class="grid" style="margin-top:10px;gap:10px">
         <label class="f">Nome<input type="text" name="nome" required autocomplete="off"></label>
@@ -322,6 +334,7 @@
       if (!S.usuarios.length) S.usuarios = await D.usuarios();
       let m;
       if (h === '#/' || h === '#') return await viewProjetos();
+      if (soVer() && (h === '#/equipe' || h === '#/novo' || /\/(planejamento|editar)$/.test(h))) { location.hash = '#/'; return; }
       if (h === '#/equipe') return await viewEquipe();
       if (h === '#/novo') { if (!podeCriar()) return viewProjetos(); S.projeto = null; if (S.parar) { S.parar(); S.parar = null; } return await viewProjetoForm(null); }
       if ((m = h.match(/^#\/p\/([^/]+)(?:\/(bueiros|editar|planejamento|b\/([^/]+)))?$/))) {
@@ -348,6 +361,11 @@
       const k = a.dataset.a;
       try {
         if (k === 'sair') { await D.sair(); S.perfil = null; S.projeto = null; S.usuarios = []; location.hash = '#/'; telaLogin(); }
+        else if (k === 'comentar') {
+          const txt = document.getElementById('com-txt').value.trim(), msg = document.getElementById('com-msg');
+          if (!txt) { msg.innerHTML = '<span class="erro">Escreva o comentário.</span>'; return; }
+          a.disabled = true; try { await D.comentar(a.dataset.id, txt); await viewDetalhe(a.dataset.id); } catch (e) { a.disabled = false; msg.innerHTML = '<span class="erro">' + esc(e.message || e) + '</span>'; }
+        }
         else if (k === 'doc') {
           const msg = document.getElementById('doc-msg'), rot = a.textContent; a.disabled = true; a.textContent = 'Gerando…'; msg.textContent = '';
           const janela = a.dataset.tipo === 'prancha' ? null : window.open('', '_blank');
