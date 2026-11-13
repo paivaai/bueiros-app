@@ -29,6 +29,7 @@
       ['Município / UF', [l.municipio, l.estado].filter(Boolean).join(' / ')], ['Km', txt(l.km)], ['Ambiente', txt(l.ambiente)], ['Sentido', txt(l.sentido)],
       ['Pista', txt(l.pistaGe)], ['Lado', txt(l.lado)], ['Data da inspeção', l.data ? U.dataBR(l.data) + (l.hora ? ' ' + l.hora : '') : ''],
       ['Responsável', txt(l.responsavel)], ['Equipe', txt(l.equipe)], ['Observações', txt(l.observacoes)],
+      ['Área privada', ((d.obsPadrao || []).some(t => /[áa]rea (particular|privada)/i.test(t))) ? 'SIM — bueiro (ou parte dele) em área particular' : ''],
     ]);
     const loc = [];
     const ori = { cadastro: 'Do cadastro (confirmar com o RTK)', manual: 'Digitadas', rtk: 'Centro do bueiro (pontos do RTK)', gps: 'GPS do aparelho (versão antiga)' }[l.coordOrigem];
