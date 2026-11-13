@@ -17,6 +17,10 @@
   /* tipo: 'antt' | 'relatorio' | 'prancha' */
   async function gerar(tipo, b, D, janela) {
     const l = levantamento(b);
+    if (tipo === 'prancha-pdf') {
+      if (!BU.Prancha.temDados(l)) { if (janela) janela.close(); throw new Error('Este bueiro ainda não tem pontos do RTK para gerar a prancha.'); }
+      await BU.Prancha.imprimir(l, janela); return;
+    }
     if (tipo === 'prancha') {
       if (!BU.Prancha.temDados(l)) throw new Error('Este bueiro ainda não tem pontos do RTK para gerar a prancha.');
       await BU.Prancha.exportarPNG(l); return;

@@ -19,6 +19,7 @@
   const INK = '#16201A', MUTED = '#56635A', GRID = '#E1E7E2', FRAME = '#16201A';
   const COR = { gi: '#C0392B', contorno: '#2E8B57', pista: '#1F3A93', terreno: '#D9822B', rn: '#7B2D8E', outro: '#6B7280' };
   const T = { foco: 'tudo', zoom: 1 };
+  let LOGO_ANTT = '', LOGO_ARTERIS = '';
   let LOGO = ''; // data URL da logo da empresa (config "logoEmpresa")
 
   /* ---------- números ---------- */
@@ -322,8 +323,10 @@
   function carimbo(l, m) {
     const P = { x: 818, y: 728, w: 358, h: 100 }, u = BU.GPS.utmDe(l);
     let g = caixa(P.x, P.y, P.w, P.h);
-    const x0 = P.x + (LOGO ? 52 : 10);
-    if (LOGO) g += `<image href="${LOGO}" x="${P.x + 6}" y="${P.y + 3}" width="42" height="16" preserveAspectRatio="xMidYMid meet"/>`;
+    const logos = [[LOGO_ANTT, 44], [LOGO_ARTERIS, 52], [LOGO, 42]].filter(x => x[0]);
+    let lx = P.x + 6;
+    for (const [src, w] of logos) { g += `<image href="${src}" x="${lx}" y="${P.y + 3}" width="${w}" height="16" preserveAspectRatio="xMidYMid meet"/>`; lx += w + 6; }
+    const x0 = logos.length ? lx + 4 : P.x + 10;
     g += tx(x0, P.y + 10, (l.equipe || 'GFA').toUpperCase(), { fs: 6.5, b: 1, c: MUTED }) + tx(x0, P.y + 18, 'CADASTRO DE BUEIROS · LEVANTAMENTO TOPOGRÁFICO', { fs: 5.6, c: MUTED });
     g += tx(P.x + 10, P.y + 40, l.codigo || 'Sem código', { fs: 15, b: 1 });
     const col = [P.x + 10, P.x + 190], lin = [P.y + 54, P.y + 70, P.y + 86];
@@ -363,7 +366,7 @@ ${planta(l, m)}${perfil(l, m)}${quadro(l, m)}${tabela(l, m)}${carimbo(l, m)}</sv
       <div class="row"><button type="button" class="btn sm" data-pr="zoom-">−</button><button type="button" class="btn sm" data-pr="ajustar">Ajustar</button><button type="button" class="btn sm" data-pr="zoom+">+</button>
         <button type="button" class="btn sm" data-pr="inverter">⇄ Inverter montante/jusante</button></div>
       <div id="prancha-box" class="prancha-wrap"><div id="prancha-svg" style="width:${Math.round(T.zoom * 100)}%">${gerarSVG(l, { foco: T.foco })}</div></div>
-      <div class="row" style="margin-top:10px"><button type="button" class="btn primary" data-pr="png">Baixar PNG</button><button type="button" class="btn" data-pr="svg">Baixar SVG</button></div>
+      <div class="row" style="margin-top:10px"><button type="button" class="btn primary" data-pr="png">Baixar PNG</button><button type="button" class="btn" data-pr="pdf">Imprimir / PDF (A3)</button><button type="button" class="btn" data-pr="svg">Baixar SVG</button></div>
       <p class="muted small">A prancha segue junto no relatório e nas exportações.</p></div>`;
   }
   function redesenhar() {
@@ -375,6 +378,7 @@ ${planta(l, m)}${perfil(l, m)}${quadro(l, m)}${tabela(l, m)}${carimbo(l, m)}</sv
   /* ---------- exportar ---------- */
   const nomeBase = l => 'PRANCHA-' + U.nomeArquivo(l.codigo);
   async function exportarPNG(l) {
+    await logosPronto;
     const svg = gerarSVG(l), img = new Image();
     if (!svg) { UI.toast('Importe os pontos do RTK para gerar a prancha', 'aviso'); return; }
     try {
@@ -395,10 +399,29 @@ ${planta(l, m)}${perfil(l, m)}${quadro(l, m)}${tabela(l, m)}${carimbo(l, m)}</sv
     else if (a === 'ajustar') { T.zoom = 1; redesenhar(); }
     else if (a === 'inverter') { l.prancha = l.prancha || {}; l.prancha.inverter = !l.prancha.inverter; if (sincronizarMedicoes(l)) { /* atualiza cotas */ } BU.App.marcarSujo(); BU.App.renderEtapa(); }
     else if (a === 'png') exportarPNG(l);
+    else if (a === 'pdf') imprimir(l);
     else if (a === 'svg') { const s = gerarSVG(l); if (s) U.baixar(new Blob([s], { type: 'image/svg+xml' }), nomeBase(l) + '.svg'); }
   });
 
   function setLogo(dataUrl) { LOGO = dataUrl || ''; }
 
-  BU.Prancha = { get logo() { return LOGO; }, etapaHTML, redesenhar, miniatura, gerarSVG, exportarPNG, temDados, croquiPronto, modelo, sincronizarMedicoes, usarCentroComoCoordenada, setLogo, papel, fmt };
+  /* Logos do cliente (ANTT e Arteris) no carimbo: carregadas uma vez e embutidas no SVG (PNG e PDF não dependem da rede). */
+  const RAIZ = (document.currentScript && document.currentScript.src) ? new URL('../', document.currentScript.src).href : '';
+  const dataURL = u => fetch(u).then(r => r.ok ? r.blob() : Promise.reject()).then(b => new Promise(ok => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.readAsDataURL(b); })).catch(() => '');
+  const logosPronto = Promise.all([dataURL(RAIZ + 'assets/logo-antt.png'), dataURL(RAIZ + 'assets/logo-arteris.png')]).then(([a, b]) => { LOGO_ANTT = a; LOGO_ARTERIS = b; try { redesenhar(); } catch (e) { /* sem tela aberta */ } });
+
+  /* Prancha em PDF: abre a folha A3 paisagem pronta para "Imprimir / Salvar como PDF". */
+  async function imprimir(l, janela) {
+    await logosPronto;
+    const svg = gerarSVG(l);
+    if (!svg) { if (janela) janela.close(); UI.toast('Importe os pontos do RTK para gerar a prancha', 'aviso'); return false; }
+    const w = janela || window.open('', '_blank'); if (!w) { UI.toast('O navegador bloqueou a nova aba. Libere pop-ups e tente de novo.', 'aviso'); return false; }
+    w.document.open();
+    w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(nomeBase(l))}</title><style>@page{size:A3 landscape;margin:8mm}html,body{margin:0;background:#fff}svg{display:block;height:280mm;width:auto;margin:0 auto;page-break-inside:avoid}.barra{font:14px Arial;padding:10px 14px;background:#eef3ef}.barra button{font:inherit;padding:7px 14px;margin-right:8px}@media print{.barra{display:none}}</style></head><body><div class="barra"><button onclick="print()">Imprimir / salvar PDF</button>Escolha “Salvar como PDF”, papel A3 paisagem.</div>${svg}</body></html>`);
+    w.document.close();
+    return true;
+  }
+
+
+  BU.Prancha = { get logo() { return LOGO; }, imprimir, get logosPronto() { return logosPronto; }, etapaHTML, redesenhar, miniatura, gerarSVG, exportarPNG, temDados, croquiPronto, modelo, sincronizarMedicoes, usarCentroComoCoordenada, setLogo, papel, fmt };
 })();
