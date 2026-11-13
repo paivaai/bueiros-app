@@ -72,6 +72,7 @@
       ['Serviços necessários', nec.join('; ')], ['Prioridade', txt(d.prioridade)], ['Observação (local e acesso)', [].concat(d.obsPadrao || [], d.obs ? [d.obs] : []).join(' ')],
       ['Observação (funcionamento)', [].concat(d.obs2Padrao || [], d.obs2 ? [d.obs2] : []).join(' ')],
     ]);
+    try { sec('Capacidade hidráulica (Manning)', BU.Hidraulica.resumo(l)); } catch (e) { /* segue sem a seção */ }
     if (l.naoLocalizado) sec('Não localizado em campo', [['Motivo', txt(l.naoLocalizado.motivo)], ['Observação', txt(l.naoLocalizado.obs)]]);
     sec('Referência de nível (RN)', [['Descrição', txt(l.rn && l.rn.descricao)], ['Leste', num(l.rn && l.rn.leste)], ['Norte', num(l.rn && l.rn.norte)], ['Cota', num(l.rn && l.rn.cota, 'm')]]);
     sec('RTK', [['Altura da antena', num(l.rtk && l.rtk.alturaAntena, 'm')], ['Solução', txt(l.rtk && l.rtk.solucao)], ['Receptor', txt(l.rtk && l.rtk.receptor)]]);
