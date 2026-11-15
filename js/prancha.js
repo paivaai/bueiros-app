@@ -181,7 +181,7 @@
     : `<circle cx="${p1(x)}" cy="${p1(y)}" r="${g === 'contorno' ? 2 : 2.2}" fill="${COR[g] || COR.outro}" stroke="#fff" stroke-width=".5"/>`;
 
   function planta(l, m, R0) {
-    const P = { x: 14, y: 14, w: 790, h: 404 };
+    const P = { x: 14, y: 14, w: 790, h: 300 };
     const pts = m.pts, Wp = m.Wplan;
     const ss = pts.map(p => p.s).concat([0, m.L]), tt = pts.map(p => p.t).concat([Wp / 2, -Wp / 2]);
     let sMin = Math.min(...ss) - 2.5, sMax = Math.max(...ss) + 2.5, tMin = Math.min(...tt) - 2.2, tMax = Math.max(...tt) + 2.2;
@@ -227,18 +227,12 @@
     const alvo = Math.min(R.w * 0.28 / sc, 200), cand = [0.5, 1, 2, 5, 10, 20, 50, 100], Lb = cand.filter(c => c <= alvo).pop() || 0.5, bx = P.x + 14, by = P.y + P.h - 18, wB = Lb * sc;
     g += `<rect x="${p1(bx)}" y="${by}" width="${p1(wB / 2)}" height="5" fill="${INK}"/><rect x="${p1(bx + wB / 2)}" y="${by}" width="${p1(wB / 2)}" height="5" fill="#fff" stroke="${INK}" stroke-width=".7"/>`
       + `<rect x="${p1(bx)}" y="${by}" width="${p1(wB)}" height="5" fill="none" stroke="${INK}" stroke-width=".7"/>` + tx(bx, by - 3, '0', { fs: 6.5 }) + tx(bx + wB, by - 3, `${Lb} m`, { fs: 6.5, a: 'middle' });
-    // legenda
-    const usados = [...new Set(pts.map(p => grupoCor(p.papel)))], nomes = { gi: 'GI / geratriz', contorno: 'Contorno', pista: 'Pista', terreno: 'Terreno', rn: 'RN', outro: 'Outros' };
-    let lx = P.x + P.w - 12; const ly = P.y + P.h - 14;
-    for (const k of ['outro', 'terreno', 'pista', 'contorno', 'gi', 'rn'].filter(k => usados.includes(k))) {
-      const w = 12 + nomes[k].length * 4; lx -= w; g += SIMB(k, lx + 3, ly - 2) + tx(lx + 9, ly, nomes[k], { fs: 6.5 });
-    }
     if (m.modo === 'estimado') g += tx(P.x + P.w / 2, P.y + 44, 'Eixo estimado: não encontrei GI MONT / GI JUS nem geratrizes. Use esses códigos no RTK.', { fs: 7, c: '#B45309', a: 'middle', b: 1 });
     return g;
   }
 
   function perfil(l, m) {
-    const P = { x: 14, y: 428, w: 790, h: 400 };
+    const P = { x: 14, y: 322, w: 790, h: 290 };
     const R = { x: P.x + 58, y: P.y + 58, w: P.w - 84, h: P.h - 58 - 44 };
     const ln_ = m.linha;
     const xMin = Math.min(-1.5, ...ln_.map(p => p.s)) - 0.8, xMax = Math.max(m.L + 1.5, ...ln_.map(p => p.s)) + 0.8;
@@ -288,7 +282,7 @@
   }
 
   function quadro(l, m) {
-    const P = { x: 818, y: 14, w: 358, h: 318 }, d = m.dims, c = l.caracteristicas;
+    const P = { x: 818, y: 14, w: 358, h: 236 }, d = m.dims, c = l.caracteristicas;
     let g = caixa(P.x, P.y, P.w, P.h) + tx(P.x + 10, P.y + 18, 'QUADRO DE DADOS', { fs: 12, b: 1 });
     const tipo = [c.tipo, c.formato, c.material].filter(Boolean).join(' · ') || '—';
     const E3 = p => `E ${fmt(p.E, 3)}  N ${fmt(p.N, 3)}  Z ${fmt(p.Z, 3)}`;
@@ -300,23 +294,23 @@
       ...(m.rn ? [['RN', E3(m.rn)]] : []),
       ['PONTOS LEVANTADOS', String(m.pts.length)], ['ARQUIVO', l.pontosArquivo || '—'],
     ];
-    const lh = Math.min(26, (P.h - 36) / itens.length);
-    itens.forEach(([k, v], i) => { const y = P.y + 36 + i * lh; g += tx(P.x + 10, y, k, { fs: 5.4, c: MUTED, b: 1 }) + tx(P.x + 10, y + 9.5, v.length > 58 ? v.slice(0, 57) + '…' : v, { fs: 7.6, b: 1 }); });
+    const lh = Math.min(26, (P.h - 30) / itens.length);
+    itens.forEach(([k, v], i) => { const y = P.y + 33 + i * lh; g += tx(P.x + 10, y, k, { fs: 5, c: MUTED, b: 1 }) + tx(P.x + 10, y + 8.2, v.length > 58 ? v.slice(0, 57) + '…' : v, { fs: 7.6, b: 1 }); });
     return g;
   }
 
   function tabela(l, m) {
-    const P = { x: 818, y: 342, w: 358, h: 376 }, pts = m.pts;
+    const P = { x: 818, y: 406, w: 358, h: 214 }, pts = m.pts;
     let g = caixa(P.x, P.y, P.w, P.h) + tx(P.x + 10, P.y + 18, 'PONTOS DO LEVANTAMENTO', { fs: 12, b: 1 });
     const cx = [P.x + 10, P.x + 52, P.x + 128, P.x + 214, P.x + 270], cab = ['Ponto', 'E', 'N', 'Cota', 'Código'];
     cab.forEach((t, i) => { g += tx(cx[i], P.y + 33, t, { fs: 5.6, c: MUTED, b: 1 }); });
     g += ln(P.x + 8, P.y + 36, P.x + P.w - 8, P.y + 36, 'stroke="#CBD4CC" stroke-width=".7"');
-    const area = P.h - 44 - 8, max = 52, rh = Math.min(8.6, area / Math.min(pts.length, max)), fs = Math.min(6.4, rh * 0.74);
+    const area = P.h - 44 - 8, max = Math.floor(area / 6.6), rh = Math.min(8.6, area / Math.min(pts.length, max)), fs = Math.min(6.4, rh * 0.74);
     pts.slice(0, max).forEach((p, i) => {
       const y = P.y + 36 + (i + 1) * rh - rh * 0.25, cor = COR[grupoCor(p.papel)] || INK;
       g += tx(cx[0], y, p.id, { fs }) + tx(cx[1], y, fmt(p.E, 3), { fs }) + tx(cx[2], y, fmt(p.N, 3), { fs }) + tx(cx[3], y, fmt(p.Z, 3), { fs }) + tx(cx[4], y, p.cod, { fs, c: cor, b: 1 });
     });
-    if (pts.length > max) g += tx(P.x + 10, P.y + P.h - 6, `… e mais ${pts.length - max} ponto(s): veja a tabela completa no relatório`, { fs: 6, c: MUTED });
+    if (pts.length > max) g += tx(P.x + 10, P.y + P.h - 6, `… e mais ${pts.length - max} ponto(s): tabela completa no relatório e no DXF`, { fs: 6, c: MUTED });
     return g;
   }
 
@@ -337,13 +331,95 @@
     return g;
   }
 
-  const FOCOS = { tudo: [0, 0, SW, SH], planta: [8, 8, 802, 416], perfil: [8, 422, 802, 414], quadro: [812, 8, 372, 828] };
+
+  /* ---------- folha completa: detalhes das bocas, legenda, notas e mapa de localização ---------- */
+  function detalhe(l, m, P, lado) {
+    const M = lado === 'M', s0 = M ? 0 : m.L, Wp = m.Wplan;
+    const R = { x: P.x + 8, y: P.y + 40, w: P.w - 16, h: P.h - 40 - 22 };
+    const hT = Math.max(Wp / 2 + 1.4, 2.4), sc = R.h / (2 * hT), hS = R.w / (2 * sc), sC = s0 + (M ? 1 : -1) * hS * 0.3;
+    const X = s => R.x + R.w / 2 + (s - sC) * sc, Y = t => R.y + R.h / 2 - t * sc;
+    let g = caixa(P.x, P.y, P.w, P.h) + tx(P.x + 8, P.y + 15, `DETALHE DA BOCA DE ${M ? 'MONTANTE' : 'JUSANTE'}`, { fs: 9.5, b: 1 })
+      + tx(P.x + 8, P.y + 26, `GI ${fmt((M ? m.A : m.B).Z, 3)} · largura externa ${fmt(Wp, 2)} m`, { fs: 6.3, c: MUTED });
+    const id = 'cl-d' + (M ? 'm' : 'j');
+    g += `<clipPath id="${id}"><rect x="${R.x}" y="${R.y}" width="${R.w}" height="${R.h}"/></clipPath><rect x="${R.x}" y="${R.y}" width="${R.w}" height="${R.h}" fill="#FAFBFA" stroke="${GRID}" stroke-width=".6"/><g clip-path="url(#${id})">`;
+    g += `<rect x="${p1(X(0))}" y="${p1(Y(Wp / 2))}" width="${p1(m.L * sc)}" height="${p1(Wp * sc)}" fill="#E3EEE6" stroke="#5E8E73" stroke-width="1" stroke-dasharray="4 2"/>`;
+    g += ln(R.x, Y(0), R.x + R.w, Y(0), 'stroke="#2B6CB0" stroke-width=".8" stroke-dasharray="8 2 1.5 2"');
+    g += ln(X(s0), Y(Wp / 2 + 0.6), X(s0), Y(-Wp / 2 - 0.6), `stroke="${INK}" stroke-width="1.6"`);
+    const c = m.pts.filter(p => p.papel === 'contorno' && ((p.s < m.L / 2) === M)).sort((x, y) => (parseFloat(x.id) - parseFloat(y.id)) || 0);
+    if (c.length >= 2) g += `<polyline points="${c.map(p => p1(X(p.s)) + ',' + p1(Y(p.t))).join(' ')}" fill="none" stroke="${COR.contorno}" stroke-width="1.1" stroke-linejoin="round"/>`;
+    for (const p of m.pts) {
+      if (Math.abs(p.s - sC) > hS + 0.5 || Math.abs(p.t) > hT + 0.5) continue;
+      const gp = grupoCor(p.papel), x = X(p.s), y = Y(p.t);
+      g += SIMB(gp, x, y) + tx(x + 3.5, y - 3, p.id + (gp === 'gi' ? ` · ${fmt(p.Z, 3)}` : ''), { fs: 5.4, c: gp === 'gi' ? COR.gi : MUTED, halo: 1 });
+    }
+    g += '</g>';
+    // cota de largura
+    const xd = Math.min(R.x + R.w - 10, Math.max(R.x + 10, X(s0) + (M ? -1 : 1) * 16));
+    g += ln(xd, Y(Wp / 2), xd, Y(-Wp / 2), 'stroke="#6B2FA0" stroke-width=".9"') + ln(xd - 3, Y(Wp / 2), xd + 3, Y(Wp / 2), 'stroke="#6B2FA0" stroke-width=".9"') + ln(xd - 3, Y(-Wp / 2), xd + 3, Y(-Wp / 2), 'stroke="#6B2FA0" stroke-width=".9"')
+      + tx(xd + (M ? -3 : 3), Y(0) - 3, `${fmt(Wp, 2)} m`, { fs: 6.3, b: 1, c: '#6B2FA0', a: M ? 'end' : 'start', halo: 1, rot: 0 });
+    // escala gráfica
+    const Lb = [0.5, 1, 2, 5].filter(v => v * sc <= R.w * 0.4).pop() || 0.5, bx = P.x + 10, by = P.y + P.h - 14;
+    g += `<rect x="${bx}" y="${by}" width="${p1(Lb * sc)}" height="4" fill="${INK}"/>` + tx(bx, by - 2, '0', { fs: 5.5 }) + tx(bx + Lb * sc, by - 2, `${Lb} m`, { fs: 5.5, a: 'middle' });
+    g += tx(P.x + P.w - 8, P.y + P.h - 8, M ? 'montante ◄ ' : ' ► jusante', { fs: 5.5, c: MUTED, a: 'end' });
+    return g;
+  }
+
+  function legenda(P) {
+    let g = caixa(P.x, P.y, P.w, P.h) + tx(P.x + 8, P.y + 15, 'LEGENDA', { fs: 9.5, b: 1 });
+    const it = [
+      ['gi', 'GI — geratriz inferior / geratrizes das bocas'], ['contorno', 'Contorno das bocas (alas, muros)'], ['pista', 'Pista (asfalto, eixo, bordas)'],
+      ['terreno', 'Terreno (TN, talude, crista, pé)'], ['rn', 'RN — referência de nível'], ['outro', 'Outros pontos levantados'],
+    ];
+    let y = P.y + 31;
+    for (const [k, t] of it) { g += SIMB(k, P.x + 14, y - 2) + tx(P.x + 26, y, t, { fs: 6.6 }); y += 15; }
+    g += `<rect x="${P.x + 8}" y="${y - 7}" width="12" height="8" fill="#E3EEE6" stroke="#5E8E73" stroke-width="1" stroke-dasharray="3 1.5"/>` + tx(P.x + 26, y, 'Corpo do bueiro (planta)', { fs: 6.6 }); y += 15;
+    g += ln(P.x + 8, y - 2.5, P.x + 20, y - 2.5, 'stroke="#2B6CB0" stroke-width=".9" stroke-dasharray="6 2 1.5 2"') + tx(P.x + 26, y, 'Eixo do bueiro', { fs: 6.6 }); y += 15;
+    g += ln(P.x + 8, y - 2.5, P.x + 20, y - 2.5, 'stroke="#8A6D1F" stroke-width="1.5"') + tx(P.x + 26, y, 'Terreno / pista no perfil', { fs: 6.6 });
+    return g;
+  }
+
+  function quebrar(t, n) {
+    const out = []; let cur = '';
+    for (const w of String(t).split(/\s+/)) { if ((cur + ' ' + w).trim().length > n && cur) { out.push(cur); cur = w; } else cur = (cur + ' ' + w).trim(); }
+    if (cur) out.push(cur); return out;
+  }
+  function notas(l, m, P) {
+    const u = BU.GPS.utmDe(l);
+    const N = [
+      `Coordenadas UTM, SIRGAS 2000${u ? ', ' + BU.GPS.rotuloUTM(u).replace(' · SIRGAS 2000', '') : ''}. Cotas e dimensões em metros.`,
+      `Levantamento RTK${l.data ? ' em ' + U.dataBR(l.data) : ''}${l.equipe ? ' (' + l.equipe + ')' : ''}; ${m.pts.length} ponto(s).`,
+      'Comprimento e declividade medidos de GI a GI. Escalas aproximadas na folha A3.',
+      'Planta girada com o eixo na horizontal; o norte está indicado.',
+      'Dimensões da seção conforme cadastro de campo.',
+    ];
+    let g = caixa(P.x, P.y, P.w, P.h) + tx(P.x + 8, P.y + 14, 'NOTAS', { fs: 9.5, b: 1 }), y = P.y + 26;
+    N.forEach((t, i) => quebrar(t, 78).forEach((ln_, j) => { if (y < P.y + P.h - 3) { g += tx(P.x + 8, y, (j ? '    ' : (i + 1) + '. ') + ln_, { fs: 5.9 }); y += 8.3; } }));
+    return g;
+  }
+
+  function mapaLoc(l, P) {
+    let g = caixa(P.x, P.y, P.w, P.h) + tx(P.x + 8, P.y + 15, 'LOCALIZAÇÃO', { fs: 9.5, b: 1 }) + tx(P.x + P.w - 8, P.y + 15, 'esquema sem escala', { fs: 5.6, c: MUTED, a: 'end' });
+    const cx = P.x + 120, cy = P.y + 78;
+    g += `<rect x="${P.x + 8}" y="${P.y + 22}" width="224" height="${P.h - 30}" fill="#F3F6F3" stroke="${GRID}" stroke-width=".7"/>`;
+    g += `<path d="M ${P.x + 8} ${cy + 36} C ${P.x + 80} ${cy + 22}, ${P.x + 150} ${cy - 24}, ${P.x + 232} ${cy - 40}" fill="none" stroke="#9AA39C" stroke-width="7" stroke-linecap="round"/><path d="M ${P.x + 8} ${cy + 36} C ${P.x + 80} ${cy + 22}, ${P.x + 150} ${cy - 24}, ${P.x + 232} ${cy - 40}" fill="none" stroke="#fff" stroke-width=".8" stroke-dasharray="5 4"/>`;
+    g += `<circle cx="${cx}" cy="${cy - 2}" r="5" fill="${COR.gi}" stroke="#fff" stroke-width="1.2"/>` + tx(cx, cy - 11, l.codigo || 'Bueiro', { fs: 6.8, b: 1, a: 'middle', halo: 1 });
+    g += tx(P.x + 14, P.y + 40, (l.estrada || 'Rodovia') + (l.km ? ' · km ' + l.km : ''), { fs: 7.4, b: 1, halo: 1 });
+    const lat = l.latitude, lon = l.longitude, u = BU.GPS.utmDe(l);
+    const L = [
+      ['MUNICÍPIO / UF', [l.municipio, l.estado].filter(Boolean).join(' / ') || '—'], ['LATITUDE', lat != null ? fmt(lat, 6) : '—'], ['LONGITUDE', lon != null ? fmt(lon, 6) : '—'],
+      ['UTM (E / N)', u ? `${fmt(u.E, 1)} / ${fmt(u.N, 1)}` : '—'], ['PISTA / LADO', [l.pistaGe, l.lado].filter(Boolean).join(' / ') || '—'],
+    ];
+    L.forEach(([k, v], i) => { const y = P.y + 34 + i * 20; g += tx(P.x + 242, y, k, { fs: 5, c: MUTED, b: 1 }) + tx(P.x + 242, y + 8.5, String(v).slice(0, 26), { fs: 6.8, b: 1 }); });
+    return g;
+  }
+
+  const FOCOS = { tudo: [0, 0, SW, SH], planta: [8, 8, 802, 312], perfil: [8, 316, 802, 302], detalhes: [8, 614, 802, 220], quadro: [812, 8, 372, 828] };
   function gerarSVG(l, { foco = 'tudo' } = {}) {
     const m = modelo(l); if (!m) return '';
     const v = FOCOS[foco] || FOCOS.tudo;
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${v.join(' ')}" width="${v[2]}" height="${v[3]}" font-family="Arial, Helvetica, sans-serif" role="img" aria-label="Planta, perfil e quadro de dados do bueiro">
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${v.join(' ')}" width="${v[2]}" height="${v[3]}" font-family="Arial, Helvetica, sans-serif" role="img" aria-label="Planta, detalhes das bocas, perfil, legenda, notas e quadro de dados do bueiro">
 <rect x="0" y="0" width="${SW}" height="${SH}" fill="#fff"/><rect x="5" y="5" width="${SW - 10}" height="${SH - 10}" fill="none" stroke="${FRAME}" stroke-width="1.4"/>
-${planta(l, m)}${perfil(l, m)}${quadro(l, m)}${tabela(l, m)}${carimbo(l, m)}</svg>`;
+${planta(l, m)}${perfil(l, m)}${detalhe(l, m, { x: 14, y: 620, w: 258, h: 208 }, 'M')}${detalhe(l, m, { x: 280, y: 620, w: 258, h: 208 }, 'J')}${legenda({ x: 546, y: 620, w: 258, h: 208 })}${quadro(l, m)}${mapaLoc(l, { x: 818, y: 258, w: 358, h: 140 })}${tabela(l, m)}${notas(l, m, { x: 818, y: 628, w: 358, h: 92 })}${carimbo(l, m)}</svg>`;
   }
 
   /* ---------- tela (etapa 5) ---------- */
@@ -362,11 +438,11 @@ ${planta(l, m)}${perfil(l, m)}${quadro(l, m)}${tabela(l, m)}${carimbo(l, m)}</sv
     return `<div class="card prancha-card"><h3>Planta, perfil e quadro de dados</h3>
       <p class="muted small">Gerados a partir dos <b>${m.pts.length}</b> pontos${l.pontosArquivo ? ` de <span class="mono">${esc(l.pontosArquivo)}</span>` : ''}. Montante: <b>${esc(m.A.id ? 'ponto ' + m.A.id : 'cota ' + fmt(m.A.Z, 3))}</b> · Jusante: <b>${esc(m.B.id ? 'ponto ' + m.B.id : 'cota ' + fmt(m.B.Z, 3))}</b>.</p>
       ${avisos.map(a => `<div class="aviso-pr">⚠️ ${a}</div>`).join('')}
-      <div class="seg-tools" role="group" aria-label="Parte da prancha">${aba('tudo', 'Prancha')}${aba('planta', 'Planta')}${aba('perfil', 'Perfil')}${aba('quadro', 'Quadro')}</div>
+      <div class="seg-tools" role="group" aria-label="Parte da prancha">${aba('tudo', 'Prancha')}${aba('planta', 'Planta')}${aba('perfil', 'Perfil')}${aba('detalhes', 'Detalhes')}${aba('quadro', 'Quadro')}</div>
       <div class="row"><button type="button" class="btn sm" data-pr="zoom-">−</button><button type="button" class="btn sm" data-pr="ajustar">Ajustar</button><button type="button" class="btn sm" data-pr="zoom+">+</button>
         <button type="button" class="btn sm" data-pr="inverter">⇄ Inverter montante/jusante</button></div>
       <div id="prancha-box" class="prancha-wrap"><div id="prancha-svg" style="width:${Math.round(T.zoom * 100)}%">${gerarSVG(l, { foco: T.foco })}</div></div>
-      <div class="row" style="margin-top:10px"><button type="button" class="btn primary" data-pr="png">Baixar PNG</button><button type="button" class="btn" data-pr="pdf">Imprimir / PDF (A3)</button><button type="button" class="btn" data-pr="svg">Baixar SVG</button></div>
+      <div class="row" style="margin-top:10px"><button type="button" class="btn primary" data-pr="png">Baixar PNG</button><button type="button" class="btn" data-pr="pdf">Imprimir / PDF (A3)</button><button type="button" class="btn" data-pr="dxf">Baixar DXF (CAD)</button><button type="button" class="btn" data-pr="svg">Baixar SVG</button></div>
       <p class="muted small">A prancha segue junto no relatório e nas exportações.</p></div>`;
   }
   function redesenhar() {
@@ -374,6 +450,52 @@ ${planta(l, m)}${perfil(l, m)}${quadro(l, m)}${tabela(l, m)}${carimbo(l, m)}</sv
     box.style.width = Math.round(T.zoom * 100) + '%'; box.innerHTML = gerarSVG(l, { foco: T.foco });
   }
   function miniatura(l) { return temDados(l) ? `<div class="croqui-mini prancha-mini">${gerarSVG(l)}</div>` : BU.Secao.miniatura(l); }
+
+
+  /* ---------- DXF (CAD editável) ----------
+     Planta em coordenadas UTM reais (E, N) e perfil ao lado (x = distância, y = cota × exagero), em metros. ASCII R12. */
+  function gerarDXF(l) {
+    const m = modelo(l); if (!m) return '';
+    const sem = t => String(t == null ? '' : t).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\x20-\x7E]/g, '?');
+    const CAMADAS = { EIXO: 5, CORPO: 3, CONTORNO: 3, PTS_GI: 1, PTS_CONTORNO: 3, PTS_PISTA: 5, PTS_TERRENO: 30, PTS_RN: 6, PTS_OUTROS: 8, TEXTO: 7, PERFIL: 7, PERFIL_TERRENO: 40, PERFIL_GI: 1, CARIMBO: 7 };
+    const mapaCamada = { gi: 'PTS_GI', contorno: 'PTS_CONTORNO', pista: 'PTS_PISTA', terreno: 'PTS_TERRENO', rn: 'PTS_RN', outro: 'PTS_OUTROS' };
+    const o = [];
+    const par = (c, v) => o.push(String(c), String(v));
+    const f = n => (+n).toFixed(3);
+    par(0, 'SECTION'); par(2, 'HEADER'); par(9, '$ACADVER'); par(1, 'AC1009'); par(9, '$INSUNITS'); par(70, 6); par(0, 'ENDSEC');
+    par(0, 'SECTION'); par(2, 'TABLES'); par(0, 'TABLE'); par(2, 'LAYER'); par(70, Object.keys(CAMADAS).length + 1);
+    par(0, 'LAYER'); par(2, '0'); par(70, 0); par(62, 7); par(6, 'CONTINUOUS');
+    for (const k in CAMADAS) { par(0, 'LAYER'); par(2, k); par(70, 0); par(62, CAMADAS[k]); par(6, 'CONTINUOUS'); }
+    par(0, 'ENDTAB'); par(0, 'ENDSEC'); par(0, 'SECTION'); par(2, 'ENTITIES');
+    const LINE = (c, a, b) => { par(0, 'LINE'); par(8, c); par(10, f(a[0])); par(20, f(a[1])); par(30, 0); par(11, f(b[0])); par(21, f(b[1])); par(31, 0); };
+    const TEXT = (c, x, y, h, t) => { par(0, 'TEXT'); par(8, c); par(10, f(x)); par(20, f(y)); par(30, 0); par(40, h); par(1, sem(t)); };
+    const POLI = (c, arr, fechada) => { par(0, 'POLYLINE'); par(8, c); par(66, 1); par(70, fechada ? 1 : 0); arr.forEach(q => { par(0, 'VERTEX'); par(8, c); par(10, f(q[0])); par(20, f(q[1])); par(30, 0); }); par(0, 'SEQEND'); par(8, c); };
+    const PT = (c, x, y, z) => { par(0, 'POINT'); par(8, c); par(10, f(x)); par(20, f(y)); par(30, f(z)); };
+    const EN = (s_, t_) => [m.A.E + m.u.E * s_ - m.u.N * t_, m.A.N + m.u.N * s_ + m.u.E * t_];
+    const W = m.Wplan / 2;
+    // planta
+    POLI('CORPO', [EN(0, -W), EN(m.L, -W), EN(m.L, W), EN(0, W)], true);
+    LINE('EIXO', EN(-1, 0), EN(m.L + 1, 0));
+    for (const lado of [0, 1]) {
+      const c = m.pts.filter(p => p.papel === 'contorno' && ((p.s < m.L / 2) === !lado)).sort((x, y) => (parseFloat(x.id) - parseFloat(y.id)) || 0);
+      if (c.length >= 2) POLI('CONTORNO', c.map(p => [p.E, p.N]), false);
+    }
+    for (const p of m.pts) { const cam = mapaCamada[grupoCor(p.papel)] || 'PTS_OUTROS'; PT(cam, p.E, p.N, p.Z); TEXT('TEXTO', p.E + 0.15, p.N + 0.15, 0.25, `${p.id} ${f(p.Z)}${p.cod ? ' ' + p.cod : ''}`); }
+    TEXT('TEXTO', m.A.E, m.A.N - 1.2, 0.5, `${l.codigo || ''}  L=${fmt(m.L, 2)} m  i=${fmt(m.decl, 2)} %`);
+    TEXT('TEXTO', EN(0, 0)[0] - 1.5, EN(0, 0)[1] + 0.8, 0.4, 'MONTANTE'); TEXT('TEXTO', EN(m.L, 0)[0] + 0.3, EN(m.L, 0)[1] + 0.8, 0.4, 'JUSANTE');
+    // perfil (deslocado para baixo da planta)
+    const Ns = m.pts.map(p => p.N), n0 = Math.min(...Ns) - 12, zb = Math.min(m.A.Z, m.B.Z, ...m.linha.map(p => p.Z)) - m.e - 0.5, EX = 5, ox = m.A.E;
+    const yb = z => n0 + (z - zb) * EX;
+    TEXT('CARIMBO', ox, yb(zb) - 3, 0.6, `PERFIL LONGITUDINAL - exagero vertical ${EX}x (x = distancia em m; y = cota ${f(zb)} + altura/${EX})`);
+    LINE('PERFIL', [ox, yb(zb)], [ox + m.L, yb(zb)]);
+    POLI('PERFIL', [[ox, yb(m.A.Z - m.e)], [ox + m.L, yb(m.B.Z - m.e)], [ox + m.L, yb(m.B.Z + m.H + m.e)], [ox, yb(m.A.Z + m.H + m.e)]], true);
+    LINE('PERFIL_GI', [ox, yb(m.A.Z)], [ox + m.L, yb(m.B.Z)]);
+    TEXT('PERFIL_GI', ox, yb(m.A.Z) - 0.7, 0.3, `GI ${f(m.A.Z)}`); TEXT('PERFIL_GI', ox + m.L, yb(m.B.Z) - 0.7, 0.3, `GI ${f(m.B.Z)}`);
+    if (m.linha.length >= 2 && m.seLinha) POLI('PERFIL_TERRENO', m.linha.map(p => [ox + p.s, yb(p.Z)]), false);
+    m.linha.forEach(p => { PT('PERFIL_TERRENO', ox + p.s, yb(p.Z), p.Z); TEXT('PERFIL_TERRENO', ox + p.s + 0.1, yb(p.Z) + 0.15, 0.2, `${p.id} ${f(p.Z)}`); });
+    par(0, 'ENDSEC'); par(0, 'EOF');
+    return o.join('\r\n') + '\r\n';
+  }
 
   /* ---------- exportar ---------- */
   const nomeBase = l => 'PRANCHA-' + U.nomeArquivo(l.codigo);
@@ -400,6 +522,7 @@ ${planta(l, m)}${perfil(l, m)}${quadro(l, m)}${tabela(l, m)}${carimbo(l, m)}</sv
     else if (a === 'inverter') { l.prancha = l.prancha || {}; l.prancha.inverter = !l.prancha.inverter; if (sincronizarMedicoes(l)) { /* atualiza cotas */ } BU.App.marcarSujo(); BU.App.renderEtapa(); }
     else if (a === 'png') exportarPNG(l);
     else if (a === 'pdf') imprimir(l);
+    else if (a === 'dxf') { const d = gerarDXF(l); if (d) U.baixar(new Blob([d], { type: 'application/dxf' }), nomeBase(l) + '.dxf'); else UI.toast('Importe os pontos do RTK para gerar o DXF', 'aviso'); }
     else if (a === 'svg') { const s = gerarSVG(l); if (s) U.baixar(new Blob([s], { type: 'image/svg+xml' }), nomeBase(l) + '.svg'); }
   });
 
@@ -423,5 +546,5 @@ ${planta(l, m)}${perfil(l, m)}${quadro(l, m)}${tabela(l, m)}${carimbo(l, m)}</sv
   }
 
 
-  BU.Prancha = { get logo() { return LOGO; }, imprimir, get logosPronto() { return logosPronto; }, etapaHTML, redesenhar, miniatura, gerarSVG, exportarPNG, temDados, croquiPronto, modelo, sincronizarMedicoes, usarCentroComoCoordenada, setLogo, papel, fmt };
+  BU.Prancha = { get logo() { return LOGO; }, imprimir, gerarDXF, get logosPronto() { return logosPronto; }, etapaHTML, redesenhar, miniatura, gerarSVG, exportarPNG, temDados, croquiPronto, modelo, sincronizarMedicoes, usarCentroComoCoordenada, setLogo, papel, fmt };
 })();
