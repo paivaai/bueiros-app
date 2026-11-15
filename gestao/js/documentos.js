@@ -21,6 +21,10 @@
       if (!BU.Prancha.temDados(l)) { if (janela) janela.close(); throw new Error('Este bueiro ainda não tem pontos do RTK para gerar a prancha.'); }
       await BU.Prancha.imprimir(l, janela); return;
     }
+    if (tipo === 'prancha-dxf') {
+      if (!BU.Prancha.temDados(l)) throw new Error('Este bueiro ainda não tem pontos do RTK para gerar a prancha.');
+      BU.U.baixar(new Blob([BU.Prancha.gerarDXF(l)], { type: 'application/dxf' }), 'PRANCHA-' + BU.U.nomeArquivo(l.codigo) + '.dxf'); return;
+    }
     if (tipo === 'prancha') {
       if (!BU.Prancha.temDados(l)) throw new Error('Este bueiro ainda não tem pontos do RTK para gerar a prancha.');
       await BU.Prancha.exportarPNG(l); return;
