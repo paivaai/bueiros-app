@@ -19,6 +19,11 @@
     if (d != null && d > 0) return { S: d / 100, origem: auto.declividade ? 'geratrizes inferiores de montante e jusante (pontos do RTK)' : 'informada nas medições', estimada: false };
     const ce = num(m.cotaEntrada), cs = num(m.cotaSaida), L = num(m.comprimentoBueiro);
     if (ce != null && cs != null && L > 0 && ce > cs) return { S: (ce - cs) / L, origem: 'cotas de entrada e saída', estimada: false };
+    // Há pontos do RTK mas as medições ainda não foram calculadas (ex.: bueiro recebido no painel): calcula pelas geratrizes.
+    try {
+      const mo = window.BU && BU.Prancha && BU.Prancha.modelo(l);
+      if (mo && mo.decl > 0) return { S: mo.decl / 100, origem: 'geratrizes inferiores de montante e jusante (pontos do RTK)', estimada: false };
+    } catch (e) { /* segue para a estimativa */ }
     return { S: S_MIN, origem: 'ESTIMADA: sem cotas das geratrizes, adotado o mínimo de 2,5%', estimada: true };
   }
 
