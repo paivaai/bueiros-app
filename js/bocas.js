@@ -278,6 +278,7 @@
   }
   /* Troca montante ↔ jusante nos pontos já distribuídos (a boca de montante nem sempre é a de cota maior: ala quebrada, suja ou alagada). */
   function trocarLados(l) {
+    if (!l.pontos.some(p => /^(montante|jusante):/.test(String(p.ref || '')))) { l.prancha = l.prancha || {}; l.prancha.inverter = !l.prancha.inverter; return; } // sem refs (geratrizes só pelo código): inverte o eixo
     l.pontos.forEach(p => { const r = String(p.ref || ''); if (/^montante:/.test(r)) p.ref = r.replace('montante:', 'jusante:'); else if (/^jusante:/.test(r)) p.ref = r.replace('jusante:', 'montante:'); });
     if (l.prancha) delete l.prancha.inverter;
   }
