@@ -369,65 +369,76 @@ ${planta(l, m, A.p1, tin, 'geral')}${planta(l, m, A.p2, tin, 'detalhe')}${perfil
   function dxf(l) {
     const m = BU.Prancha.modelo(l); if (!m) return '';
     const sem = t => String(t == null ? '' : t).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\x20-\x7E]/g, '?');
-    const CAM = { TIN: 8, CORPO: 8, EIXO: 6, BUEIRO: 6, ALAS: 2, PTS_GI: 1, PTS_PISTA: 30, PTS_TERRENO: 5, PTS_RN: 6, PTS_OUTROS: 8, LINHAS_PISTA: 30, LINHAS_TERRENO: 4, LINHAS_OUTROS: 8, TEXTO: 7, GRADE: 9, PERFIL_BUEIRO: 6, PERFIL_HACHURA: 6, PERFIL_TERRENO: 30, PERFIL_GI: 1, PERFIL_TEXTO: 7, TABELA: 7, CARIMBO: 4 };
-    const mapaCam = { gi: 'PTS_GI', contorno: 'ALAS', pista: 'PTS_PISTA', terreno: 'PTS_TERRENO', rn: 'PTS_RN', outro: 'PTS_OUTROS' };
+    const CAM = { 'MDT_TIN': 253, 'MDT_BREAKLINES': 8, 'TERRENO_NATURAL': 9, 'TOP_Topopoints': 1, 'TEXTO_NUM': 7, 'TEXTO_COTA': 8, 'TEXTO_DESC': 140, 'TEXTO_OAC': 6, 'TEXTO_CN': 251, 'DETALHE_REF': 2, 'TOP-Curva Mestra': 101, 'TOP-Curva Interm.': 63, 'TOP-DDR': 210, 'TOP-Valeta': 210, 'TOP-Caixa Coletora': 130, 'TOP-Talude de Aterro': 30, 'TOP-Linhas Gerais': 1, 'TOP-Bueiro-Tubular': 210, 'TOP-Norte': 2, 'PERFIL_GRADE': 9, 'PERFIL_TERRENO': 32, 'PERFIL_TUBO': 6, 'PERFIL_ESTRUTURA': 5, 'PERFIL_DRENAGEM': 4, 'PERFIL_TEXTO': 7, 'PERFIL_TITULO': 7, 'PRANCHA_MOLDURA': 7, 'PRANCHA_TEXTO': 7, 'L-TABELA': 5 };
+    const camFeicao = fe => { const c = String(fe.cod).toUpperCase(); return /^DRE-?(DR|DDR)|DDR|DESC/.test(c) ? 'TOP-DDR' : /VT|VALET/.test(c) ? 'TOP-Valeta' : /CX|CAIXA/.test(c) ? 'TOP-Caixa Coletora' : /TA\b|TALUD/.test(c) ? 'TOP-Talude de Aterro' : fe.g === 'terreno' ? 'TERRENO_NATURAL' : 'TOP-Linhas Gerais'; };
+    
     const E = m.pts.map(p => p.E), N = m.pts.map(p => p.N), e0 = Math.min(...E), e1 = Math.max(...E), n0 = Math.min(...N), n1 = Math.max(...N), ext = Math.max(e1 - e0, n1 - n0, 10);
     const h = Math.min(1.2, Math.max(0.16, ext / 120)); // altura dos textos
     const o = []; const par = (c, v) => o.push(String(c), String(v)); const f = n => (+n).toFixed(3);
     par(0, 'SECTION'); par(2, 'HEADER'); par(9, '$ACADVER'); par(1, 'AC1009'); par(9, '$INSUNITS'); par(70, 6); par(9, '$PDMODE'); par(70, 35); par(9, '$PDSIZE'); par(40, f(h * 0.7)); par(0, 'ENDSEC');
     par(0, 'SECTION'); par(2, 'TABLES'); par(0, 'TABLE'); par(2, 'LAYER'); par(70, Object.keys(CAM).length + 1); par(0, 'LAYER'); par(2, '0'); par(70, 0); par(62, 7); par(6, 'CONTINUOUS');
     for (const k in CAM) { par(0, 'LAYER'); par(2, k); par(70, 0); par(62, CAM[k]); par(6, 'CONTINUOUS'); }
-    par(0, 'ENDTAB'); par(0, 'ENDSEC'); par(0, 'SECTION'); par(2, 'ENTITIES');
+    par(0, 'ENDTAB'); par(0, 'ENDSEC');
+    par(0, 'SECTION'); par(2, 'BLOCKS'); par(0, 'BLOCK'); par(8, '0'); par(2, 'PTO'); par(70, 2); par(10, 0); par(20, 0); par(30, 0); par(3, 'PTO');
+    par(0, 'CIRCLE'); par(8, '0'); par(10, 0); par(20, 0); par(30, 0); par(40, 0.25); par(0, 'POINT'); par(8, '0'); par(10, 0); par(20, 0); par(30, 0);
+    [['NUM', 'Numero do ponto'], ['COTA', 'Cota'], ['DESC', 'Descricao']].forEach(([t, p], i) => { par(0, 'ATTDEF'); par(8, '0'); par(10, 0.4); par(20, -0.4 - i * 0.9); par(30, 0); par(40, 0.8); par(1, ''); par(3, p); par(2, t); par(70, 1); });
+    par(0, 'ENDBLK'); par(8, '0'); par(0, 'ENDSEC'); par(0, 'SECTION'); par(2, 'ENTITIES');
     const LINE = (c, a, b) => { par(0, 'LINE'); par(8, c); par(10, f(a[0])); par(20, f(a[1])); par(30, 0); par(11, f(b[0])); par(21, f(b[1])); par(31, 0); };
     const TEXT = (c, x, y, ht, t, rot) => { par(0, 'TEXT'); par(8, c); par(10, f(x)); par(20, f(y)); par(30, 0); par(40, f(ht)); par(1, sem(t)); if (rot) par(50, rot); };
     const POLI = (c, arr, fechada) => { par(0, 'POLYLINE'); par(8, c); par(66, 1); par(70, fechada ? 1 : 0); arr.forEach(q => { par(0, 'VERTEX'); par(8, c); par(10, f(q[0])); par(20, f(q[1])); par(30, 0); }); par(0, 'SEQEND'); par(8, c); };
     const PT = (c, x, y, z) => { par(0, 'POINT'); par(8, c); par(10, f(x)); par(20, f(y)); par(30, f(z)); };
     // triangulação como superfície (3DFACE com as cotas reais)
     let tin = null; try { tin = m.pts.length >= 3 ? BU.TIN.triangular(m.pts) : null; } catch (er) { tin = null; }
-    if (tin) tin.tri.forEach(t => { const [a, b, c] = t.map(i => m.pts[i]); par(0, '3DFACE'); par(8, 'TIN'); [[10, a], [11, b], [12, c], [13, c]].forEach(([g0, p]) => { par(g0, f(p.E)); par(g0 + 10, f(p.N)); par(g0 + 20, f(p.Z)); }); });
+    if (tin) tin.tri.forEach(t => { const [a, b, c] = t.map(i => m.pts[i]); par(0, '3DFACE'); par(8, 'MDT_TIN'); [[10, a], [11, b], [12, c], [13, c]].forEach(([g0, p]) => { par(g0, f(p.E)); par(g0 + 10, f(p.N)); par(g0 + 20, f(p.Z)); }); });
     // corpo do bueiro (sólido cinza), eixo e arestas do tubo
-    const cs = cantos(m); par(0, 'SOLID'); par(8, 'CORPO'); [[10, cs[0]], [11, cs[1]], [12, cs[3]], [13, cs[2]]].forEach(([g0, p]) => { par(g0, f(p.E)); par(g0 + 10, f(p.N)); par(g0 + 20, 0); });
-    POLI('CORPO', cs.map(c => [c.E, c.N]), true);
+    const cs = cantos(m); par(0, 'SOLID'); par(8, 'TOP-Bueiro-Tubular'); [[10, cs[0]], [11, cs[1]], [12, cs[3]], [13, cs[2]]].forEach(([g0, p]) => { par(g0, f(p.E)); par(g0 + 10, f(p.N)); par(g0 + 20, 0); });
+    POLI('TOP-Bueiro-Tubular', cs.map(c => [c.E, c.N]), true);
     const ext2 = Math.max(4, 0.25 * m.L), ax = (t, s0, s1) => [pontoEm(m, s0, t), pontoEm(m, s1, t)].map(p => [p.E, p.N]);
-    LINE('EIXO', ...ax(0, -ext2, m.L + ext2)); for (const t of [m.H / 2 + m.e / 2, -(m.H / 2 + m.e / 2)]) LINE('BUEIRO', ...ax(t, -ext2, m.L + ext2));
-    for (const c of ligaAlas(m)) POLI('ALAS', c.map(p => [p.E, p.N]), false);
-    for (const fe of feicoes(m)) POLI(fe.g === 'pista' ? 'LINHAS_PISTA' : fe.g === 'terreno' ? 'LINHAS_TERRENO' : 'LINHAS_OUTROS', fe.pts.map(p => [p.E, p.N]), false);
-    for (const p of m.pts) { PT(mapaCam[grupo(p.papel)] || 'PTS_OUTROS', p.E, p.N, p.Z); TEXT('TEXTO', p.E + h * 0.4, p.N + h * 0.4, h * 0.8, `${p.id} ${f(p.Z)}${p.cod ? ' ' + p.cod : ''}`); }
-    TEXT('TEXTO', pontoEm(m, 0, 0).E - h * 6, pontoEm(m, 0, 0).N + h * 2, h * 1.4, 'MONTANTE'); TEXT('TEXTO', pontoEm(m, m.L, 0).E + h, pontoEm(m, m.L, 0).N + h * 2, h * 1.4, 'JUSANTE');
-    TEXT('TEXTO', e0, n1 + h * 3, h * 2, `${l.codigo || ''}  PLANTA - UTM SIRGAS 2000 - L=${fmt(m.L, 2)} m  i=${fmt(m.decl, 2)} %`);
+    LINE('DETALHE_REF', ...ax(0, -ext2, m.L + ext2)); for (const t of [m.H / 2 + m.e / 2, -(m.H / 2 + m.e / 2)]) LINE('TOP-Bueiro-Tubular', ...ax(t, -ext2, m.L + ext2));
+    for (const c of ligaAlas(m)) POLI('TOP-Bueiro-Tubular', c.map(p => [p.E, p.N]), false);
+    for (const fe of feicoes(m)) POLI(camFeicao(fe), fe.pts.map(p => [p.E, p.N]), false);
+    // curvas de nível da TIN (0,5 m; mestras 2,5 m) com cota nas mestras
+    { const cv = curvas(m, tin); for (const s of cv.segs) LINE(s.mestra ? 'TOP-Curva Mestra' : 'TOP-Curva Interm.', [s.a.E, s.a.N], [s.b.E, s.b.N]); for (const s of cv.rot) TEXT('TEXTO_CN', (s.a.E + s.b.E) / 2, (s.a.N + s.b.N) / 2, h * 0.6, fmt(s.z, 1), Math.atan2(s.b.N - s.a.N, s.b.E - s.a.E) * 180 / Math.PI); }
+    for (const p of m.pts) {
+      par(0, 'INSERT'); par(8, 'TOP_Topopoints'); par(66, 1); par(2, 'PTO'); par(10, f(p.E)); par(20, f(p.N)); par(30, f(p.Z)); par(41, f(h)); par(42, f(h)); par(43, f(h));
+      [['NUM', p.id], ['COTA', f(p.Z)], ['DESC', p.cod || '']].forEach(([t, v], i) => { par(0, 'ATTRIB'); par(8, 'TOP_Topopoints'); par(10, f(p.E)); par(20, f(p.N)); par(30, 0); par(40, f(h * 0.8)); par(1, sem(v)); par(2, t); par(70, 1); }); par(0, 'SEQEND'); par(8, 'TOP_Topopoints');
+      TEXT('TEXTO_NUM', p.E + h * 0.4, p.N + h * 0.4, h * 0.8, p.id); TEXT('TEXTO_COTA', p.E + h * 0.4, p.N - h * 0.5, h * 0.8, f(p.Z)); if (p.cod) TEXT('TEXTO_DESC', p.E + h * 0.4, p.N - h * 1.4, h * 0.8, p.cod);
+    }
+    TEXT('TEXTO_OAC', pontoEm(m, 0, 0).E - h * 6, pontoEm(m, 0, 0).N + h * 2, h * 1.4, 'BOCA MONTANTE'); TEXT('TEXTO_OAC', pontoEm(m, m.L, 0).E + h, pontoEm(m, m.L, 0).N + h * 2, h * 1.4, 'BOCA JUSANTE');
+    TEXT('PRANCHA_TEXTO', e0, n1 + h * 3, h * 2, `${l.codigo || ''}  PLANTA - UTM SIRGAS 2000 - L=${fmt(m.L, 2)} m  i=${fmt(m.decl, 2)} %`);
     // perfil, logo abaixo da planta (mesma escala horizontal; vertical exagerado)
     const nl = m.linha, sMin = Math.min(-2, ...nl.map(p => p.s)) - 1, sMax = Math.max(m.L + 2, ...nl.map(p => p.s)) + 1;
     const zs = [m.A.Z - m.e, m.B.Z - m.e, m.A.Z + m.H + m.e, ...nl.map(p => p.Z)], zMin = Math.min(...zs) - 0.5, zMax = Math.max(...zs) + 1;
-    const EX = Math.max(2, Math.min(10, Math.round((0.28 * (sMax - sMin)) / Math.max(zMax - zMin, 0.5)))), hProf = (zMax - zMin) * EX, linhaH = h * 3.2;
+    const EX = 1, hProf = (zMax - zMin) * EX, linhaH = h * 3.2;
     const x0 = e0 + Math.max(0, ((e1 - e0) - (sMax - sMin)) / 2) - sMin, base = n0 - 6 * h - hProf - 10 * h; // x0 + s ; y de zMin = base
     const X = s => x0 + s, Y = z => base + (z - zMin) * EX;
-    TEXT('PERFIL_TEXTO', X(sMin), Y(zMax) + h * 4, h * 2, `PERFIL LONGITUDINAL - EXAGERO VERTICAL ${EX}x`);
+    TEXT('PERFIL_TITULO', X(sMin), Y(zMax) + h * 4, h * 2, 'PERFIL LONGITUDINAL DO BUEIRO (EIXO DO TUBO) - ESC. H = V = 1:100');
     const pz = passo(zMax - zMin, 6), px = passo(sMax - sMin, 12);
-    for (let z = Math.ceil(zMin / pz) * pz; z <= zMax; z += pz) { LINE('GRADE', [X(sMin), Y(z)], [X(sMax), Y(z)]); TEXT('PERFIL_TEXTO', X(sMin) - h * 5, Y(z) - h * 0.4, h * 0.9, fmt(z, 1)); }
-    for (let s = Math.ceil(sMin / px) * px; s <= sMax; s += px) { LINE('GRADE', [X(s), Y(zMin)], [X(s), Y(zMax)]); TEXT('PERFIL_TEXTO', X(s) - h, Y(zMin) - h * 2, h * 0.9, fmt(s, 0)); }
+    for (let z = Math.ceil(zMin / pz) * pz; z <= zMax; z += pz) { LINE('PERFIL_GRADE', [X(sMin), Y(z)], [X(sMax), Y(z)]); TEXT('PERFIL_TEXTO', X(sMin) - h * 5, Y(z) - h * 0.4, h * 0.9, fmt(z, 1)); }
+    for (let s = Math.ceil(sMin / px) * px; s <= sMax; s += px) { LINE('PERFIL_GRADE', [X(s), Y(zMin)], [X(s), Y(zMax)]); TEXT('PERFIL_TEXTO', X(s) - h, Y(zMin) - h * 2, h * 0.9, fmt(s, 0)); }
     const L = m.L, H = m.H, e = m.e;
-    POLI('PERFIL_BUEIRO', [[X(0), Y(m.A.Z - e)], [X(L), Y(m.B.Z - e)], [X(L), Y(m.B.Z + H + e)], [X(0), Y(m.A.Z + H + e)]], true);
-    POLI('PERFIL_BUEIRO', [[X(0), Y(m.A.Z)], [X(L), Y(m.B.Z)], [X(L), Y(m.B.Z + H)], [X(0), Y(m.A.Z + H)]], true);
+    POLI('PERFIL_TUBO', [[X(0), Y(m.A.Z - e)], [X(L), Y(m.B.Z - e)], [X(L), Y(m.B.Z + H + e)], [X(0), Y(m.A.Z + H + e)]], true);
+    POLI('PERFIL_TUBO', [[X(0), Y(m.A.Z)], [X(L), Y(m.B.Z)], [X(L), Y(m.B.Z + H)], [X(0), Y(m.A.Z + H)]], true);
     const bx = z => (s => [Y(m.A.Z + (m.B.Z - m.A.Z) * s / L + z)]);
-    for (let s = 0; s < L; s += Math.max(0.6, L / 40)) { const s2 = Math.min(L, s + (H + 2 * e) * 0.6), a = Y(m.A.Z + (m.B.Z - m.A.Z) * s / L - e), b = Y(m.A.Z + (m.B.Z - m.A.Z) * s2 / L + H + e); LINE('PERFIL_HACHURA', [X(s), a], [X(s2), b]); }
+    for (let s = 0; s < L; s += Math.max(0.6, L / 40)) { const s2 = Math.min(L, s + (H + 2 * e) * 0.6), a = Y(m.A.Z + (m.B.Z - m.A.Z) * s / L - e), b = Y(m.A.Z + (m.B.Z - m.A.Z) * s2 / L + H + e); LINE('PERFIL_ESTRUTURA', [X(s), a], [X(s2), b]); }
     void bx;
-    LINE('PERFIL_GI', [X(0), Y(m.A.Z)], [X(L), Y(m.B.Z)]); TEXT('PERFIL_GI', X(0) - h * 8, Y(m.A.Z), h, `GI ${f(m.A.Z)}`); TEXT('PERFIL_GI', X(L) + h, Y(m.B.Z), h, `GI ${f(m.B.Z)}`);
+    LINE('PERFIL_DRENAGEM', [X(0), Y(m.A.Z)], [X(L), Y(m.B.Z)]); TEXT('PERFIL_TEXTO', X(0) - h * 8, Y(m.A.Z), h, `GI ${f(m.A.Z)}`); TEXT('PERFIL_TEXTO', X(L) + h, Y(m.B.Z), h, `GI ${f(m.B.Z)}`);
     if (m.seLinha && nl.length > 1) POLI('PERFIL_TERRENO', nl.map(p => [X(p.s), Y(p.Z)]), false);
-    (m.pontosEixo || []).forEach(p => { PT('PERFIL_TERRENO', X(p.s), Y(p.Z), 0); TEXT('PERFIL_TEXTO', X(p.s) + h * 0.3, Y(p.Z) + h * 0.8, h * 0.7, `${p.id} ${f(p.Z)}`, 90); });
+    (m.pontosEixo || []).forEach(p => {  TEXT('PERFIL_TEXTO', X(p.s) + h * 0.3, Y(p.Z) + h * 0.8, h * 0.7, `${p.id} ${f(p.Z)}`, 90); });
     if (m.cob && m.cob.valor > 0) { const s = m.cob.s; LINE('PERFIL_TEXTO', [X(s), Y(m.inv(s) + H + e)], [X(s), Y(m.cob.zTopoPista)]); TEXT('PERFIL_TEXTO', X(s) + h * 0.6, (Y(m.inv(s) + H + e) + Y(m.cob.zTopoPista)) / 2, h, `recobrimento ${fmt(m.cob.valor, 2)} m`); }
     // tabela de estacas
     const terrenoEm = s => { if (!nl.length) return null; if (s <= nl[0].s) return nl[0].Z; for (let i = 1; i < nl.length; i++) if (s <= nl[i].s) { const a = nl[i - 1], b = nl[i]; return b.s === a.s ? b.Z : a.Z + (b.Z - a.Z) * (s - a.s) / (b.s - a.s); } return nl[nl.length - 1].Z; };
     const cols = estacas(m, nl).map(s => ({ s })), lab = ['ESTACA (m)', 'COTA TERRENO', 'COTA GI', 'RECOBRIMENTO', 'DECLIVIDADE %'], yT = Y(zMin) - h * 5;
-    lab.forEach((t, i) => { LINE('TABELA', [X(sMin), yT - i * linhaH], [X(sMax), yT - i * linhaH]); TEXT('TABELA', X(sMin) - h * 12, yT - i * linhaH - linhaH * 0.7, h * 0.8, t); }); LINE('TABELA', [X(sMin), yT - 5 * linhaH], [X(sMax), yT - 5 * linhaH]);
+    lab.forEach((t, i) => { LINE('L-TABELA', [X(sMin), yT - i * linhaH], [X(sMax), yT - i * linhaH]); TEXT('L-TABELA', X(sMin) - h * 12, yT - i * linhaH - linhaH * 0.7, h * 0.8, t); }); LINE('L-TABELA', [X(sMin), yT - 5 * linhaH], [X(sMax), yT - 5 * linhaH]);
     let ult = -1e9; for (const c of cols) {
       ult = c.s;
       const dentro = c.s >= 0 && c.s <= L, Zt = terrenoEm(c.s), inv = dentro ? m.inv(c.s) : null, rec = dentro && Zt != null ? Zt - (inv + H + e) : null;
-      [fmt(c.s, 1), Zt != null ? fmt(Zt, 3) : '-', inv != null ? fmt(inv, 3) : '-', rec != null && rec > 0 ? fmt(rec, 2) : '-', dentro ? fmt(m.decl, 2) : '-'].forEach((t, i) => TEXT('TABELA', X(c.s) - h * 1.4, yT - i * linhaH - linhaH * 0.7, h * 0.75, t));
-      LINE('TABELA', [X(c.s), yT - 5 * linhaH], [X(c.s), yT]);
+      [fmt(c.s, 1), Zt != null ? fmt(Zt, 3) : '-', inv != null ? fmt(inv, 3) : '-', rec != null && rec > 0 ? fmt(rec, 2) : '-', dentro ? fmt(m.decl, 2) : '-'].forEach((t, i) => TEXT('L-TABELA', X(c.s) - h * 1.4, yT - i * linhaH - linhaH * 0.7, h * 0.75, t));
+      LINE('L-TABELA', [X(c.s), yT - 5 * linhaH], [X(c.s), yT]);
     }
     // carimbo (texto)
     const yc = yT - 5 * linhaH - h * 5, rod = [l.estrada || 'BR-101', l.km ? 'KM ' + kmTxt(l.km) : ''].filter(Boolean).join(' ');
-    ['PROJETISTA: GFA', `TITULO: ${rod}`, 'ESTUDOS TOPOGRAFICOS', 'LEVANTAMENTO CADASTRAL DE BUEIRO - PLANTA E PERFIL', `BUEIRO: ${l.codigo || ''}   DATA DO LEVANTAMENTO: ${U.dataBR(l.data)}`, 'CLIENTE: ANTT / ARTERIS FLUMINENSE'].forEach((t, i) => TEXT('CARIMBO', X(sMin), yc - i * h * 2, h * 1.3, t));
+    ['PROJETISTA: GFA', `TITULO: ${rod}`, 'ESTUDOS TOPOGRAFICOS', 'LEVANTAMENTO CADASTRAL DE BUEIRO - PLANTA E PERFIL', `BUEIRO: ${l.codigo || ''}   DATA DO LEVANTAMENTO: ${U.dataBR(l.data)}`, 'CLIENTE: ANTT / ARTERIS FLUMINENSE'].forEach((t, i) => TEXT('PRANCHA_TEXTO', X(sMin), yc - i * h * 2, h * 1.3, t));
     par(0, 'ENDSEC'); par(0, 'EOF');
     return o.join('\r\n') + '\r\n';
   }
