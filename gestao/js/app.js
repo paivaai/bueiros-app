@@ -156,8 +156,10 @@
     const nomeB = id => { const b = S.bueiros.find(x => x.id === id); return b ? b.codigo : id; };
     const linhas = L.grupos.map((g, i) => {
       const ops = '<option value="">— ignorar este grupo —</option>' + g.cand.map(c => `<option value="${esc(c.b.id)}"${g.alvo === c.b.id ? ' selected' : ''}>${esc(c.b.codigo)}${c.b.km ? ' · km ' + esc(c.b.km) : ''} · ${Math.round(c.d)} m${c.b.status === 'a_vistoriar' ? '' : ' · ' + esc(ROT[c.b.status] || c.b.status)}</option>`).join('');
+      const f3 = v => v == null ? '' : v.toFixed(2).replace('.', ',');
       const tub = g.tubos ? (g.tubos.length ? `${g.tubos.length} tubo(s) ligado(s)` : '—') : '—';
-      return `<tr><td><input type="checkbox" data-lote-i="${i}" ${g.alvo ? 'checked' : ''} aria-label="Importar grupo ${i + 1}"></td><td>${i + 1}</td><td>${g.n} <span class="muted small">(${g.nGI} de geratriz)</span></td><td>${tub}</td>
+      const mj = g.zMont != null ? `<div class="small muted">montante ${f3(g.inverter ? g.zJus : g.zMont)} · jusante ${f3(g.inverter ? g.zMont : g.zJus)}</div><label class="small"><input type="checkbox" data-lote-inv="${i}" ${g.inverter ? 'checked' : ''}> inverter montante/jusante</label>` : '';
+      return `<tr><td><input type="checkbox" data-lote-i="${i}" ${g.alvo ? 'checked' : ''} aria-label="Importar grupo ${i + 1}"></td><td>${i + 1}</td><td>${g.n} <span class="muted small">(${g.nGI} de geratriz)</span></td><td>${tub}${mj}</td>
         <td><select data-lote-s="${i}" style="min-width:230px">${ops}</select></td><td class="small">${g.dist != null ? Math.round(g.dist) + ' m' : '—'}</td><td class="small" style="color:#9A6700">${esc((g.aviso || []).concat(g.avisosTubos || []).join('; '))}</td></tr>`;
     }).join('');
     return `<div class="card" id="lote"><h3>Importar ${esc(L.arquivo)}</h3>
@@ -171,7 +173,7 @@
     if (!r.ok.length) { toast('Nenhuma linha válida no arquivo. O formato é: ID X Y Z "CÓDIGO".'); return; }
     const pts = r.ok.map(p => ({ id: p.id, x: p.x, y: p.y, z: p.z, codigo: p.codigo, obs: '' }));
     const grupos = BU.Lote.separar(pts, S.bueiros);
-    grupos.forEach(g => { const t = BU.Lote.parear(g.pontos.map(p => ({ ...p })), null); g.tubos = t.tubos; g.avisosTubos = t.avisos; });
+    grupos.forEach(g => { const t = BU.Lote.parear(g.pontos.map(p => ({ ...p })), null); g.tubos = t.tubos; g.avisosTubos = t.avisos; g.zMont = t.zMont; g.zJus = t.zJus; });
     S.lote = { arquivo: file.name, total: pts.length, grupos, ignoradas: r.ruins.length };
     viewBueiros();
     toast(`${pts.length} ponto(s) em ${grupos.length} grupo(s)` + (r.ruins.length ? ` · ${r.ruins.length} linha(s) ignorada(s)` : '') + '. Confira a tabela e aplique.');
@@ -185,7 +187,7 @@
       msg.textContent = `Enviando ${ok + falhas.length + 1} de ${fila.length}…`;
       try {
         const b = await D.bueiro(g.alvo), cel = b && b.dados && b.dados.caracteristicas ? b.dados.caracteristicas.celulas : null;
-        const pts = g.pontos.map(p => ({ ...p })), t = BU.Lote.parear(pts, cel);
+        const pts = g.pontos.map(p => ({ ...p })), t = BU.Lote.parear(pts, cel, { inverter: !!g.inverter });
         await D.anexarPontos(g.alvo, pts, L.arquivo, true); ok++;
         if (t.avisos.length) avisos.push(`${nomeDe2(g.alvo)}: ${t.avisos.join('; ')}`);
       } catch (e) { falhas.push(`${nomeDe2(g.alvo)}: ${e.message || e}`); if (/Falta rodar/.test(e.message || '')) break; }
@@ -492,6 +494,7 @@
   document.addEventListener('change', async ev => {
     if (ev.target.id === 'lote-arq') { const f = ev.target.files && ev.target.files[0]; if (f) { try { await loteLer(f); } catch (e) { toast(esc(e.message || e)); } } ev.target.value = ''; return; }
     if (ev.target.dataset && ev.target.dataset.loteI != null && S.lote) { const g = S.lote.grupos[+ev.target.dataset.loteI]; g.marcado = ev.target.checked; return; }
+    if (ev.target.dataset && ev.target.dataset.loteInv != null && S.lote) { S.lote.grupos[+ev.target.dataset.loteInv].inverter = ev.target.checked; viewBueiros(); return; }
     if (ev.target.dataset && ev.target.dataset.loteS != null && S.lote) { const g = S.lote.grupos[+ev.target.dataset.loteS]; g.alvo = ev.target.value; const cb = document.querySelector(`[data-lote-i="${ev.target.dataset.loteS}"]`); if (cb) { cb.checked = !!g.alvo; g.marcado = !!g.alvo; } return; }
     if (ev.target.id === 'txt-pontos') {
       const inp = ev.target, f = inp.files && inp.files[0], msg = document.getElementById('txt-msg'); if (!f) return;
@@ -502,7 +505,8 @@
         const b = await D.bueiro(inp.dataset.id), n = ((b.dados || {}).pontos || []).length; let subst = true;
         if (n) { const r2 = window.confirm(`Este bueiro já tem ${n} ponto(s).\n\nOK = substituir pelos ${r.ok.length} do arquivo\nCancelar = manter os atuais`); if (!r2) { inp.value = ''; return; } }
         msg.textContent = 'Enviando…';
-        const pts = r.ok.map(p => ({ id: p.id, x: p.x, y: p.y, z: p.z, codigo: p.codigo, obs: '' })), lig = BU.Lote.parear(pts, (b.dados || {}).caracteristicas ? b.dados.caracteristicas.celulas : null);
+        const pts = r.ok.map(p => ({ id: p.id, x: p.x, y: p.y, z: p.z, codigo: p.codigo, obs: '' })), cel1 = (b.dados || {}).caracteristicas ? b.dados.caracteristicas.celulas : null; let lig = BU.Lote.parear(pts, cel1);
+        if (lig.zMont != null && !window.confirm(`Montante: cota média ${lig.zMont.toFixed(2)} m\nJusante: cota média ${lig.zJus.toFixed(2)} m\n\nOK = confirmar\nCancelar = inverter montante/jusante`)) lig = BU.Lote.parear(pts, cel1, { inverter: true });
         await D.anexarPontos(inp.dataset.id, pts, f.name, subst);
         toast(`${r.ok.length} ponto(s) enviado(s)` + (lig.tubos.length ? ` · ${lig.tubos.length} tubo(s) ligado(s)` : '') + (lig.avisos.length ? ' · atenção: ' + lig.avisos[0] : '') + (r.ruins.length ? ` · ${r.ruins.length} linha(s) ignorada(s)` : '') + '.', 9000);
         viewDetalhe(inp.dataset.id);

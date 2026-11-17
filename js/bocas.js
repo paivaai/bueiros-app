@@ -232,7 +232,7 @@
   function dist(a, b) { return Math.hypot(a.N - b.N, a.E - b.E); }
   function distribuir(l) {
     const livres = l.pontos.filter(p => !p.ref); let n = 0;
-    const atrib = (lado, k, p) => { if (!p || p.ref || !pontosDaBoca(l, lado).some(d => d.k === k)) return; p.ref = refDe(lado, k); delete l.bocas[lado].naoMarcados[k]; n++; };
+    const atrib = (lado, k, p) => { if (!p || p.ref || !(/^GTZ-\d+$/.test(k) || pontosDaBoca(l, lado).some(d => d.k === k))) return; /* GTZ-2.. = demais tubos */ p.ref = refDe(lado, k); delete l.bocas[lado].naoMarcados[k]; n++; };
     const gU = unidades(livres.filter(isGtz), 0.3);
     const nM = pontosDaBoca(l, 'montante').filter(d => d.k.startsWith('GTZ-')).length, nJ = pontosDaBoca(l, 'jusante').filter(d => d.k.startsWith('GTZ-')).length;
     // separa as galerias em duas bocas (a mais alta é a montante)
@@ -276,6 +276,24 @@
     });
     return n;
   }
+  /* Troca montante ↔ jusante nos pontos já distribuídos (a boca de montante nem sempre é a de cota maior: ala quebrada, suja ou alagada). */
+  function trocarLados(l) {
+    l.pontos.forEach(p => { const r = String(p.ref || ''); if (/^montante:/.test(r)) p.ref = r.replace('montante:', 'jusante:'); else if (/^jusante:/.test(r)) p.ref = r.replace('jusante:', 'montante:'); });
+    if (l.prancha) delete l.prancha.inverter;
+  }
+  /* Depois do TXT: mostra qual grupo foi tomado como montante e pede confirmação; se não confirmar, inverte. */
+  async function confirmarLados(l) {
+    let m; try { m = BU.Prancha.modelo(l); } catch (e) { return; }
+    if (!m || m.modo === 'estimado') return;
+    const nz = ps => ps.length ? ps.reduce((s, p) => s + p.Z, 0) / ps.length : null;
+    const gm = m.pts.filter(p => p.papel === 'gim'), gj = m.pts.filter(p => p.papel === 'gij');
+    const zm = gm.length ? nz(gm) : m.A.Z, zj = gj.length ? nz(gj) : m.B.Z, f = v => v == null ? '—' : v.toFixed(3).replace('.', ',');
+    const html = `<p>O app identificou os grupos de geratrizes assim:</p>
+      <p><b>Montante</b> (entrada): ${gm.length || 1} ponto(s), cota média <b>${f(zm)}</b> m<br><b>Jusante</b> (saída): ${gj.length || 1} ponto(s), cota média <b>${f(zj)}</b> m</p>
+      <p class="muted small">Comprimento ${m.L.toFixed(2).replace('.', ',')} m · declividade ${m.decl.toFixed(2).replace('.', ',')}%. Se a montante é o outro lado (ala quebrada, suja ou alagada, por exemplo), toque em “Não, inverter”.</p>`;
+    const r = await UI.escolher('Confirmar montante e jusante', html, [{ k: 'ok', label: 'Confirmar', cls: 'primary' }, { k: 'inv', label: 'Não, inverter' }]);
+    if (r === 'inv') { trocarLados(l); UI.toast('Montante e jusante invertidas', ''); }
+  }
   async function importar(file, lado) {
     const App = BU.App, l = App.cur(); if (!l) return;
     let texto; try { texto = await new Promise((ok, er) => { const fr = new FileReader(); fr.onload = () => ok(String(fr.result)); fr.onerror = () => er(fr.error); fr.readAsText(file); }); } catch (e) { UI.toast('Não foi possível ler o arquivo', 'erro'); return; }
@@ -285,6 +303,8 @@
     const novos = r.ok.filter(p => !ids.has(String(p.id)));
     l.pontos.push(...novos); l.pontosArquivo = file.name;
     const n = distribuir(l);
+    await confirmarLados(l);
+    try { BU.Prancha.sincronizarMedicoes(l); } catch (e) { /* sem modelo */ }
     App.marcarSujo(); App.renderEtapa();
     UI.toast(`${novos.length} ponto(s) importado(s); ${n} colocado(s) nas bocas.${r.ruins.length ? ` ${r.ruins.length} linha(s) ignorada(s).` : ''}`, n ? '' : 'aviso');
   }
@@ -396,6 +416,6 @@
     pendentes(l) { return (l.presencas || []).filter(x => !x.enviado); },
   };
 
-  BU.Bocas = { etapaHTML, pontosDaBoca, faltando, estado, distribuir, perfilBoca, LADOS };
+  BU.Bocas = { etapaHTML, pontosDaBoca, faltando, estado, distribuir, trocarLados, confirmarLados, perfilBoca, LADOS };
   BU.Presenca = Presenca;
 })();
