@@ -537,7 +537,7 @@ ${planta(l, m)}${perfil(l, m)}${detalhe(l, m, { x: 14, y: 620, w: 258, h: 208 },
   /* ---------- exportar ---------- */
   const nomeBase = l => 'PRANCHA-' + U.nomeArquivo(l.codigo);
   async function exportarPNG(l) {
-    await logosPronto;
+    await logosPronto; try { await BU.Folha.preparar(l); } catch (e) { /* esquema */ }
     const svg = gerarSVG(l), img = new Image();
     if (!svg) { UI.toast('Importe os pontos do RTK para gerar a prancha', 'aviso'); return; }
     try {
@@ -572,7 +572,7 @@ ${planta(l, m)}${perfil(l, m)}${detalhe(l, m, { x: 14, y: 620, w: 258, h: 208 },
 
   /* Prancha em PDF: abre a folha A3 paisagem pronta para "Imprimir / Salvar como PDF". */
   async function imprimir(l, janela) {
-    await logosPronto;
+    await logosPronto; try { await BU.Folha.preparar(l); } catch (e) { /* esquema */ }
     const svg = gerarSVG(l);
     if (!svg) { if (janela) janela.close(); UI.toast('Importe os pontos do RTK para gerar a prancha', 'aviso'); return false; }
     const w = janela || window.open('', '_blank'); if (!w) { UI.toast('O navegador bloqueou a nova aba. Libere pop-ups e tente de novo.', 'aviso'); return false; }

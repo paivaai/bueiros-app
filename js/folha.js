@@ -1,7 +1,7 @@
 /* folha.js — a folha A3 da prancha no modelo do CAD do cliente (ANTT / Arteris Fluminense) e o DXF correspondente.
    Esquerda/alto: PLANTA GERAL e PLANTA DE DETALHE (norte para cima, com a triangulação dos pontos).
    Embaixo: PERFIL LONGITUDINAL com grade e a tabela de estacas. Direita: notas, legenda, coordenadas, localização,
-   revisões e carimbo (logos ANTT, Arteris Fluminense e GFA). Expõe BU.Folha = { svg, dxf, FOCOS }. */
+   revisões e carimbo (logos ANTT, Arteris Fluminense e GFA). Expõe BU.Folha = { preparar, svg, dxf, FOCOS }. */
 (function () {
   'use strict';
   const BU = window.BU, U = BU.U, esc = U.esc;
@@ -99,6 +99,10 @@
     // escoamento
     const f1 = pontoEm(m, m.L * 0.3, m.Wplan / 2 + 1.6), f2 = pontoEm(m, m.L * 0.7, m.Wplan / 2 + 1.6);
     g += ln(X(f1.E), Y(f1.N), X(f2.E), Y(f2.N), 'stroke="#2B6CB0" stroke-width="1.2"') + (() => { const x2 = X(f2.E), y2 = Y(f2.N), ang = Math.atan2(Y(f2.N) - Y(f1.N), X(f2.E) - X(f1.E)); const q = (d, a) => `${p1(x2 + d * Math.cos(ang + a))},${p1(y2 + d * Math.sin(ang + a))}`; return `<polygon points="${p1(x2)},${p1(y2)} ${q(-6, .45)} ${q(-6, -.45)}" fill="#2B6CB0"/>`; })();
+    if (geral) { // janela da planta de detalhe (retângulo amarelo, como no CAD)
+      const dm = Math.max(5, 0.4 * m.L), ce = cantos(m), de0 = Math.min(...ce.map(c => c.E)) - dm, de1 = Math.max(...ce.map(c => c.E)) + dm, dn0 = Math.min(...ce.map(c => c.N)) - dm, dn1 = Math.max(...ce.map(c => c.N)) + dm;
+      g += `<rect x="${p1(X(de0))}" y="${p1(Y(dn1))}" width="${p1(X(de1) - X(de0))}" height="${p1(Y(dn0) - Y(dn1))}" fill="none" stroke="#C9A400" stroke-width=".8" stroke-dasharray="4 2"/>`;
+    }
     g += '</g>';
     // norte (símbolo amarelo, como no modelo) e título + escala gráfica
     const nx = P.x + P.w - 20, ny = P.y + 20;
@@ -211,13 +215,48 @@
     lista.slice(0, 10).forEach((p, i) => { const y = P.y + 36 + i * 8.2, nome = p.ref === 'RN' ? 'RN ' + p.id : String(p.ref || '').replace('montante', 'MONT').replace('jusante', 'JUS').replace('GTZ-', 'GI ') || 'GI ' + p.id; g += tx(cx[0], y, nome, { fs: 5, b: 1 }) + tx(cx[1], y, fmt(p.E, 3), { fs: 5 }) + tx(cx[2], y, fmt(p.N, 3), { fs: 5 }) + tx(cx[3], y, fmt(p.Z, 3), { fs: 5 }); });
     return g;
   }
+  /* Imagem de satélite (Esri World Imagery) centrada no bueiro: baixada uma vez, virada em JPEG e guardada em memória.
+     Se estiver sem internet ou o servidor não responder, a folha usa o esquema antigo. */
+  const MAPAS = new Map(), chaveMapa = l => (l.latitude != null && l.longitude != null) ? (+l.latitude).toFixed(5) + ',' + (+l.longitude).toFixed(5) : null;
+  function preparar(l) {
+    const k = chaveMapa(l); if (!k || MAPAS.has(k) || typeof document === 'undefined') return Promise.resolve();
+    MAPAS.set(k, null);
+    const Z = 14, lat = +l.latitude, lon = +l.longitude, n = 2 ** Z;
+    const px = (lon + 180) / 360 * n, py = (1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * n;
+    const tx0 = Math.floor(px) - 1, ty0 = Math.floor(py) - 1, W = 540, H = 270;
+    const img = (x, y) => new Promise(ok => { const im = new Image(); im.crossOrigin = 'anonymous'; im.onload = () => ok(im); im.onerror = () => ok(null); im.src = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${Z}/${y}/${x}`; });
+    const tempo = new Promise(ok => setTimeout(ok, 8000));
+    const trabalho = (async () => {
+      const ims = await Promise.all([0, 1, 2].flatMap(j => [0, 1, 2].map(i => img(tx0 + i, ty0 + j).then(im => ({ im, i, j })))));
+      if (ims.some(t => !t.im)) return;
+      const c = document.createElement('canvas'); c.width = W; c.height = H; const cx = c.getContext('2d');
+      const ox = (px - tx0) * 256 - W / 2, oy = (py - ty0) * 256 - H / 2;
+      ims.forEach(t => cx.drawImage(t.im, t.i * 256 - ox, t.j * 256 - oy));
+      MAPAS.set(k, c.toDataURL('image/jpeg', .82));
+    })().catch(() => { /* canvas contaminado ou sem rede: fica o esquema */ });
+    return Promise.race([trabalho, tempo]).then(() => { if (MAPAS.get(k) == null) MAPAS.delete(k); });
+  }
   function mapa(l) {
     const P = A.mp; let g = titulo(P, 'MAPA DE LOCALIZAÇÃO');
+    const sat = MAPAS.get(chaveMapa(l) || '');
+    if (sat) {
+      const cx = P.x + P.w / 2, cy = P.y + 20 + 60;
+      g += `<image href="${sat}" x="${P.x + 6}" y="${P.y + 20}" width="${P.w - 12}" height="120" preserveAspectRatio="xMidYMid slice"/><rect x="${P.x + 6}" y="${P.y + 20}" width="${P.w - 12}" height="120" fill="none" stroke="${INK}" stroke-width=".6"/>`
+        + `<circle cx="${cx}" cy="${cy}" r="9" fill="none" stroke="#fff" stroke-width="1.2"/><circle cx="${cx}" cy="${cy}" r="4.5" fill="${COR.gi}" stroke="#fff" stroke-width="1.2"/>`
+        + tx(cx + 12, cy - 6, l.codigo || 'Bueiro', { fs: 6.5, b: 1, c: '#fff', ex: ' stroke="#000" stroke-width="2" paint-order="stroke"' })
+        + tx(P.x + 12, P.y + 32, (l.estrada || 'Rodovia') + (l.km ? ' · km ' + l.km : ''), { fs: 6.5, b: 1, c: '#fff', ex: ' stroke="#000" stroke-width="2" paint-order="stroke"' })
+        + tx(P.x + P.w - 10, P.y + 134, 'Imagem: Esri, Maxar, Earthstar Geographics · escala aprox. 1:25.000', { fs: 4.2, c: '#fff', a: 'end', ex: ' stroke="#000" stroke-width="1.6" paint-order="stroke"' });
+      return g + mapaDados(l, P);
+    }
     const cy = P.y + 80, cx = P.x + 120;
     g += `<rect x="${P.x + 6}" y="${P.y + 20}" width="${P.w - 12}" height="120" fill="#F2F5F2" stroke="${GRID}" stroke-width=".6"/>`
       + `<path d="M ${P.x + 6} ${cy + 36} C ${P.x + 70} ${cy + 22}, ${P.x + 130} ${cy - 22}, ${P.x + P.w - 6} ${cy - 38}" fill="none" stroke="#9AA39C" stroke-width="7" stroke-linecap="round"/><path d="M ${P.x + 6} ${cy + 36} C ${P.x + 70} ${cy + 22}, ${P.x + 130} ${cy - 22}, ${P.x + P.w - 6} ${cy - 38}" fill="none" stroke="#fff" stroke-width=".8" stroke-dasharray="5 4"/>`
       + `<circle cx="${cx}" cy="${cy - 2}" r="5" fill="${COR.gi}" stroke="#fff" stroke-width="1.2"/>` + tx(cx, cy - 11, l.codigo || 'Bueiro', { fs: 6.5, b: 1, a: 'middle', halo: 1 })
       + tx(P.x + 12, P.y + 33, (l.estrada || 'Rodovia') + (l.km ? ' · km ' + l.km : ''), { fs: 6.5, b: 1, halo: 1 }) + tx(P.x + P.w - 10, P.y + 134, 'esquema sem escala', { fs: 4.6, c: MUTED, a: 'end' });
+    return g + mapaDados(l, P);
+  }
+  function mapaDados(l, P) {
+    let g = '';
     const u = BU.GPS.utmDe(l), Lx = [['MUNICÍPIO / UF', [l.municipio, l.estado].filter(Boolean).join(' / ') || '—'], ['LATITUDE / LONGITUDE', l.latitude != null ? `${fmt(l.latitude, 6)} / ${fmt(l.longitude, 6)}` : '—'], ['UTM (E / N)', u ? `${fmt(u.E, 1)} / ${fmt(u.N, 1)}` : '—'], ['PISTA / LADO', [l.pistaGe, l.lado].filter(Boolean).join(' / ') || '—']];
     Lx.forEach(([k, v], i) => { const x = P.x + 8 + (i % 2) * 124, y = P.y + 154 + (i >> 1) * 26; g += tx(x, y, k, { fs: 4.6, b: 1, c: MUTED }) + tx(x, y + 9, String(v).slice(0, 30), { fs: 5.8, b: 1 }); });
     return g;
@@ -327,5 +366,5 @@ ${planta(l, m, A.p1, tin, 'geral')}${planta(l, m, A.p2, tin, 'detalhe')}${perfil
     return o.join('\r\n') + '\r\n';
   }
 
-  BU.Folha = { svg, dxf, FOCOS, SW, SH };
+  BU.Folha = { preparar, svg, dxf, FOCOS, SW, SH };
 })();
