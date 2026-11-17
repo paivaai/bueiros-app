@@ -62,6 +62,8 @@
   const COR_FEICAO = { pista: '#D9822B', terreno: '#1B9E8A', outro: '#7A7F7C' };
 
   /* ---------- planta (norte para cima, com triangulação) ---------- */
+  /* janela da planta de detalhe (1:50) centrada na boca de montante, um pouco para dentro do tubo */
+  function janelaDetalhe(m) { const c = pontoEm(m, Math.min(2, m.L / 4), 0), sc = 1415 / 50; return { E: c.E, N: c.N, w: (A.p2.w - 34) / sc, h: (A.p2.h - 24) / sc }; }
   function planta(l, m, P, tin, modo) {
     const geral = modo === 'geral', cs = cantos(m);
     let E = cs.map(c => c.E), N = cs.map(c => c.N);
@@ -69,17 +71,23 @@
     let e0 = Math.min(...E), e1 = Math.max(...E), n0 = Math.min(...N), n1 = Math.max(...N);
     const mg = geral ? Math.max(4, 0.06 * Math.max(e1 - e0, n1 - n0)) : Math.max(5, 0.4 * m.L);
     e0 -= mg; e1 += mg; n0 -= mg; n1 += mg;
-    const R = { x: P.x + 26, y: P.y + 6, w: P.w - 34, h: P.h - 24 }, sc = Math.min(R.w / (e1 - e0), R.h / (n1 - n0)), cE = (e0 + e1) / 2, cN = (n0 + n1) / 2;
+    const R = { x: P.x + 26, y: P.y + 6, w: P.w - 34, h: P.h - 24 };
+    let sc = Math.min(R.w / (e1 - e0), R.h / (n1 - n0)), cE = (e0 + e1) / 2, cN = (n0 + n1) / 2;
+    /* escalas redondas, como no CAD: planta geral na menor escala 1:S que cabe; detalhe 1:50 centrado na boca de montante */
+    const ESC = [50, 100, 150, 200, 250, 350, 500, 750, 1000, 1500, 2000, 2500, 5000], dj = janelaDetalhe(m);
+    let S;
+    if (geral) S = ESC.find(v => v >= 1415 / sc) || Math.round(1415 / sc); else { S = 50; cE = dj.E; cN = dj.N; }
+    sc = 1415 / S;
     const X = e => R.x + R.w / 2 + (e - cE) * sc, Y = n => R.y + R.h / 2 - (n - cN) * sc;
     const id = 'cp-' + modo;
     let g = `<clipPath id="${id}"><rect x="${P.x}" y="${P.y}" width="${P.w}" height="${P.h}"/></clipPath>` + box(P.x, P.y, P.w, P.h, RED, .9) + `<g clip-path="url(#${id})">`;
     // grade de cruzetas com as coordenadas
     const st = passo(Math.max(R.w, R.h) / sc, 4);
     for (let e = Math.ceil((cE - R.w / 2 / sc) / st) * st; e <= cE + R.w / 2 / sc; e += st) {
-      g += tx(X(e), P.y + P.h - 4, fmt(e, 0), { fs: 4.8, c: '#8A8F8C', a: 'middle' });
+      g += tx(X(e), P.y + P.h - 4, 'E=' + fmt(e, 0), { fs: 4.8, c: '#8A8F8C', a: 'middle' });
       for (let n = Math.ceil((cN - R.h / 2 / sc) / st) * st; n <= cN + R.h / 2 / sc; n += st) g += ln(X(e) - 3, Y(n), X(e) + 3, Y(n), 'stroke="#9AA09C" stroke-width=".5"') + ln(X(e), Y(n) - 3, X(e), Y(n) + 3, 'stroke="#9AA09C" stroke-width=".5"');
     }
-    for (let n = Math.ceil((cN - R.h / 2 / sc) / st) * st; n <= cN + R.h / 2 / sc; n += st) g += tx(P.x + 9, Y(n), fmt(n, 0), { fs: 4.8, c: '#8A8F8C', a: 'middle', rot: -90 });
+    for (let n = Math.ceil((cN - R.h / 2 / sc) / st) * st; n <= cN + R.h / 2 / sc; n += st) g += tx(P.x + 9, Y(n), 'N=' + fmt(n, 0), { fs: 4.8, c: '#8A8F8C', a: 'middle', rot: -90 });
     // triangulação
     if (tin) g += `<g stroke="#6F7773" stroke-width="${geral ? .4 : .5}" fill="none">${tin.arestas.map(([a, b]) => ln(X(m.pts[a].E), Y(m.pts[a].N), X(m.pts[b].E), Y(m.pts[b].N))).join('')}</g>`;
     // linhas de feição (pista, bordas, talude)
@@ -100,19 +108,21 @@
     const f1 = pontoEm(m, m.L * 0.3, m.Wplan / 2 + 1.6), f2 = pontoEm(m, m.L * 0.7, m.Wplan / 2 + 1.6);
     g += ln(X(f1.E), Y(f1.N), X(f2.E), Y(f2.N), 'stroke="#2B6CB0" stroke-width="1.2"') + (() => { const x2 = X(f2.E), y2 = Y(f2.N), ang = Math.atan2(Y(f2.N) - Y(f1.N), X(f2.E) - X(f1.E)); const q = (d, a) => `${p1(x2 + d * Math.cos(ang + a))},${p1(y2 + d * Math.sin(ang + a))}`; return `<polygon points="${p1(x2)},${p1(y2)} ${q(-6, .45)} ${q(-6, -.45)}" fill="#2B6CB0"/>`; })();
     if (geral) { // janela da planta de detalhe (retângulo amarelo, como no CAD)
-      const dm = Math.max(5, 0.4 * m.L), ce = cantos(m), de0 = Math.min(...ce.map(c => c.E)) - dm, de1 = Math.max(...ce.map(c => c.E)) + dm, dn0 = Math.min(...ce.map(c => c.N)) - dm, dn1 = Math.max(...ce.map(c => c.N)) + dm;
-      g += `<rect x="${p1(X(de0))}" y="${p1(Y(dn1))}" width="${p1(X(de1) - X(de0))}" height="${p1(Y(dn0) - Y(dn1))}" fill="none" stroke="#C9A400" stroke-width=".8" stroke-dasharray="4 2"/>`;
+      const x1 = X(dj.E - dj.w / 2), x2 = X(dj.E + dj.w / 2), y1 = Y(dj.N + dj.h / 2), y2 = Y(dj.N - dj.h / 2);
+      g += `<rect x="${p1(x1)}" y="${p1(y1)}" width="${p1(x2 - x1)}" height="${p1(y2 - y1)}" fill="none" stroke="#C9A400" stroke-width=".8" stroke-dasharray="4 2"/>` + tx(x1, y1 - 3, 'DETALHE 1', { fs: 5.6, b: 1, c: '#C9A400', halo: 1 });
+      const ang0 = Math.atan2(-m.u.N, m.u.E) * 180 / Math.PI, ang = Math.abs(ang0) > 90 ? ang0 + (ang0 > 0 ? -180 : 180) : ang0, dir = Math.abs(ang0) > 90 ? -1 : 1;
+      const lado = (b, h, s, nome) => { const q = pontoEm(m, s, 0), px = X(q.E), py = Y(q.N), d = 8 * dir * (s < 1 ? -1 : 1); return tx(px + d * Math.cos(ang * Math.PI / 180) * -0, py, '', {}) + tx(px - 0, py, nome + `  Ø/H=${fmt(h, 2)} m  GI=${fmt(b.Z, 3)}`, { fs: 4.8, b: 1, c: MAG, a: s < 1 ? (dir > 0 ? 'end' : 'start') : (dir > 0 ? 'start' : 'end'), rot: p1(ang), halo: 1 }); };
+      g += lado(m.A, m.hA, -2, 'BOCA MONTANTE') + lado(m.B, m.hB, m.L + 2, 'BOCA JUSANTE');
     }
     g += '</g>';
     // norte (símbolo amarelo, como no modelo) e título + escala gráfica
     const nx = P.x + P.w - 20, ny = P.y + 20;
     g += `<circle cx="${nx}" cy="${ny}" r="9" fill="#F2C200" stroke="#7A6200" stroke-width=".6"/><polygon points="${nx},${ny - 7} ${nx + 3},${ny + 3} ${nx},${ny + 1} ${nx - 3},${ny + 3}" fill="${INK}"/>` + tx(nx, ny + 17, 'N', { fs: 6.5, b: 1, a: 'middle' });
-    const razao = 1000 / (sc * (420 / SW)), nice = [20, 25, 50, 75, 100, 150, 200, 250, 300, 500, 750, 1000, 1500, 2000, 2500, 5000], esc_ = nice.find(v => v >= razao) || Math.round(razao);
     const alvo = Math.min(90 / sc, 200), lb = [1, 2, 5, 10, 20, 50, 100].filter(v => v <= alvo).pop() || 1, wB = lb * sc, bx = P.x + P.w - 12 - wB, by = P.y + P.h + 12;
     for (let i = 0; i < 4; i++) g += `<rect x="${p1(bx + i * wB / 4)}" y="${by}" width="${p1(wB / 4)}" height="4" fill="${i % 2 ? '#fff' : INK}" stroke="${INK}" stroke-width=".5"/>`;
-    g += tx(bx, by - 2, '0', { fs: 5 }) + tx(bx + wB, by - 2, `${lb} m`, { fs: 5, a: 'middle' }) + tx(bx + wB, by + 13, `ESC. APROX. 1:${esc_} (A3)`, { fs: 5, c: MUTED, a: 'end' });
-    g += `<circle cx="${P.x + 8}" cy="${P.y + P.h + 12}" r="5" fill="none" stroke="${RED}" stroke-width=".8"/><circle cx="${P.x + 8}" cy="${P.y + P.h + 12}" r="2" fill="#18A0C8"/>`
-      + tx(P.x + 18, P.y + P.h + 12, geral ? 'PLANTA GERAL DO LEVANTAMENTO' : 'PLANTA DE DETALHE DO BUEIRO', { fs: 8, b: 1, c: '#0B7C99' }) + tx(P.x + 18, P.y + P.h + 22, `COORDENADAS UTM · SIRGAS 2000 · FUSO ${l.zona || ''}${l.hemisferio || 'S'} · NORTE PARA CIMA`, { fs: 5.2, c: '#9A8200' });
+    g += tx(bx, by - 2, '0', { fs: 5 }) + tx(bx + wB, by - 2, `${lb} m`, { fs: 5, a: 'middle' }) + tx(bx + wB, by + 13, `ESCALA GRÁFICA 1:${S}`, { fs: 5, b: 1, c: RED, a: 'end' });
+    g += `<circle cx="${P.x + 10}" cy="${P.y + P.h + 13}" r="7" fill="none" stroke="${RED}" stroke-width=".8"/>` + tx(P.x + 10, P.y + P.h + 16, geral ? 'A' : '1', { fs: 8, b: 1, c: '#0B7C99', a: 'middle' })
+      + tx(P.x + 22, P.y + P.h + 12, geral ? 'PLANTA PLANIALTIMÉTRICA CADASTRAL' : 'DETALHE 1 - BOCA MONTANTE E DRENAGEM', { fs: 8, b: 1, c: '#0B7C99' }) + tx(P.x + 22, P.y + P.h + 23, `ESC. 1:${S}`, { fs: 5.6, b: 1, c: '#9A8200' });
     return g;
   }
 
@@ -126,58 +136,74 @@
   }
   /* ---------- perfil longitudinal ---------- */
   function perfil(l, m, P) {
-    const nl = m.linha, tab = 5, rh = 17, th = tab * rh;
-    const R = { x: P.x + 112, y: P.y + 52, w: P.w - 112 - 18, h: P.h - 52 - th - 40 };
-    const xMin = Math.min(-2, ...nl.map(p => p.s)) - 1, xMax = Math.max(m.L + 2, ...nl.map(p => p.s)) + 1;
-    const zs = [m.A.Z - m.e, m.B.Z - m.e, m.A.Z + m.H + m.e, m.B.Z + m.H + m.e, ...nl.map(p => p.Z)], zMin = Math.min(...zs) - 0.4, zMax = Math.max(...zs) + 0.8;
-    const sx = R.w / (xMax - xMin); let sy = R.h / (zMax - zMin); sy = Math.min(sy, sx * 8);
-    const hh = (zMax - zMin) * sy, ex = sy / sx, X = s => R.x + (s - xMin) * sx, Y = z => R.y + R.h - (z - zMin) * sy;
-    const yBase = R.y + R.h; // fundo do gráfico (a grade usa a altura cheia; o desenho fica encostado embaixo)
-    void hh;
-    let g = box(P.x, P.y, P.w, P.h, RED, .9) + `<clipPath id="cp-pf"><rect x="${R.x - 2}" y="${R.y - 22}" width="${R.w + 4}" height="${R.h + 24}"/></clipPath>`;
-    g += `<pattern id="hach" patternUnits="userSpaceOnUse" width="5" height="5" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="5" stroke="${MAG}" stroke-width=".6"/></pattern>`;
-    const pz = passo(zMax - zMin, Math.max(4, Math.round(R.h / 22))), px = passo(xMax - xMin, 14);
-    { const pm = pz / 4; for (let z = Math.ceil(zMin / pm) * pm; z <= zMax + 1e-9; z += pm) g += ln(R.x, Y(z), R.x + R.w, Y(z), `stroke="${GRID}" stroke-width=".25"`); }
-    for (let z = Math.ceil(zMin / pz) * pz; z <= zMax + 1e-9; z += pz) g += ln(R.x, Y(z), R.x + R.w, Y(z), `stroke="${GRID}" stroke-width=".6"`) + tx(R.x - 4, Y(z) + 2, fmt(z, pz < 1 ? 1 : 0), { fs: 5.2, c: MUTED, a: 'end' });
-    for (let x = Math.ceil(xMin / px) * px; x <= xMax + 1e-9; x += px) g += ln(X(x), R.y, X(x), yBase, `stroke="${GRID}" stroke-width=".6"`);
-    g += box(R.x, R.y, R.w, R.h, '#9AA09C', .6) + `<g clip-path="url(#cp-pf)">`;
-    const L = m.L, e = m.e, H = m.H, poly = pts => pts.map(q => p1(X(q[0])) + ',' + p1(Y(q[1]))).join(' ');
-    g += `<polygon points="${poly([[0, m.A.Z - e], [L, m.B.Z - e], [L, m.B.Z + H + e], [0, m.A.Z + H + e]])}" fill="url(#hach)" stroke="${MAG}" stroke-width="1"/>`
-      + `<polygon points="${poly([[0, m.A.Z], [L, m.B.Z], [L, m.B.Z + H], [0, m.A.Z + H]])}" fill="#fff" fill-opacity=".85" stroke="${MAG}" stroke-width=".6"/>`
-      + ln(X(0), Y(m.A.Z), X(L), Y(m.B.Z), `stroke="${COR.gi}" stroke-width="1.8"`);
-    g += tx(X(0) - 3, Y(m.A.Z) + 10, `GI ${fmt(m.A.Z, 3)}`, { fs: 6, b: 1, c: COR.gi, a: 'end', halo: 1 }) + tx(X(L) + 3, Y(m.B.Z) + 10, `GI ${fmt(m.B.Z, 3)}`, { fs: 6, b: 1, c: COR.gi, halo: 1 });
-    if (m.seLinha && nl.length > 1) g += `<polyline points="${nl.map(p => p1(X(p.s)) + ',' + p1(Y(p.Z))).join(' ')}" fill="none" stroke="#8A5A00" stroke-width="1.3" stroke-linejoin="round"/>`;
-    let ult = -1e9;
-    for (const p of (m.pontosEixo || [])) { g += `<circle cx="${p1(X(p.s))}" cy="${p1(Y(p.Z))}" r="1.5" fill="#fff" stroke="#8A5A00" stroke-width=".8"/>`; if (X(p.s) - ult >= 9) { g += tx(X(p.s) + 1.5, Y(p.Z) - 4, `${p.id}  ${fmt(p.Z, 3)}`, { fs: 4.6, c: '#444', rot: -90 }); ult = X(p.s); } }
-    if (m.cob && m.cob.valor > 0) {
-      const xc = X(m.cob.s), yT = Y(m.inv(m.cob.s) + H + e), yP = Y(m.cob.zTopoPista);
-      g += ln(xc, yT, xc, yP, `stroke="${PURPLE}" stroke-width="1.2"`) + ln(xc - 3, yT, xc + 3, yT, `stroke="${PURPLE}" stroke-width="1.2"`) + ln(xc - 3, yP, xc + 3, yP, `stroke="${PURPLE}" stroke-width="1.2"`)
-        + tx(xc - 5, (yT + yP) / 2 + 2, `recobrimento ${fmt(m.cob.valor, 2)} m`, { fs: 6.5, b: 1, c: PURPLE, a: 'end', halo: 1 });
-    }
-    g += tx(X(L / 2), Y(m.A.Z + (m.B.Z - m.A.Z) / 2 - e) + 14, `L = ${fmt(L, 2)} m · i = ${fmt(m.decl, 2)} % · ${m.dims ? m.dims.rotulo : 'H = ' + fmt(H, 2) + ' m'}`, { fs: 7, b: 1, a: 'middle', halo: 1 });
+    const nl = m.linha, L = m.L, tab = 5, rh = 28, th = tab * rh, labW = 104;
+    const gi = s => m.A.Z + (m.B.Z - m.A.Z) * s / L, gsf = s => m.gs ? m.gs(s) : gi(s) + m.H;
+    // alcance horizontal: 5 m antes da boca de montante até 5 m depois da jusante (múltiplos de 2,5 m)
+    const sIni = -5, sFim = Math.ceil((L + 5) / 2.5) * 2.5;
+    const zT = nl.filter(p => p.s >= sIni && p.s <= sFim).map(p => p.Z);
+    const zLo = Math.floor(Math.min(m.A.Z, m.B.Z, ...(zT.length ? zT : [m.A.Z])) - 1), zHi = Math.ceil(Math.max(gsf(0), gsf(L), ...(zT.length ? zT : [m.A.Z])) + 1.5);
+    // escala real 1:S (A1: 1 m = 1415/S unidades da folha), a maior que cabe
+    const availW = P.w - labW - 34, availH = P.h - 70 - th - 40;
+    const S = [50, 100, 200, 250, 500, 1000, 2000].find(s => (sFim - sIni) * 1415 / s <= availW && (zHi - zLo) * 1415 / s <= availH) || 2000, k = 1415 / S;
+    const W = (sFim - sIni) * k, Hh = (zHi - zLo) * k;
+    const x0 = P.x + labW + 14 + (availW - W) / 2, yTop = P.y + 70, yBase = yTop + Hh;
+    const X = s => x0 + (s - sIni) * k, Y = z => yBase - (z - zLo) * k;
+    let g = box(P.x, P.y, P.w, P.h, RED, .9) + `<clipPath id="cp-pf"><rect x="${p1(x0 - 2)}" y="${p1(yTop - 2)}" width="${p1(W + 4)}" height="${p1(Hh + 4)}"/></clipPath>`;
+    g += `<pattern id="hach" patternUnits="userSpaceOnUse" width="4" height="4" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="4" stroke="${MAG}" stroke-width=".6"/></pattern>`;
+    // título (letra B), escala e barra gráfica
+    g += `<circle cx="${P.x + 12}" cy="${P.y + 18}" r="7" fill="none" stroke="${RED}" stroke-width=".8"/>` + tx(P.x + 12, P.y + 21, 'B', { fs: 8, b: 1, c: '#0B7C99', a: 'middle' })
+      + tx(P.x + 26, P.y + 17, 'PERFIL LONGITUDINAL DO BUEIRO (EIXO DO TUBO)', { fs: 9, b: 1, c: '#0B7C99' })
+      + tx(P.x + 26, P.y + 28, `ESC. H = V = 1:${S} (sem exagero vertical) - distâncias a partir da boca de montante`, { fs: 5.4, c: '#9A8200' });
+    { const lb = [1, 2, 5, 10, 20, 50].filter(v => v * k <= 120).pop() || 1, wB = lb * k, bx = P.x + P.w - 20 - wB, by = P.y + 22;
+      for (let i = 0; i < 5; i++) g += `<rect x="${p1(bx + i * wB / 5)}" y="${by}" width="${p1(wB / 5)}" height="4" fill="${i % 2 ? '#fff' : INK}" stroke="${INK}" stroke-width=".5"/>`;
+      g += tx(bx, by - 2, '0', { fs: 5, a: 'middle' }) + tx(bx + wB, by - 2, lb + ' m', { fs: 5, a: 'middle' }) + tx(bx, by + 12, `ESCALA GRÁFICA 1:${S}`, { fs: 4.8, c: MUTED }); }
+    // grade: horizontais a cada 0,5 m (cotas a cada 1 m), verticais nas estacas
+    for (let z = zLo; z <= zHi + 1e-9; z += 0.5) { const inteiro = Math.abs(z - Math.round(z)) < 1e-9; g += ln(x0, Y(z), x0 + W, Y(z), `stroke="${inteiro ? '#BFC5C1' : GRID}" stroke-width="${inteiro ? .45 : .3}"`); if (inteiro) g += tx(x0 - 4, Y(z) + 2, fmt(z, 2), { fs: 5.2, c: INK, a: 'end' }); }
+    const passoSt = [2.5, 5, 10, 20, 50].find(v => v * k >= 20) || 50, est = [];
+    for (let s = Math.ceil(sIni / passoSt) * passoSt; s <= sFim + 1e-9; s += passoSt) est.push(+s.toFixed(3));
+    const iL = est.findIndex(s => Math.abs(s - L) < passoSt * 0.4); if (iL >= 0) est[iL] = +L.toFixed(2); else { est.push(+L.toFixed(2)); est.sort((a, b) => a - b); }
+    est.forEach(s => { g += ln(X(s), yTop, X(s), yBase, `stroke="${GRID}" stroke-width=".4"`); });
+    g += box(x0, yTop, W, Hh, '#9AA09C', .6) + `<g clip-path="url(#cp-pf)">`;
+    // terreno pelo eixo (TIN) e corpo do tubo (GI → GS)
+    const nv = nl.filter(p => p.s >= sIni - 0.01 && p.s <= sFim + 0.01);
+    if (m.seLinha && nv.length > 1) g += `<polyline points="${nv.map(p => p1(X(p.s)) + ',' + p1(Y(p.Z))).join(' ')}" fill="none" stroke="#B4793A" stroke-width="1.1" stroke-linejoin="round"/>`;
+    const tubo = [[0, gi(0)], [L, gi(L)], [L, gsf(L)], [0, gsf(0)]].map(q => p1(X(q[0])) + ',' + p1(Y(q[1]))).join(' ');
+    g += `<polygon points="${tubo}" fill="url(#hach)" stroke="${MAG}" stroke-width="1"/>`;
+    // alas / topo de ala e caixa coletora
+    const perto = (E, N, r) => m.pts.filter(p => Math.hypot(p.E - E, p.N - N) <= r);
+    const topoAla = (b) => { const a = perto(b.E, b.N, 6).filter(p => p.papel === 'contorno').map(p => p.Z); return a.length ? Math.max(...a) : null; };
+    const tA = topoAla(m.A), tB = topoAla(m.B);
+    [[0, m.A, tA], [L, m.B, tB]].forEach(([s, b, t]) => { if (t != null) g += ln(X(s), Y(b.Z), X(s), Y(t), `stroke="${MAG}" stroke-width="1.1"`) + ln(X(s) - 3, Y(t), X(s) + 3, Y(t), `stroke="${MAG}" stroke-width="1.1"`); });
+    const cxs = m.pts.filter(p => /^DRE-?CX|CAIXA/i.test(String(p.cod || '')) && Math.abs(p.t) <= 3 && p.s >= -6 && p.s <= 6);
+    if (cxs.length) { const a = Math.min(...cxs.map(p => p.s)) - 0.2, b = Math.max(...cxs.map(p => p.s)) + 0.2, zt = Math.max(...cxs.map(p => p.Z)), zb = Math.min(...cxs.map(p => p.Z)) - 0.15;
+      g += `<rect x="${p1(X(a))}" y="${p1(Y(zt))}" width="${p1(X(b) - X(a))}" height="${p1(Y(zb) - Y(zt))}" fill="none" stroke="#2F4BD8" stroke-width=".9"/>` + tx(X(b) + 3, Y(zt) - 2, `CAIXA (topo ${fmt(zt, 3)})`, { fs: 4.8, halo: 1 }); }
+    // pontos do terreno sobre o eixo: BA / CR / PA com chamada vertical
+    const ROT = { ASF: 'BA', CA: 'CR', PA: 'PA' }; let ult = -1e9;
+    const marc = m.pts.filter(p => { const c = String(p.cod || '').toUpperCase().match(/^TER-?(ASF|CA|PA)$/); return c && Math.abs(p.t) <= 2.2 && p.s >= sIni && p.s <= sFim; }).sort((a, b) => a.s - b.s);
+    for (const p of marc) { const x = X(p.s); if (x - ult < 7.5) continue; ult = x; const ab = ROT[String(p.cod).toUpperCase().replace('TER-', '').replace('TER', '')];
+      g += ln(x, Y(p.Z), x, Y(p.Z) - 16, 'stroke="#555" stroke-width=".5"') + tx(x + 1.8, Y(p.Z) - 18, `${ab} ${fmt(p.Z, 3)}`, { fs: 4.8, rot: -90 }); }
+    // recobrimento máximo (cota roxa)
+    if (m.cob && m.cob.valor > 0) { const xc = X(m.cob.s), yT = Y(gsf(m.cob.s)), yP = Y(m.cob.zTopoPista);
+      g += ln(xc, yT, xc, yP, `stroke="${PURPLE}" stroke-width="1"`) + tx(xc + 3, (yT + yP) / 2 + 2, `rec. ${fmt(m.cob.valor, 2)} m`, { fs: 4.8, b: 1, c: PURPLE, halo: 1 }); }
+    // rótulo do bueiro, paralelo ao tubo
+    { const ang = Math.atan2(Y(gi(L)) - Y(gi(0)), X(L) - X(0)) * 180 / Math.PI, mx = X(L / 2), my = Y(gi(L / 2)) + 12;
+      g += tx(mx, my, `BUEIRO Ø/H≈${fmt((m.hA + m.hB) / 2, 2)} m  -  L = ${fmt(L, 2)} m  -  i = ${fmt(m.decl, 2)} %`, { fs: 6, b: 1, a: 'middle', rot: p1(ang) }); }
     g += '</g>';
-    { const alvo = 80 / sx, lb = [1, 2, 5, 10, 20, 50, 100].filter(v => v <= alvo).pop() || 1, wB = lb * sx, bx = P.x + P.w - 14 - wB, by = P.y + 20;
-      for (let i = 0; i < 4; i++) g += `<rect x="${p1(bx + i * wB / 4)}" y="${by}" width="${p1(wB / 4)}" height="4" fill="${i % 2 ? '#fff' : INK}" stroke="${INK}" stroke-width=".5"/>`;
-      g += tx(bx, by - 2, '0', { fs: 5 }) + tx(bx + wB, by - 2, lb + ' m', { fs: 5, a: 'middle' }) + tx(bx + wB, by + 12, 'ESC. HORIZ. = DA PLANTA', { fs: 4.6, c: MUTED, a: 'end' }); }
-    // título e escala
-    g += `<circle cx="${P.x + 10}" cy="${P.y + 14}" r="5" fill="none" stroke="${RED}" stroke-width=".8"/><circle cx="${P.x + 10}" cy="${P.y + 14}" r="2" fill="#18A0C8"/>`
-      + tx(P.x + 20, P.y + 16, 'PERFIL LONGITUDINAL PELO EIXO DO BUEIRO', { fs: 9, b: 1, c: '#0B7C99' })
-      + tx(P.x + 20, P.y + 27, `EXAGERO VERTICAL ${String(ex.toFixed(1)).replace('.', ',')}× · DISTÂNCIAS A PARTIR DA GERATRIZ INFERIOR DE MONTANTE · COTAS EM METROS`, { fs: 5.2, c: '#9A8200' });
+    // bocas: títulos, GI, Ø/H e topo de ala
+    const bocaTxt = (s, b, h, t, nome) => tx(X(s), Y(b.Z) + 12, nome, { fs: 6.5, b: 1, a: 'middle' }) + tx(X(s), Y(b.Z) + 20, `GI = ${fmt(b.Z, 3)}  |  Ø/H≈${fmt(h, 2)} m`, { fs: 4.8, a: 'middle' }) + tx(X(s), Y(b.Z) + 27, `Topo ala = ${fmt(t != null ? t : b.Z + h, 3)}`, { fs: 4.8, a: 'middle' });
+    g += bocaTxt(0, m.A, m.hA, tA, 'BOCA MONTANTE') + bocaTxt(L, m.B, m.hB, tB, 'BOCA JUSANTE');
     // tabela de estacas
-    const terrenoEm = s => { if (!nl.length) return null; if (s <= nl[0].s) return nl[0].Z; for (let i = 1; i < nl.length; i++) if (s <= nl[i].s) { const a = nl[i - 1], b = nl[i]; return b.s === a.s ? b.Z : a.Z + (b.Z - a.Z) * (s - a.s) / (b.s - a.s); } return nl[nl.length - 1].Z; };
-    const sel = estacas(m, nl).map(s => ({ s, fixo: s === 0 || s === +L.toFixed(3) })), passoE = passoEstaca(m);
-    const ty = P.y + P.h - th - 22, rot = ['ESTACA / DIST. (m)', 'COTA DO TERRENO (m)', 'COTA GERATRIZ INF. (m)', 'RECOBRIMENTO (m)', 'DECLIVIDADE (%)'];
-    g += box(P.x + 8, ty, R.x + R.w - P.x - 8, th, '#888', .6);
-    rot.forEach((t, i) => { g += tx(P.x + 12, ty + i * rh + 11, t, { fs: 5.4, b: 1, c: '#0B7C99' }) + (i ? ln(P.x + 8, ty + i * rh, R.x + R.w, ty + i * rh, 'stroke="#BBB" stroke-width=".5"') : ''); });
-    g += ln(R.x - 6, ty, R.x - 6, ty + th, 'stroke="#888" stroke-width=".6"');
-    for (const c of sel) {
-      const x = X(c.s), dentro = c.s >= -1e-6 && c.s <= L + 1e-6, Zt = terrenoEm(c.s), inv = dentro ? m.inv(c.s) : null;
-      const rec = dentro && Zt != null ? Zt - (inv + H + e) : null;
-      g += ln(x, yBase, x, ty, 'stroke="#C9CECB" stroke-width=".4" stroke-dasharray="1.5 2"');
-      const v = [fmt(c.s, 1), Zt != null ? fmt(Zt, 3) : '—', inv != null ? fmt(inv, 3) : '—', rec != null && rec > 0 ? fmt(rec, 2) : '—', dentro ? fmt(m.decl, 2) : '—'];
-      v.forEach((t, i) => { g += tx(x, ty + i * rh + 11, t, { fs: 5, a: 'middle', b: c.fixo }); });
+    const terrenoEm = s => { if (nl.length < 2 || s < nl[0].s - 1e-6 || s > nl[nl.length - 1].s + 1e-6) return null; for (let i = 1; i < nl.length; i++) if (s <= nl[i].s) { const a = nl[i - 1], b = nl[i]; return b.s === a.s ? b.Z : a.Z + (b.Z - a.Z) * (s - a.s) / (b.s - a.s); } return nl[nl.length - 1].Z; };
+    const ty = yBase + 10, rot = ['DISTÂNCIA (m)', 'COTA TERRENO (m)', 'COTA GI (m)', 'COTA GS (m)', 'RECOBRIMENTO (m)'], tx0 = x0 - labW;
+    g += box(tx0, ty, labW + W, th, '#9AA09C', .6) + ln(x0, ty, x0, ty + th, 'stroke="#9AA09C" stroke-width=".6"');
+    rot.forEach((t, i) => { g += tx(tx0 + 6, ty + i * rh + 11, t, { fs: 5.2 }) + (i ? ln(tx0, ty + i * rh, x0 + W, ty + i * rh, 'stroke="#C9CECB" stroke-width=".5"') : ''); });
+    for (const s of est) {
+      const x = X(s), dentro = s >= -1e-6 && s <= L + 1e-6, zt = terrenoEm(s), rec = dentro && zt != null && s < L - 1e-6 ? zt - gsf(s) : null;
+      const v = [fmt(s, 2), zt != null ? fmt(zt, 3) : '-', dentro ? fmt(gi(s), 3) : '-', dentro ? fmt(gsf(s), 3) : '-', rec != null && rec > 0 ? fmt(rec, 2) : '-'];
+      g += ln(x, yBase, x, ty + th, 'stroke="#C9CECB" stroke-width=".35" stroke-dasharray="1.5 2"');
+      v.forEach((t, i) => { g += tx(x + 1.8, ty + i * rh + rh / 2, t, { fs: 4.6, a: 'middle', rot: -90 }); });
     }
-    g += tx(P.x + 12, P.y + P.h - 9, 'GI = geratriz inferior. Terreno interpolado na triangulação dos pontos levantados, ao longo do eixo; estacas a cada ' + String(passoE).replace('.', ',') + ' m.', { fs: 5, c: MUTED });
+    g += tx(x0, ty + th + 14, 'BA = borda do asfalto | CR = crista do aterro | PA = pé do aterro | GI/GS = geratriz inferior/superior', { fs: 5 });
     return g;
   }
 
@@ -186,33 +212,53 @@
   function quebrar(t, n) { const o = []; let c = ''; for (const w of String(t).split(/\s+/)) { if ((c + ' ' + w).trim().length > n && c) { o.push(c); c = w; } else c = (c + ' ' + w).trim(); } if (c) o.push(c); return o; }
 
   function notas(l, m) {
-    const P = A.nt, u = BU.GPS.utmDe(l);
-    const N = [`Coordenadas UTM, SIRGAS 2000${u ? ', ' + BU.GPS.rotuloUTM(u).replace(' · SIRGAS 2000', '') : ''}. Cotas e dimensões em metros.`,
-      `Levantamento RTK${l.data ? ' em ' + U.dataBR(l.data) : ''}${l.equipe ? ' (' + l.equipe + ')' : ''}; ${m.pts.length} pontos.`,
-      'Comprimento e declividade medidos de geratriz inferior a geratriz inferior.', 'Escalas aproximadas para a folha A3.'];
-    let g = titulo(P, 'NOTAS'), y = P.y + 24;
-    N.forEach((t, i) => quebrar(t, 56).forEach((ln_, j) => { if (y < P.y + P.h - 2) { g += tx(P.x + 6, y, (j ? '   ' : (i + 1) + '. ') + ln_, { fs: 5.2 }); y += 8; } }));
+    const P = A.nt, z = parseInt(l.zona, 10), hem = (l.hemisferio || 'S').toUpperCase();
+    const epsg = z && hem === 'S' ? ` (EPSG:${31960 + z})` : '';
+    const hA = m.hA, hB = m.hB, difere = Math.abs(hA - hB) > 0.05;
+    let rmin = null, rmax = null;
+    for (let s = 0.5; s < m.L - 0.4; s += 0.5) { const zt = (() => { const nl = m.linha; if (nl.length < 2 || s < nl[0].s || s > nl[nl.length - 1].s) return null; for (let i = 1; i < nl.length; i++) if (s <= nl[i].s) { const a = nl[i - 1], b = nl[i]; return b.s === a.s ? b.Z : a.Z + (b.Z - a.Z) * (s - a.s) / (b.s - a.s); } return null; })(); if (zt == null) continue; const r = zt - (m.gs ? m.gs(s) : m.A.Z + (m.B.Z - m.A.Z) * s / m.L + m.H); if (r > 0) { rmin = rmin == null ? r : Math.min(rmin, r); rmax = rmax == null ? r : Math.max(rmax, r); } }
+    const N = [`Coordenadas UTM (m): SIRGAS 2000 / UTM ${z || ''}${hem}${epsg}. Cotas em metros (RN do levantamento).`,
+      'Superfície por TIN com linhas de quebra.',
+      `Bueiro: L = ${fmt(m.L, 2)} m; i = ${fmt(m.decl, 2)} %; GI ${fmt(m.A.Z, 3)} -> ${fmt(m.B.Z, 3)} m; Ø/H ≈ ${fmt(hA, 2)} / ${fmt(hB, 2)} m.`,
+      rmin != null ? `Recobrimento do tubo: mín. ${fmt(rmin, 2)} m; máx. ${fmt(rmax, 2)} m.` : null,
+      difere ? `Ø/H diferente nas bocas (${fmt(hA, 2)} x ${fmt(hB, 2)} m).` : null].filter(Boolean);
+    let g = titulo(P, 'N O T A S'), y = P.y + 26;
+    N.forEach((t, i) => quebrar(t, 74).forEach((ln_, j) => { if (y < P.y + P.h - 2) { g += tx(P.x + 6, y, (j ? '    ' : (i + 1) + '. ') + ln_, { fs: 5 }); y += 8; } }));
     return g;
   }
   function legenda() {
-    const P = A.lg; let g = titulo(P, 'LEGENDA'), y = P.y + 27;
-    const it = [['l', MAG, 'Eixo do bueiro'], ['r', '#CFCFCF', 'Corpo do bueiro (planta)'], ['p', COR.contorno, 'Ala / muro de boca'], ['s', 'gi', 'Geratriz inferior (GI)'], ['s', 'terreno', 'Ponto de terreno'],
-      ['s', 'pista', 'Ponto de pista'], ['s', 'rn', 'RN — referência de nível'], ['t', '#6F7773', 'Triangulação dos pontos'], ['q', '#D9822B', 'Linha de pista / borda'], ['q', '#1B9E8A', 'Linha de terreno / talude'], ['q', '#8A5A00', 'Terreno no perfil'], ['q', COR.gi, 'GI no perfil']];
-    it.forEach(([k, c, t], i) => {
-      const col = i % 2, row = i >> 1, x = P.x + 8 + col * 122, yy = y + row * 18;
-      g += k === 's' ? SIMB(c, x + 8, yy - 2, 1.2) : k === 'r' ? `<rect x="${x}" y="${yy - 6}" width="16" height="9" fill="${c}" stroke="#555" stroke-width=".6"/>` : `${ln(x, yy - 2, x + 16, yy - 2, `stroke="${c}" stroke-width="${k === 'l' ? 1.2 : 1.4}" ${k === 'l' ? 'stroke-dasharray="6 2 1.5 2"' : ''}`)}`;
-      g += quebrar(t, 20).map((s, j) => tx(x + 21, yy + j * 7, s, { fs: 5.2 })).join('');
+    const P = A.lg; let g = titulo(P, 'L E G E N D A');
+    const Ym = '#C9A400', O = '#D9822B', V = '#7B2D8E';
+    const sim = {
+      tubo: (x, y) => ln(x, y - 3, x + 22, y - 3, `stroke="${MAG}" stroke-width=".9"`) + ln(x, y + 3, x + 22, y + 3, `stroke="${MAG}" stroke-width=".9"`) + ln(x, y - 4.5, x, y + 4.5, `stroke="${MAG}" stroke-width=".9"`) + ln(x + 22, y - 4.5, x + 22, y + 4.5, `stroke="${MAG}" stroke-width=".9"`),
+      dr: (x, y) => `<path d="M ${x + 3} ${y - 6} L ${x + 3} ${y + 1} Q ${x + 8} ${y + 5} ${x + 11} ${y + 5} Q ${x + 14} ${y + 5} ${x + 19} ${y + 1} L ${x + 19} ${y - 6}" fill="none" stroke="${V}" stroke-width=".9"/>`,
+      cx: (x, y) => `<rect x="${x + 5}" y="${y - 5}" width="12" height="10" fill="none" stroke="#18A0C8" stroke-width=".9"/>`,
+      cn: (x, y) => ln(x + 2, y + 3, x + 20, y - 3, 'stroke="#2E9E5B" stroke-width=".8"') + ln(x + 2, y, x + 20, y - 6, 'stroke="#2E9E5B" stroke-width=".8"') + ln(x + 2, y + 6, x + 20, y, 'stroke="#2E9E5B" stroke-width=".8"'),
+      pav: (x, y) => `<rect x="${x + 1}" y="${y - 5}" width="20" height="10" fill="#CFCFCF" stroke="#555" stroke-width=".6"/>`,
+      eixo: (x, y) => ln(x, y, x + 22, y, `stroke="${MAG}" stroke-width="1" stroke-dasharray="6 2 1.5 2"`),
+      ater: (x, y) => `<ellipse cx="${x + 11}" cy="${y}" rx="10" ry="5.5" fill="none" stroke="${O}" stroke-width=".8"/>` + ln(x + 3, y - 3, x + 3, y + 3, `stroke="${O}" stroke-width=".6"`) + ln(x + 8, y - 5, x + 8, y + 5, `stroke="${O}" stroke-width=".6"`) + ln(x + 14, y - 5, x + 14, y + 5, `stroke="${O}" stroke-width=".6"`) + ln(x + 19, y - 3, x + 19, y + 3, `stroke="${O}" stroke-width=".6"`),
+      norte: (x, y) => `<circle cx="${x + 11}" cy="${y}" r="6" fill="#F2C200" stroke="#7A6200" stroke-width=".6"/><polygon points="${x + 11},${y - 5} ${x + 13.5},${y + 3} ${x + 11},${y + 1} ${x + 8.5},${y + 3}" fill="${INK}"/>`,
+      pto: (x, y) => ln(x + 8, y, x + 14, y, 'stroke="#D32F2F" stroke-width="1"') + ln(x + 11, y - 3, x + 11, y + 3, 'stroke="#D32F2F" stroke-width="1"'),
+      tin: (x, y) => `<polygon points="${x + 2},${y + 4} ${x + 11},${y - 5} ${x + 20},${y + 4}" fill="none" stroke="#6F7773" stroke-width=".7"/>`,
+      lim: (x, y) => `<rect x="${x + 1}" y="${y - 4}" width="20" height="8" fill="none" stroke="${Ym}" stroke-width=".8" stroke-dasharray="3 1.5"/>`,
+      vt: (x, y) => ln(x + 1, y - 2, x + 21, y - 2, `stroke="${V}" stroke-width=".8"`) + ln(x + 1, y + 2, x + 21, y + 2, `stroke="${V}" stroke-width=".8"`),
+    };
+    const it = [['tubo', 'BUEIRO TUBULAR (TUBO, ALAS E TESTAS)'], ['ater', 'ATERRO EXISTENTE (CRISTA / PÉ)'], ['dr', "DESCIDA D'ÁGUA TIPO RÁPIDA (DR)"], ['norte', 'INDICAÇÃO DE NORTE'], ['cx', 'CAIXA COLETORA'], ['pto', 'PONTO LEVANTADO'],
+      ['cn', 'CURVAS DE NÍVEL'], ['tin', 'MALHA TRIANGULAR (TIN)'], ['pav', 'PAVIMENTO ASFÁLTICO'], ['lim', 'LIMITE DO DETALHE 1'], ['eixo', 'EIXO DO BUEIRO'], ['vt', 'VALETA (VT)']];
+    it.forEach(([k, t], i) => {
+      const col = i % 2, row = i >> 1, x = P.x + 8 + col * 122, yy = P.y + 32 + row * 20;
+      g += sim[k](x, yy) + quebrar(t, 22).map((s, j) => tx(x + 27, yy + 1 + j * 6.5 - (quebrar(t, 22).length - 1) * 3, s, { fs: 4.6 })).join('');
     });
     return g;
   }
-  function coordenadas(m) {
-    const P = A.co; let g = titulo(P, 'COORDENADAS DAS GERATRIZES E RN'); const cx = [P.x + 5, P.x + 38, P.x + 100, P.x + 168, P.x + 212];
-    ['Ponto', 'Este (m)', 'Norte (m)', 'Cota (m)'].forEach((t, i) => { g += tx(cx[i], P.y + 25, t, { fs: 5, b: 1, c: MUTED }); });
-    g += ln(P.x + 3, P.y + 27, P.x + P.w - 3, P.y + 27, 'stroke="#CCC" stroke-width=".5"');
-    const gi = m.pts.filter(p => grupo(p.papel) === 'gi' && /GTZ|GI/i.test(String(p.ref || p.cod))).sort((a, b) => String(a.ref || '').localeCompare(String(b.ref || ''), 'pt', { numeric: true }));
-    const lista = [...gi.filter(p => p.ref), ...(gi.some(p => p.ref) ? [] : [m.A, m.B].map((q, i) => ({ id: q.id || (i ? 'GI JUS' : 'GI MONT'), E: q.E, N: q.N, Z: q.Z, ref: i ? 'jusante' : 'montante' })))].slice(0, 9);
-    if (m.rn) lista.push({ id: m.rn.id, E: m.rn.E, N: m.rn.N, Z: m.rn.Z, ref: 'RN' });
-    lista.slice(0, 10).forEach((p, i) => { const y = P.y + 36 + i * 8.2, nome = p.ref === 'RN' ? 'RN ' + p.id : String(p.ref || '').replace('montante', 'MONT').replace('jusante', 'JUS').replace('GTZ-', 'GI ') || 'GI ' + p.id; g += tx(cx[0], y, nome, { fs: 5, b: 1 }) + tx(cx[1], y, fmt(p.E, 3), { fs: 5 }) + tx(cx[2], y, fmt(p.N, 3), { fs: 5 }) + tx(cx[3], y, fmt(p.Z, 3), { fs: 5 }); });
+  /* quadro "rótulo do ponto e códigos do levantamento" (no lugar da tabela de coordenadas) */
+  function coordenadas() {
+    const P = A.co; let g = titulo(P, 'RÓTULO DO PONTO E CÓDIGOS DO LEVANTAMENTO');
+    g += ln(P.x + 10, P.y + 28, P.x + 16, P.y + 28, 'stroke="#D32F2F" stroke-width="1"') + ln(P.x + 13, P.y + 25, P.x + 13, P.y + 31, 'stroke="#D32F2F" stroke-width="1"')
+      + tx(P.x + 20, P.y + 26, '123', { fs: 5 }) + tx(P.x + 20, P.y + 32, '23,456', { fs: 4, c: MUTED }) + tx(P.x + 20, P.y + 38, 'TER-ASF', { fs: 4, c: '#18A0C8' }) + tx(P.x + 54, P.y + 31, 'número / cota (m) / código de campo', { fs: 4.8 });
+    const C = [['TER-ASF', 'borda do asfalto'], ['TER-CA', 'crista do aterro'], ['TER-PA', 'pé do aterro'], ['TER-TN', 'terreno natural'], ['OAC-ALA', 'ala do bueiro'], ['OAC-GTZ', 'geratriz do tubo (inf./sup.)'], ['DRE-DR', "descida d'água rápida"], ['DRE-CX', 'caixa coletora'], ['DRE-VT', 'valeta'], ['DRE-NA', "nível d'água"], ['DRE-FR', 'fundo / talvegue']];
+    const esq = C.filter((_, i) => i % 2 === 0), dir = C.filter((_, i) => i % 2 === 1);
+    [esq, dir].forEach((col, c) => col.forEach(([k, d], i) => { const x = P.x + 8 + c * 122, y = P.y + 56 + i * 10; g += tx(x, y, k, { fs: 4.8, b: 1, c: '#18A0C8' }) + tx(x + 34, y, d, { fs: 4.8 }); }));
     return g;
   }
   /* Imagem de satélite (Esri World Imagery) centrada no bueiro: baixada uma vez, virada em JPEG e guardada em memória.
@@ -272,19 +318,20 @@
   }
   function carimbo(l, m) {
     const P = A.cb, Lg = BU.Prancha.logos ? BU.Prancha.logos() : {}; let g = box(P.x, P.y, P.w, P.h, BLUE, 1);
-    const hl = 46; g += ln(P.x + P.w / 2, P.y, P.x + P.w / 2, P.y + hl, `stroke="${BLUE}" stroke-width=".8"`) + ln(P.x, P.y + hl, P.x + P.w, P.y + hl, `stroke="${BLUE}" stroke-width=".8"`);
+    const hl = 46, L = (y) => ln(P.x, y, P.x + P.w, y, `stroke="${BLUE}" stroke-width=".7"`), Y = '#9A8200', C = '#0B7C99';
+    g += ln(P.x + P.w / 2, P.y, P.x + P.w / 2, P.y + hl, `stroke="${BLUE}" stroke-width=".8"`) + L(P.y + hl);
     if (Lg.antt) g += `<image href="${Lg.antt}" x="${P.x + 14}" y="${P.y + 8}" width="${P.w / 2 - 28}" height="${hl - 16}" preserveAspectRatio="xMidYMid meet"/>`;
     if (Lg.arteris) g += `<image href="${Lg.arteris}" x="${P.x + P.w / 2 + 14}" y="${P.y + 5}" width="${P.w / 2 - 28}" height="${hl - 10}" preserveAspectRatio="xMidYMid meet"/>`;
-    let y = P.y + hl + 10;
-    g += tx(P.x + 6, y, 'PROJETISTA:', { fs: 6, b: 1, c: '#9A8200' }) + tx(P.x + 66, y, 'GFA', { fs: 8, b: 1, c: '#0B7C99' });
-    if (Lg.gfa) g += `<image href="${Lg.gfa}" x="${P.x + P.w - 44}" y="${y - 10}" width="38" height="20" preserveAspectRatio="xMidYMid meet"/>`;
-    y += 14; g += tx(P.x + 6, y, 'TÍTULO:', { fs: 6, b: 1, c: '#9A8200' });
-    const rod = [l.estrada || 'BR-101', l.km ? 'KM ' + kmTxt(l.km) : ''].filter(Boolean).join(' ');
-    g += tx(P.x + 50, y, rod, { fs: 7.5, b: 1, c: '#0B7C99' }) + tx(P.x + 50, y + 9, 'ESTUDOS TOPOGRÁFICOS', { fs: 5.8, b: 1, c: '#0B7C99' }) + quebrar('LEVANTAMENTO CADASTRAL DE BUEIRO - PLANTA E PERFIL', 38).map((s, i) => tx(P.x + 50, y + 18 + i * 8, s, { fs: 5.8, b: 1, c: '#0B7C99' })).join('');
-    y = P.y + P.h - 38; g += ln(P.x, y - 8, P.x + P.w, y - 8, `stroke="${BLUE}" stroke-width=".6"`);
-    const cel = (x, yy, k, v) => tx(x, yy, k, { fs: 4.4, b: 1, c: '#9A8200' }) + tx(x, yy + 8, String(v || '—').slice(0, 26), { fs: 6.2, b: 1 });
-    g += cel(P.x + 6, y, 'BUEIRO', l.codigo || 'Sem código') + cel(P.x + 90, y, 'DATA DO LEVANTAMENTO', U.dataBR(l.data)) + cel(P.x + 180, y, 'FOLHA', '01 / 01')
-      + cel(P.x + 6, y + 20, 'MUNICÍPIO / UF', [l.municipio, l.estado].filter(Boolean).join(' / ')) + cel(P.x + 90, y + 20, 'REFERENCIAL', 'SIRGAS 2000 · UTM') + cel(P.x + 180, y + 20, 'FORMATO', 'A3');
+    const lab = (x, y, t) => tx(x, y, t, { fs: 5.6, b: 1, c: Y });
+    const rod = [l.estrada || 'BR-101', l.km ? 'KM ' + kmTxt(l.km) : ''].filter(Boolean).join(' '), rodovia = [l.estrada, l.estado].filter(Boolean).join('/') || '—';
+    let y = P.y + hl;
+    g += lab(P.x + 5, y + 11, 'PROJETISTA:') + tx(P.x + 70, y + 20, 'GFA', { fs: 8, b: 1, c: C });
+    if (Lg.gfa) g += `<image href="${Lg.gfa}" x="${P.x + P.w - 46}" y="${y + 3}" width="40" height="20" preserveAspectRatio="xMidYMid meet"/>`;
+    y += 24; g += L(y) + lab(P.x + 5, y + 11, 'TÍTULO:') + tx(P.x + 50, y + 11, rod, { fs: 7.5, b: 1, c: C }) + tx(P.x + 50, y + 21, 'ESTUDOS TOPOGRÁFICOS', { fs: 5.8, b: 1, c: C })
+      + quebrar('LEVANTAMENTO CADASTRAL DE BUEIRO - PLANTA E PERFIL', 40).map((s, i) => tx(P.x + 50, y + 30 + i * 8, s, { fs: 5.8, b: 1, c: C })).join('');
+    y += 42; g += L(y) + ln(P.x + P.w / 2, y, P.x + P.w / 2, y + 15, `stroke="${BLUE}" stroke-width=".5"`) + lab(P.x + 5, y + 11, 'RODOVIA:') + tx(P.x + 40, y + 11, rodovia.slice(0, 22), { fs: 5.6, b: 1, c: C }) + lab(P.x + P.w / 2 + 4, y + 11, 'TRECHO:') + tx(P.x + P.w / 2 + 38, y + 11, rod.slice(0, 22), { fs: 5.6, b: 1, c: C });
+    y += 15; g += L(y) + lab(P.x + 5, y + 10, 'Nº DESENHO ANTT:') + tx(P.x + 76, y + 11, String(l.numeroDesenho || '—').slice(0, 34), { fs: 6, b: 1, c: '#1F3AD0' });
+    y += 15; g += L(y) + ln(P.x + P.w / 2, y, P.x + P.w / 2, P.y + P.h, `stroke="${BLUE}" stroke-width=".5"`) + lab(P.x + 5, y + 11, 'ESCALA:') + tx(P.x + 40, y + 11, 'INDICADAS', { fs: 5.6, b: 1, c: C }) + lab(P.x + P.w / 2 + 4, y + 11, 'FOLHA:') + tx(P.x + P.w / 2 + 34, y + 11, '01/01', { fs: 5.6, b: 1, c: C });
     void m; return g;
   }
 
@@ -296,7 +343,7 @@
     const aviso = m.modo === 'estimado' ? tx(A.p1.x + 6, A.p1.y + 12, 'Eixo estimado: não achei GI MONT / GI JUS nem geratrizes. Use esses códigos no RTK.', { fs: 6, b: 1, c: '#B45309' }) : '';
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${v.join(' ')}" width="${v[2]}" height="${v[3]}" font-family="Arial, Helvetica, sans-serif" role="img" aria-label="Folha da prancha: plantas, perfil longitudinal, legenda, coordenadas e carimbo do bueiro">
 <rect x="0" y="0" width="${SW}" height="${SH}" fill="#fff"/><rect x="5" y="5" width="${SW - 10}" height="${SH - 10}" fill="none" stroke="${BLUE}" stroke-width="1.1"/><rect x="34" y="14" width="1143" height="812" fill="none" stroke="${BLUE}" stroke-width=".8"/>${[0.166, 0.34, 0.559].map(k => `<line x1="${p1(SW * k)}" y1="5" x2="${p1(SW * k)}" y2="14" stroke="${RED}" stroke-width=".7"/><line x1="${p1(SW * k)}" y1="${SH - 14}" x2="${p1(SW * k)}" y2="${SH - 5}" stroke="${RED}" stroke-width=".7"/>`).join('')}<line x1="5" y1="${SH / 2}" x2="34" y2="${SH / 2}" stroke="${RED}" stroke-width=".7"/><line x1="${SW - 34}" y1="${SH / 2}" x2="${SW - 5}" y2="${SH / 2}" stroke="${RED}" stroke-width=".7"/>
-${planta(l, m, A.p1, tin, 'geral')}${planta(l, m, A.p2, tin, 'detalhe')}${perfil(l, m, A.p3)}${notas(l, m)}${legenda()}${coordenadas(m)}${mapa(l)}${revisoes(l)}${carimbo(l, m)}${aviso}</svg>`;
+${planta(l, m, A.p1, tin, 'geral')}${planta(l, m, A.p2, tin, 'detalhe')}${perfil(l, m, A.p3)}${notas(l, m)}${legenda()}${coordenadas()}${mapa(l)}${revisoes(l)}${carimbo(l, m)}${aviso}</svg>`;
   }
 
   /* ---------- DXF (R12, ASCII): planta em UTM real com triangulação, alas, corpo, eixo e perfil logo abaixo ---------- */
