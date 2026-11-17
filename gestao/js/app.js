@@ -273,7 +273,7 @@
     const d = b.dados || {}, c = d.caracteristicas || {}, campo = S.usuarios.filter(u => u.papel === 'campo');
     let prancha = '';
     if (BU.Prancha && Array.isArray(d.pontos) && d.pontos.length) {
-      try { const lv = window.Documentos.levantamento(b); BU.Prancha.sincronizarMedicoes(lv); prancha = BU.Prancha.gerarSVG(lv, { foco: 'tudo' }); } catch (e) { prancha = ''; }
+      try { const lv = window.Documentos.levantamento(b); try { await BU.Folha.preparar(lv); } catch (er) { /* sem imagem */ } BU.Prancha.sincronizarMedicoes(lv); prancha = BU.Prancha.gerarSVG(lv, { foco: 'tudo' }); } catch (e) { prancha = ''; }
     }
     const revisavel = ['concluido', 'nao_localizado'].includes(b.status);
     const volta = `#/p/${S.projeto.id}/bueiros`;
