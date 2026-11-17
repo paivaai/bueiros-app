@@ -49,7 +49,7 @@
       </nav>`;
   }
   /* Perfil "Visualização": o servidor já bloqueia qualquer gravação; aqui some também o que seria inútil na tela. */
-  const SO_VER_OCULTAR = ['#barra-atrib', '[data-sel]', '#d-atrib', '#r-com', '[data-a=aprovar]', '[data-a=atribuir]', '[data-a=devolver]', '[data-a=salvar-equipe]', '[data-a=arquivar]', '#card-txt', '[href$="/editar"]', '[href="#/novo"]'];
+  const SO_VER_OCULTAR = ['#barra-atrib', '[data-sel]', '#d-atrib', '#r-com', '[data-a=aprovar]', '[data-a=atribuir]', '[data-a=devolver]', '[data-a=salvar-equipe]', '[data-a=arquivar]', '#card-txt', '[data-a=lote]', '#lote', '[href$="/editar"]', '[href="#/novo"]'];
   function pagina(aba, corpo) {
     raiz.innerHTML = topo(aba) + `<main>${corpo}</main>`;
     if (soVer()) {
@@ -150,11 +150,62 @@
   }
   const TH = [['codigo', 'Código'], ['km', 'Km'], ['status', 'Situação'], ['responsavel_nome', 'Responsável'], ['atualizado_em', 'Atualizado']];
 
+  /* ---------- importar um TXT com vários bueiros ---------- */
+  function loteHTML() {
+    const L = S.lote; if (!L) return '';
+    const nomeB = id => { const b = S.bueiros.find(x => x.id === id); return b ? b.codigo : id; };
+    const linhas = L.grupos.map((g, i) => {
+      const ops = '<option value="">— ignorar este grupo —</option>' + g.cand.map(c => `<option value="${esc(c.b.id)}"${g.alvo === c.b.id ? ' selected' : ''}>${esc(c.b.codigo)}${c.b.km ? ' · km ' + esc(c.b.km) : ''} · ${Math.round(c.d)} m${c.b.status === 'a_vistoriar' ? '' : ' · ' + esc(ROT[c.b.status] || c.b.status)}</option>`).join('');
+      const tub = g.tubos ? (g.tubos.length ? `${g.tubos.length} tubo(s) ligado(s)` : '—') : '—';
+      return `<tr><td><input type="checkbox" data-lote-i="${i}" ${g.alvo ? 'checked' : ''} aria-label="Importar grupo ${i + 1}"></td><td>${i + 1}</td><td>${g.n} <span class="muted small">(${g.nGI} de geratriz)</span></td><td>${tub}</td>
+        <td><select data-lote-s="${i}" style="min-width:230px">${ops}</select></td><td class="small">${g.dist != null ? Math.round(g.dist) + ' m' : '—'}</td><td class="small" style="color:#9A6700">${esc((g.aviso || []).concat(g.avisosTubos || []).join('; '))}</td></tr>`;
+    }).join('');
+    return `<div class="card" id="lote"><h3>Importar ${esc(L.arquivo)}</h3>
+      <p class="muted small" style="margin:6px 0 10px">${L.total} ponto(s) em <b>${L.grupos.length}</b> grupo(s). Cada grupo é um bueiro: o painel sugere o bueiro cadastrado mais perto. Confira, ajuste se precisar e aplique. Nos bueiros duplos ou triplos, cada geratriz é ligada ao tubo certo (o tubo 1 é o da esquerda, olhando para jusante). Pontos que já existem no bueiro são <b>substituídos</b>.</p>
+      <div class="tab-wrap" style="max-height:340px"><table><thead><tr><th></th><th>#</th><th>Pontos</th><th>Tubos</th><th>Bueiro</th><th>Distância</th><th>Observação</th></tr></thead><tbody>${linhas}</tbody></table></div>
+      <div class="linha" style="margin-top:10px"><button class="btn pri" data-a="lote-aplicar">Aplicar nos bueiros marcados</button><button class="btn" data-a="lote-cancelar">Cancelar</button><span id="lote-msg" class="small"></span></div></div>`;
+  }
+  async function loteLer(file) {
+    const texto = await new Promise((ok, er) => { const fr = new FileReader(); fr.onload = () => ok(String(fr.result)); fr.onerror = () => er(fr.error); fr.readAsText(file); });
+    const r = BU.Pontos.parsear(texto);
+    if (!r.ok.length) { toast('Nenhuma linha válida no arquivo. O formato é: ID X Y Z "CÓDIGO".'); return; }
+    const pts = r.ok.map(p => ({ id: p.id, x: p.x, y: p.y, z: p.z, codigo: p.codigo, obs: '' }));
+    const grupos = BU.Lote.separar(pts, S.bueiros);
+    grupos.forEach(g => { const t = BU.Lote.parear(g.pontos.map(p => ({ ...p })), null); g.tubos = t.tubos; g.avisosTubos = t.avisos; });
+    S.lote = { arquivo: file.name, total: pts.length, grupos, ignoradas: r.ruins.length };
+    viewBueiros();
+    toast(`${pts.length} ponto(s) em ${grupos.length} grupo(s)` + (r.ruins.length ? ` · ${r.ruins.length} linha(s) ignorada(s)` : '') + '. Confira a tabela e aplique.');
+  }
+  async function loteAplicar(btn) {
+    const L = S.lote, msg = document.getElementById('lote-msg'); if (!L) return;
+    const fila = L.grupos.filter(g => g.marcado !== false && g.alvo); if (!fila.length) { msg.innerHTML = '<span class="erro">Nenhum grupo marcado com bueiro escolhido.</span>'; return; }
+    const alvos = fila.map(g => g.alvo); if (new Set(alvos).size !== alvos.length) { msg.innerHTML = '<span class="erro">Dois grupos estão apontando para o mesmo bueiro. Ajuste a tabela.</span>'; return; }
+    btn.disabled = true; let ok = 0; const falhas = [], avisos = [];
+    for (const g of fila) {
+      msg.textContent = `Enviando ${ok + falhas.length + 1} de ${fila.length}…`;
+      try {
+        const b = await D.bueiro(g.alvo), cel = b && b.dados && b.dados.caracteristicas ? b.dados.caracteristicas.celulas : null;
+        const pts = g.pontos.map(p => ({ ...p })), t = BU.Lote.parear(pts, cel);
+        await D.anexarPontos(g.alvo, pts, L.arquivo, true); ok++;
+        if (t.avisos.length) avisos.push(`${nomeDe2(g.alvo)}: ${t.avisos.join('; ')}`);
+      } catch (e) { falhas.push(`${nomeDe2(g.alvo)}: ${e.message || e}`); if (/Falta rodar/.test(e.message || '')) break; }
+    }
+    btn.disabled = false;
+    if (!falhas.length) S.lote = null;
+    viewBueiros();
+    const m = document.getElementById('lote-msg') || document.querySelector('main');
+    toast(`${ok} bueiro(s) atualizado(s)` + (falhas.length ? ` · ${falhas.length} com erro` : '') + '.', 12000);
+    if (falhas.length || avisos.length) { const el = document.getElementById('lote-msg'); if (el) el.innerHTML = [...falhas.map(f => `<div class="erro">${esc(f)}</div>`), ...avisos.map(a => `<div style="color:#9A6700">${esc(a)}</div>`)].join(''); else alert([...falhas, ...avisos].join('\n')); void m; }
+  }
+  const nomeDe2 = id => { const b = S.bueiros.find(x => x.id === id); return b ? b.codigo : id; };
+
   function viewBueiros() {
     const lista = filtrados(), f = S.filtro, campo = S.usuarios.filter(u => u.papel === 'campo');
     const foco = document.activeElement && document.activeElement.id === 'f-q';
     pagina('bueiros', `<div class="linha"><h1>Bueiros</h1><span class="esp"></span>
+        <button class="btn" data-a="lote">Importar TXT (vários bueiros)</button><input type="file" id="lote-arq" accept=".txt,.csv,.xyz,text/plain" hidden>
         <button class="btn pri" data-a="exportar">Exportar…</button></div>
+      ${loteHTML()}
       <div class="card filtros">
         <label class="f">Buscar<input type="search" id="f-q" placeholder="código, km, responsável" value="${esc(f.q)}"></label>
         <label class="f">Situação<select id="f-st"><option value="">Todas</option>${ORDEM.map(k => `<option value="${k}"${f.st === k ? ' selected' : ''}>${ROT[k]}</option>`).join('')}</select></label>
@@ -379,6 +430,9 @@
           } catch (e) { msg.innerHTML = '<span class="erro">' + esc(e.message || e) + '</span>'; }
           finally { a.disabled = false; a.textContent = rot; }
         }
+        else if (k === 'lote') document.getElementById('lote-arq').click();
+        else if (k === 'lote-cancelar') { S.lote = null; viewBueiros(); }
+        else if (k === 'lote-aplicar') await loteAplicar(a);
         else if (k === 'csv') csv();
         else if (k === 'exportar') { const eixo = await D.eixo(S.projeto.id).catch(() => null); window.Exportacao.abrir({ projeto: S.projeto, bueiros: S.bueiros, filtrados: filtrados(), nomeDe, D, eixo }); }
         else if (k === 'salvar-equipe') {
@@ -435,6 +489,9 @@
   });
   document.addEventListener('input', ev => { if (ev.target.id === 'f-q') { S.filtro.q = ev.target.value; viewBueiros(); } });
   document.addEventListener('change', async ev => {
+    if (ev.target.id === 'lote-arq') { const f = ev.target.files && ev.target.files[0]; if (f) { try { await loteLer(f); } catch (e) { toast(esc(e.message || e)); } } ev.target.value = ''; return; }
+    if (ev.target.dataset && ev.target.dataset.loteI != null && S.lote) { const g = S.lote.grupos[+ev.target.dataset.loteI]; g.marcado = ev.target.checked; return; }
+    if (ev.target.dataset && ev.target.dataset.loteS != null && S.lote) { const g = S.lote.grupos[+ev.target.dataset.loteS]; g.alvo = ev.target.value; const cb = document.querySelector(`[data-lote-i="${ev.target.dataset.loteS}"]`); if (cb) { cb.checked = !!g.alvo; g.marcado = !!g.alvo; } return; }
     if (ev.target.id === 'txt-pontos') {
       const inp = ev.target, f = inp.files && inp.files[0], msg = document.getElementById('txt-msg'); if (!f) return;
       try {
@@ -444,8 +501,9 @@
         const b = await D.bueiro(inp.dataset.id), n = ((b.dados || {}).pontos || []).length; let subst = true;
         if (n) { const r2 = window.confirm(`Este bueiro já tem ${n} ponto(s).\n\nOK = substituir pelos ${r.ok.length} do arquivo\nCancelar = manter os atuais`); if (!r2) { inp.value = ''; return; } }
         msg.textContent = 'Enviando…';
-        await D.anexarPontos(inp.dataset.id, r.ok.map(p => ({ id: p.id, x: p.x, y: p.y, z: p.z, codigo: p.codigo, obs: '' })), f.name, subst);
-        toast(`${r.ok.length} ponto(s) enviado(s)` + (r.ruins.length ? ` · ${r.ruins.length} linha(s) ignorada(s)` : '') + '.');
+        const pts = r.ok.map(p => ({ id: p.id, x: p.x, y: p.y, z: p.z, codigo: p.codigo, obs: '' })), lig = BU.Lote.parear(pts, (b.dados || {}).caracteristicas ? b.dados.caracteristicas.celulas : null);
+        await D.anexarPontos(inp.dataset.id, pts, f.name, subst);
+        toast(`${r.ok.length} ponto(s) enviado(s)` + (lig.tubos.length ? ` · ${lig.tubos.length} tubo(s) ligado(s)` : '') + (lig.avisos.length ? ' · atenção: ' + lig.avisos[0] : '') + (r.ruins.length ? ` · ${r.ruins.length} linha(s) ignorada(s)` : '') + '.', 9000);
         viewDetalhe(inp.dataset.id);
       } catch (e) { msg.innerHTML = '<span class="erro">' + esc(e.message || e) + '</span>'; inp.value = ''; }
       return;
