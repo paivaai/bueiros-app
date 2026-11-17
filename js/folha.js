@@ -135,13 +135,13 @@
     g += tx(X(0) - 3, Y(m.A.Z) + 10, `GI ${fmt(m.A.Z, 3)}`, { fs: 6, b: 1, c: COR.gi, a: 'end', halo: 1 }) + tx(X(L) + 3, Y(m.B.Z) + 10, `GI ${fmt(m.B.Z, 3)}`, { fs: 6, b: 1, c: COR.gi, halo: 1 });
     if (m.seLinha && nl.length > 1) g += `<polyline points="${nl.map(p => p1(X(p.s)) + ',' + p1(Y(p.Z))).join(' ')}" fill="none" stroke="#8A5A00" stroke-width="1.3" stroke-linejoin="round"/>`;
     let ult = -1e9;
-    for (const p of nl) { g += `<circle cx="${p1(X(p.s))}" cy="${p1(Y(p.Z))}" r="1.5" fill="#fff" stroke="#8A5A00" stroke-width=".8"/>`; if (X(p.s) - ult >= 9) { g += tx(X(p.s) + 1.5, Y(p.Z) - 4, `${p.id}  ${fmt(p.Z, 3)}`, { fs: 4.6, c: '#444', rot: -90 }); ult = X(p.s); } }
+    for (const p of (m.pontosEixo || [])) { g += `<circle cx="${p1(X(p.s))}" cy="${p1(Y(p.Z))}" r="1.5" fill="#fff" stroke="#8A5A00" stroke-width=".8"/>`; if (X(p.s) - ult >= 9) { g += tx(X(p.s) + 1.5, Y(p.Z) - 4, `${p.id}  ${fmt(p.Z, 3)}`, { fs: 4.6, c: '#444', rot: -90 }); ult = X(p.s); } }
     if (m.cob && m.cob.valor > 0) {
       const xc = X(m.cob.s), yT = Y(m.inv(m.cob.s) + H + e), yP = Y(m.cob.zTopoPista);
       g += ln(xc, yT, xc, yP, `stroke="${PURPLE}" stroke-width="1.2"`) + ln(xc - 3, yT, xc + 3, yT, `stroke="${PURPLE}" stroke-width="1.2"`) + ln(xc - 3, yP, xc + 3, yP, `stroke="${PURPLE}" stroke-width="1.2"`)
         + tx(xc - 5, (yT + yP) / 2 + 2, `recobrimento ${fmt(m.cob.valor, 2)} m`, { fs: 6.5, b: 1, c: PURPLE, a: 'end', halo: 1 });
     }
-    g += tx(X(L / 2), Y(m.A.Z + (m.B.Z - m.A.Z) / 2 + H / 2) + 2.5, `L = ${fmt(L, 2)} m · i = ${fmt(m.decl, 2)} % · ${m.dims ? m.dims.rotulo : 'H = ' + fmt(H, 2) + ' m'}`, { fs: 7, b: 1, a: 'middle', halo: 1 });
+    g += tx(X(L / 2), Y(m.A.Z + (m.B.Z - m.A.Z) / 2 - e) + 14, `L = ${fmt(L, 2)} m · i = ${fmt(m.decl, 2)} % · ${m.dims ? m.dims.rotulo : 'H = ' + fmt(H, 2) + ' m'}`, { fs: 7, b: 1, a: 'middle', halo: 1 });
     g += '</g>';
     // título e escala
     g += `<circle cx="${P.x + 10}" cy="${P.y + 14}" r="5" fill="none" stroke="${RED}" stroke-width=".8"/><circle cx="${P.x + 10}" cy="${P.y + 14}" r="2" fill="#18A0C8"/>`
@@ -149,20 +149,21 @@
       + tx(P.x + 20, P.y + 27, `EXAGERO VERTICAL ${String(ex.toFixed(1)).replace('.', ',')}× · DISTÂNCIAS A PARTIR DA GERATRIZ INFERIOR DE MONTANTE · COTAS EM METROS`, { fs: 5.2, c: '#9A8200' });
     // tabela de estacas
     const terrenoEm = s => { if (!nl.length) return null; if (s <= nl[0].s) return nl[0].Z; for (let i = 1; i < nl.length; i++) if (s <= nl[i].s) { const a = nl[i - 1], b = nl[i]; return b.s === a.s ? b.Z : a.Z + (b.Z - a.Z) * (s - a.s) / (b.s - a.s); } return nl[nl.length - 1].Z; };
-    const cols = [{ s: 0, fixo: 1 }, { s: L, fixo: 1 }, ...nl.map(p => ({ s: p.s, id: p.id, Z: p.Z }))].sort((a, b) => a.s - b.s);
-    const sel = []; for (const c of cols) { const prev = sel[sel.length - 1]; if (prev && X(c.s) - X(prev.s) < 21) { if (c.fixo && !prev.fixo) sel[sel.length - 1] = c; continue; } sel.push(c); }
+    const passoE = L <= 12 ? 2 : L <= 30 ? 5 : L <= 80 ? 10 : 20, ests = new Set([0, +L.toFixed(3)]);
+    for (let s = passoE; s < L - passoE * 0.35; s += passoE) ests.add(+s.toFixed(3));
+    const sel = [...ests].sort((a, b) => a - b).map(s => ({ s, fixo: s === 0 || s === +L.toFixed(3) }));
     const ty = P.y + P.h - th - 22, rot = ['ESTACA / DIST. (m)', 'COTA DO TERRENO (m)', 'COTA GERATRIZ INF. (m)', 'RECOBRIMENTO (m)', 'DECLIVIDADE (%)'];
     g += box(P.x + 8, ty, R.x + R.w - P.x - 8, th, '#888', .6);
     rot.forEach((t, i) => { g += tx(P.x + 12, ty + i * rh + 11, t, { fs: 5.4, b: 1, c: '#0B7C99' }) + (i ? ln(P.x + 8, ty + i * rh, R.x + R.w, ty + i * rh, 'stroke="#BBB" stroke-width=".5"') : ''); });
     g += ln(R.x - 6, ty, R.x - 6, ty + th, 'stroke="#888" stroke-width=".6"');
     for (const c of sel) {
-      const x = X(c.s), dentro = c.s >= -1e-6 && c.s <= L + 1e-6, Zt = c.Z != null ? c.Z : terrenoEm(c.s), inv = dentro ? m.inv(c.s) : null;
+      const x = X(c.s), dentro = c.s >= -1e-6 && c.s <= L + 1e-6, Zt = terrenoEm(c.s), inv = dentro ? m.inv(c.s) : null;
       const rec = dentro && Zt != null ? Zt - (inv + H + e) : null;
       g += ln(x, yBase, x, ty, 'stroke="#C9CECB" stroke-width=".4" stroke-dasharray="1.5 2"');
       const v = [fmt(c.s, 1), Zt != null ? fmt(Zt, 3) : '—', inv != null ? fmt(inv, 3) : '—', rec != null && rec > 0 ? fmt(rec, 2) : '—', dentro ? fmt(m.decl, 2) : '—'];
       v.forEach((t, i) => { g += tx(x, ty + i * rh + 11, t, { fs: 5, a: 'middle', b: c.fixo }); });
     }
-    g += tx(P.x + 12, P.y + P.h - 9, 'GI = geratriz inferior. A tabela repete as cotas e o recobrimento em cada ponto do terreno levantado sobre o eixo.', { fs: 5, c: MUTED });
+    g += tx(P.x + 12, P.y + P.h - 9, 'GI = geratriz inferior. Terreno interpolado na triangulação dos pontos levantados, ao longo do eixo; estacas a cada ' + String(passoE).replace('.', ',') + ' m.', { fs: 5, c: MUTED });
     return g;
   }
 
@@ -297,15 +298,16 @@ ${planta(l, m, A.p1, tin, 'geral')}${planta(l, m, A.p2, tin, 'detalhe')}${perfil
     void bx;
     LINE('PERFIL_GI', [X(0), Y(m.A.Z)], [X(L), Y(m.B.Z)]); TEXT('PERFIL_GI', X(0) - h * 8, Y(m.A.Z), h, `GI ${f(m.A.Z)}`); TEXT('PERFIL_GI', X(L) + h, Y(m.B.Z), h, `GI ${f(m.B.Z)}`);
     if (m.seLinha && nl.length > 1) POLI('PERFIL_TERRENO', nl.map(p => [X(p.s), Y(p.Z)]), false);
-    nl.forEach(p => { PT('PERFIL_TERRENO', X(p.s), Y(p.Z), 0); TEXT('PERFIL_TEXTO', X(p.s) + h * 0.3, Y(p.Z) + h * 0.8, h * 0.7, `${p.id} ${f(p.Z)}`, 90); });
+    (m.pontosEixo || []).forEach(p => { PT('PERFIL_TERRENO', X(p.s), Y(p.Z), 0); TEXT('PERFIL_TEXTO', X(p.s) + h * 0.3, Y(p.Z) + h * 0.8, h * 0.7, `${p.id} ${f(p.Z)}`, 90); });
     if (m.cob && m.cob.valor > 0) { const s = m.cob.s; LINE('PERFIL_TEXTO', [X(s), Y(m.inv(s) + H + e)], [X(s), Y(m.cob.zTopoPista)]); TEXT('PERFIL_TEXTO', X(s) + h * 0.6, (Y(m.inv(s) + H + e) + Y(m.cob.zTopoPista)) / 2, h, `recobrimento ${fmt(m.cob.valor, 2)} m`); }
     // tabela de estacas
     const terrenoEm = s => { if (!nl.length) return null; if (s <= nl[0].s) return nl[0].Z; for (let i = 1; i < nl.length; i++) if (s <= nl[i].s) { const a = nl[i - 1], b = nl[i]; return b.s === a.s ? b.Z : a.Z + (b.Z - a.Z) * (s - a.s) / (b.s - a.s); } return nl[nl.length - 1].Z; };
-    const cols = [{ s: 0 }, { s: L }, ...nl.map(p => ({ s: p.s, Z: p.Z }))].sort((a, b) => a.s - b.s), lab = ['ESTACA (m)', 'COTA TERRENO', 'COTA GI', 'RECOBRIMENTO', 'DECLIVIDADE %'], yT = Y(zMin) - h * 5;
+    const passoE = L <= 12 ? 2 : L <= 30 ? 5 : L <= 80 ? 10 : 20, ests = new Set([0, +L.toFixed(3)]); for (let s = passoE; s < L - passoE * 0.35; s += passoE) ests.add(+s.toFixed(3));
+    const cols = [...ests].sort((a, b) => a - b).map(s => ({ s })), lab = ['ESTACA (m)', 'COTA TERRENO', 'COTA GI', 'RECOBRIMENTO', 'DECLIVIDADE %'], yT = Y(zMin) - h * 5;
     lab.forEach((t, i) => { LINE('TABELA', [X(sMin), yT - i * linhaH], [X(sMax), yT - i * linhaH]); TEXT('TABELA', X(sMin) - h * 12, yT - i * linhaH - linhaH * 0.7, h * 0.8, t); }); LINE('TABELA', [X(sMin), yT - 5 * linhaH], [X(sMax), yT - 5 * linhaH]);
     let ult = -1e9; for (const c of cols) {
-      if (c.s - ult < Math.max(1.2, (sMax - sMin) / 28) && c.s !== 0 && c.s !== L) continue; ult = c.s;
-      const dentro = c.s >= 0 && c.s <= L, Zt = c.Z != null ? c.Z : terrenoEm(c.s), inv = dentro ? m.inv(c.s) : null, rec = dentro && Zt != null ? Zt - (inv + H + e) : null;
+      ult = c.s;
+      const dentro = c.s >= 0 && c.s <= L, Zt = terrenoEm(c.s), inv = dentro ? m.inv(c.s) : null, rec = dentro && Zt != null ? Zt - (inv + H + e) : null;
       [fmt(c.s, 1), Zt != null ? fmt(Zt, 3) : '-', inv != null ? fmt(inv, 3) : '-', rec != null && rec > 0 ? fmt(rec, 2) : '-', dentro ? fmt(m.decl, 2) : '-'].forEach((t, i) => TEXT('TABELA', X(c.s) - h * 1.4, yT - i * linhaH - linhaH * 0.7, h * 0.75, t));
       LINE('TABELA', [X(c.s), yT - 5 * linhaH], [X(c.s), yT]);
     }

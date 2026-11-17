@@ -139,10 +139,30 @@
     const cand = pts.filter(p => p.papel === 'terreno' || p.papel === 'pista' || p.papel === 'outro');
     let linha = cand.filter(p => Math.abs(p.t) <= tol).sort((x, y) => x.s - y.s), seLinha = true;
     if (linha.length < 2) { linha = cand.slice().sort((x, y) => x.s - y.s); seLinha = false; }
+    /* Perfil do terreno pelo eixo: cota interpolada na triangulação (TIN) a cada 25 cm, 6 m além de cada boca.
+       Os pontos levantados perto do eixo (pontosEixo) ficam só como marcas; a linha deixa de zigue-zaguear entre pontos de lados diferentes. */
+    let pontosEixo = linha, perfilTin = null;
+    try {
+      const base = pts.filter(p => p.papel === 'terreno' || p.papel === 'pista' || p.papel === 'outro');
+      if (base.length >= 3 && BU.TIN) {
+        const tin = BU.TIN.triangular(base), EXT = 6, passo = 0.25, amostra = [];
+        const tris = tin.tri.map(t => t.map(i => base[i]));
+        for (let s = -EXT; s <= L + EXT + 1e-9; s += passo) {
+          const E = A.E + uE * s, N = A.N + uN * s;
+          for (const [a, b, c] of tris) {
+            const d = (b.N - c.N) * (a.E - c.E) + (c.E - b.E) * (a.N - c.N); if (Math.abs(d) < 1e-9) continue;
+            const w1 = ((b.N - c.N) * (E - c.E) + (c.E - b.E) * (N - c.N)) / d, w2 = ((c.N - a.N) * (E - c.E) + (a.E - c.E) * (N - c.N)) / d, w3 = 1 - w1 - w2;
+            if (w1 >= -1e-9 && w2 >= -1e-9 && w3 >= -1e-9) { amostra.push({ s: +s.toFixed(3), Z: w1 * a.Z + w2 * b.Z + w3 * c.Z, id: '' }); break; }
+          }
+        }
+        if (amostra.length >= 4) perfilTin = amostra;
+      }
+    } catch (er) { perfilTin = null; }
+    if (perfilTin) { linha = perfilTin; seLinha = true; pontosEixo = pontosEixo.filter(p => Math.abs(p.t) <= tol && p.s >= -6 && p.s <= L + 6); }
     const dentro = linha.filter(p => p.s >= 0 && p.s <= L);
     let cob = null;
     if (dentro.length) { const t = maxZ(dentro); cob = { s: t.s, zTopoPista: t.Z, valor: t.Z - (inv(t.s) + Hint + e) }; }
-    return { pts, A, B, L, u: { E: uE, N: uN }, decl, H: Hint, e, Wplan, ilustrativo, modo: ex.modo, linha, seLinha, tol, cob, inv, rn: pts.find(p => p.papel === 'rn') || null, dims: d };
+    return { pts, A, B, L, u: { E: uE, N: uN }, decl, H: Hint, e, Wplan, ilustrativo, modo: ex.modo, linha, pontosEixo, seLinha, tol, cob, inv, rn: pts.find(p => p.papel === 'rn') || null, dims: d };
   }
 
   const temDados = l => { try { return !!modelo(l); } catch (e) { console.error(e); return false; } };
@@ -273,8 +293,8 @@
     g += tx(X(0) - 4, Y(A.Z) + 11, `GI ${fmt(A.Z, 3)}`, { fs: 7.5, b: 1, c: COR.gi, a: 'end', halo: 1 }) + tx(X(L) + 4, Y(B.Z) + 11, `GI ${fmt(B.Z, 3)}`, { fs: 7.5, b: 1, c: COR.gi, a: 'start', halo: 1 });
     // terreno / pista
     if (m.seLinha) g += `<polyline points="${m.linha.map(p => p1(X(p.s)) + ',' + p1(Y(p.Z))).join(' ')}" fill="none" stroke="#8A6D1F" stroke-width="1.5" stroke-linejoin="round"/>`;
-    const rotular = m.linha.length <= 40;
-    for (const p of m.linha) {
+    const rotular = (m.pontosEixo || []).length <= 40;
+    for (const p of (m.pontosEixo || [])) {
       g += `<circle cx="${p1(X(p.s))}" cy="${p1(Y(p.Z))}" r="2" fill="#fff" stroke="#8A6D1F" stroke-width="1"/>`;
       if (rotular) g += tx(X(p.s) + 2.5, Y(p.Z) - 4, p.id, { fs: 5, c: MUTED, halo: 1 });
     }
@@ -509,7 +529,7 @@ ${planta(l, m)}${perfil(l, m)}${detalhe(l, m, { x: 14, y: 620, w: 258, h: 208 },
     LINE('PERFIL_GI', [ox, yb(m.A.Z)], [ox + m.L, yb(m.B.Z)]);
     TEXT('PERFIL_GI', ox, yb(m.A.Z) - 0.7, 0.3, `GI ${f(m.A.Z)}`); TEXT('PERFIL_GI', ox + m.L, yb(m.B.Z) - 0.7, 0.3, `GI ${f(m.B.Z)}`);
     if (m.linha.length >= 2 && m.seLinha) POLI('PERFIL_TERRENO', m.linha.map(p => [ox + p.s, yb(p.Z)]), false);
-    m.linha.forEach(p => { PT('PERFIL_TERRENO', ox + p.s, yb(p.Z), p.Z); TEXT('PERFIL_TERRENO', ox + p.s + 0.1, yb(p.Z) + 0.15, 0.2, `${p.id} ${f(p.Z)}`); });
+    (m.pontosEixo || []).forEach(p => { PT('PERFIL_TERRENO', ox + p.s, yb(p.Z), p.Z); TEXT('PERFIL_TERRENO', ox + p.s + 0.1, yb(p.Z) + 0.15, 0.2, `${p.id} ${f(p.Z)}`); });
     par(0, 'ENDSEC'); par(0, 'EOF');
     return o.join('\r\n') + '\r\n';
   }
