@@ -42,6 +42,9 @@ jobs:
           # versão do service worker = commit (celulares percebem a atualização sozinhos)
           sed -i "s/^const VERSAO = '.*';/const VERSAO = '${GITHUB_SHA::7}';/" _site/service-worker.js
           grep -n "^const VERSAO" _site/service-worker.js
+          # painel: scripts e estilos com ?v=commit (o navegador não reaproveita arquivo antigo do cache)
+          sed -i -E "s#(src|href)=\"([^\"]+\\.(js|css))\"#\\1=\"\\2?v=${GITHUB_SHA::7}\"#g" _site/gestao/index.html
+          grep -c "?v=${GITHUB_SHA::7}" _site/gestao/index.html
           # todo arquivo listado no cache precisa existir
           node -e "
             const s=require('fs').readFileSync('_site/service-worker.js','utf8');
