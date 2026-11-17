@@ -76,11 +76,13 @@
   const minZ = a => a.reduce((m, p) => (p.Z < m.Z ? p : m), a[0]);
   const maxZ = a => a.reduce((m, p) => (p.Z > m.Z ? p : m), a[0]);
 
+  /* geratriz superior: maior cota entre os pontos de geratriz a menos de 0,5 m da inferior (o par topo/base do RTK) */
+  function topoDe(a, pts) { const z = pts.filter(q => (q.papel === 'gim' || q.papel === 'gij' || q.papel === 'gtz') && Math.hypot(q.E - a.E, q.N - a.N) <= 0.5).map(q => q.Z); const t = z.length ? Math.max(...z) : null; return t != null && t - a.Z >= 0.15 ? t : null; }
   function acharEixo(pts) {
     const gim = pts.filter(p => p.papel === 'gim'), gij = pts.filter(p => p.papel === 'gij');
     if (gim.length && gij.length) {
       const a = minZ(gim), b = minZ(gij);
-      if (Math.hypot(a.E - b.E, a.N - b.N) >= 0.5) return { A: { E: a.E, N: a.N, Z: a.Z, id: a.id, c: centro(gim) }, B: { E: b.E, N: b.N, Z: b.Z, id: b.id, c: centro(gij) }, modo: 'GI', rotulado: true };
+      if (Math.hypot(a.E - b.E, a.N - b.N) >= 0.5) return { A: { E: a.E, N: a.N, Z: a.Z, id: a.id, c: centro(gim), Zs: topoDe(a, pts) }, B: { E: b.E, N: b.N, Z: b.Z, id: b.id, c: centro(gij), Zs: topoDe(b, pts) }, modo: 'GI', rotulado: true };
     }
     const gs = pts.filter(p => p.papel === 'gim' || p.papel === 'gij' || p.papel === 'gtz');
     if (gs.length >= 2) {
@@ -92,7 +94,7 @@
           if (!melhor || d > melhor.d) melhor = { i, j, d };
         }
         if (melhor.d >= 0.5) {
-          const mk = c => { const lo = minZ(c), hi = maxZ(c), ce = centro(c); return { E: ce.E, N: ce.N, Z: lo.Z, id: lo.id, topo: hi.Z - lo.Z }; };
+          const mk = c => { const lo = minZ(c), hi = maxZ(c), ce = centro(c); return { E: ce.E, N: ce.N, Z: lo.Z, id: lo.id, topo: hi.Z - lo.Z, Zs: hi.Z - lo.Z >= 0.15 ? hi.Z : null }; };
           let a = mk(cl[melhor.i]), b = mk(cl[melhor.j]);
           const tops = [a.topo, b.topo].filter(t => t > 0.2);
           if (a.Z < b.Z) { const t = a; a = b; b = t; } // montante = boca mais alta
@@ -132,6 +134,10 @@
     const Hint = d ? d.H : (ex.Hgeratriz || 1), e = d ? d.e : Hint * 0.08, Wplan = d ? d.W : Hint + 2 * e;
     const ilustrativo = !d && !ex.Hgeratriz;
     const inv = s => A.Z + (B.Z - A.Z) * s / L;
+    /* altura do tubo em cada boca: medida (geratriz superior do RTK) ou, na falta, a das dimensões / padrão */
+    const temGS = !d && A.Zs != null && B.Zs != null;
+    const hA = temGS ? A.Zs - A.Z : Hint, hB = temGS ? B.Zs - B.Z : Hint;
+    const gs = s => inv(s) + hA + (hB - hA) * s / L;
     const decl = (A.Z - B.Z) / L * 100;
 
     // Linha do terreno/pista: pontos de terreno, pista e "outros" perto do eixo, em ordem de distância.
@@ -161,8 +167,8 @@
     if (perfilTin) { linha = perfilTin; seLinha = true; pontosEixo = pontosEixo.filter(p => Math.abs(p.t) <= tol && p.s >= -10 && p.s <= L + 10); }
     const dentro = linha.filter(p => p.s >= 0 && p.s <= L);
     let cob = null;
-    if (dentro.length) { const t = maxZ(dentro); cob = { s: t.s, zTopoPista: t.Z, valor: t.Z - (inv(t.s) + Hint + e) }; }
-    return { pts, A, B, L, u: { E: uE, N: uN }, decl, H: Hint, e, Wplan, ilustrativo, modo: ex.modo, linha, pontosEixo, seLinha, tol, cob, inv, rn: pts.find(p => p.papel === 'rn') || null, dims: d };
+    if (dentro.length) { const t = maxZ(dentro); cob = { s: t.s, zTopoPista: t.Z, valor: temGS ? t.Z - gs(t.s) : t.Z - (inv(t.s) + Hint + e) }; }
+    return { pts, A, B, L, u: { E: uE, N: uN }, decl, H: Hint, hA, hB, gs, temGS, e, Wplan, ilustrativo, modo: ex.modo, linha, pontosEixo, seLinha, tol, cob, inv, rn: pts.find(p => p.papel === 'rn') || null, dims: d };
   }
 
   const temDados = l => { try { return !!modelo(l); } catch (e) { console.error(e); return false; } };
