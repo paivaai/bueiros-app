@@ -62,6 +62,21 @@
   const COR_FEICAO = { pista: '#D9822B', terreno: '#1B9E8A', outro: '#7A7F7C' };
 
   /* ---------- planta (norte para cima, com triangulação) ---------- */
+  /* Curvas de nível da própria triangulação: de 0,50 em 0,50 m (mestras de 2,50 em 2,50 m), com a cota nas mestras. */
+  function curvas(m, tin) {
+    if (!tin || !tin.tri || !tin.tri.length) return { segs: [], rot: [] };
+    const P = m.pts, zs = P.map(p => p.Z), zMin = Math.min(...zs), zMax = Math.max(...zs), segs = [], melhor = new Map();
+    const lo = Math.ceil(zMin / 0.5 - 1e-9) * 0.5;
+    for (const [a, b, c] of tin.tri) {
+      const T = [P[a], P[b], P[c]], t0 = Math.min(T[0].Z, T[1].Z, T[2].Z), t1 = Math.max(T[0].Z, T[1].Z, T[2].Z);
+      for (let z = Math.ceil(Math.max(t0, lo) / 0.5 - 1e-9) * 0.5; z <= t1 + 1e-9 && z <= zMax; z += 0.5) {
+        const pts = [];
+        for (let i = 0; i < 3; i++) { const u = T[i], v = T[(i + 1) % 3]; if ((u.Z - z) * (v.Z - z) < 0) { const k = (z - u.Z) / (v.Z - u.Z); pts.push({ E: u.E + (v.E - u.E) * k, N: u.N + (v.N - u.N) * k }); } }
+        if (pts.length === 2) { const mestra = Math.abs(z / 2.5 - Math.round(z / 2.5)) < 1e-6, s = { z: +z.toFixed(2), mestra, a: pts[0], b: pts[1] }; segs.push(s); const len = Math.hypot(pts[0].E - pts[1].E, pts[0].N - pts[1].N); if (mestra && (!melhor.has(s.z) || len > melhor.get(s.z).len)) melhor.set(s.z, { len, s }); }
+      }
+    }
+    return { segs, rot: [...melhor.values()].filter(r => r.len > 1.2).map(r => r.s) };
+  }
   /* janela da planta de detalhe (1:50) centrada na boca de montante, um pouco para dentro do tubo */
   function janelaDetalhe(m) { const c = pontoEm(m, Math.min(2, m.L / 4), 0), sc = 1415 / 50; return { E: c.E, N: c.N, w: (A.p2.w - 34) / sc, h: (A.p2.h - 24) / sc }; }
   function planta(l, m, P, tin, modo) {
@@ -90,6 +105,10 @@
     for (let n = Math.ceil((cN - R.h / 2 / sc) / st) * st; n <= cN + R.h / 2 / sc; n += st) g += tx(P.x + 9, Y(n), 'N=' + fmt(n, 0), { fs: 4.8, c: '#8A8F8C', a: 'middle', rot: -90 });
     // triangulação
     if (tin) g += `<g stroke="#6F7773" stroke-width="${geral ? .4 : .5}" fill="none">${tin.arestas.map(([a, b]) => ln(X(m.pts[a].E), Y(m.pts[a].N), X(m.pts[b].E), Y(m.pts[b].N))).join('')}</g>`;
+    // curvas de nível (da triangulação)
+    { const cv = curvas(m, tin); if (cv.segs.length < 4000) {
+      g += `<g fill="none" stroke="#2E9E5B" stroke-linecap="round">${cv.segs.map(s => `<line x1="${p1(X(s.a.E))}" y1="${p1(Y(s.a.N))}" x2="${p1(X(s.b.E))}" y2="${p1(Y(s.b.N))}" stroke-width="${s.mestra ? .7 : .35}"/>`).join('')}</g>`;
+      for (const s of cv.rot) { const x = (X(s.a.E) + X(s.b.E)) / 2, y = (Y(s.a.N) + Y(s.b.N)) / 2; let an = Math.atan2(Y(s.b.N) - Y(s.a.N), X(s.b.E) - X(s.a.E)) * 180 / Math.PI; if (an > 90) an -= 180; if (an < -90) an += 180; if (x > P.x + 30 && x < P.x + P.w - 10 && y > P.y + 6 && y < P.y + P.h - 14) g += tx(x, y, fmt(s.z, 1), { fs: geral ? 4.4 : 5.4, c: '#1F7A44', rot: p1(an), halo: 1, a: 'middle' }); } } }
     // linhas de feição (pista, bordas, talude)
     for (const f of feicoes(m)) g += `<polyline points="${f.pts.map(p => p1(X(p.E)) + ',' + p1(Y(p.N))).join(' ')}" fill="none" stroke="${COR_FEICAO[f.g] || COR_FEICAO.outro}" stroke-width="${geral ? .7 : .9}" stroke-linejoin="round"/>`;
     // corpo, eixo e arestas do tubo
@@ -308,13 +327,13 @@
     return g;
   }
   function revisoes(l) {
-    const P = A.rv, cx = [P.x, P.x + 24, P.x + 120, P.x + 168]; let g = box(P.x, P.y, P.w, P.h, '#B58900', .8);
-    ['REV.', 'DESCRIÇÃO', 'DATA', 'RESP. TÉCNICO / PROJETISTA'].forEach((t, i) => { g += tx(cx[i] + 3, P.y + 9, t, { fs: 4.6, b: 1, c: MUTED }); });
-    g += ln(P.x, P.y + 13, P.x + P.w, P.y + 13, 'stroke="#B58900" stroke-width=".5"') + ln(P.x, P.y + 33, P.x + P.w, P.y + 33, 'stroke="#B58900" stroke-width=".5"');
-    cx.slice(1).forEach(x => { g += ln(x, P.y, x, P.y + P.h, 'stroke="#B58900" stroke-width=".5"'); });
-    const L = BU.Prancha.logos ? BU.Prancha.logos() : {};
-    g += tx(P.x + 4, P.y + 25, '00', { fs: 6, b: 1 }) + tx(cx[1] + 3, P.y + 25, 'EMISSÃO INICIAL', { fs: 5.6, b: 1 }) + tx(cx[2] + 3, P.y + 25, hoje(), { fs: 5.6, b: 1 }) + tx(cx[3] + 3, P.y + 25, String(l.responsavel || 'GFA').slice(0, 22), { fs: 5.6, b: 1 });
-    void L; return g;
+    const P = A.rv, cx = [P.x, P.x + 26, P.x + 76], ac = '#B58900'; let g = box(P.x, P.y, P.w, P.h, ac, .8);
+    g += tx(P.x + P.w / 2, P.y + 8, 'CONTROLE INTERNO DE REVISÕES', { fs: 5.4, b: 1, c: MUTED, a: 'middle' });
+    g += ln(P.x, P.y + 12, P.x + P.w, P.y + 12, `stroke="${ac}" stroke-width=".5"`) + ln(P.x, P.y + 22, P.x + P.w, P.y + 22, `stroke="${ac}" stroke-width=".5"`);
+    ['REV.', 'DATA', 'ASSUNTO'].forEach((t, i) => { g += tx(cx[i] + 3, P.y + 19, t, { fs: 4.6, b: 1, c: MUTED }); });
+    cx.slice(1).forEach(x => { g += ln(x, P.y + 12, x, P.y + P.h, `stroke="${ac}" stroke-width=".5"`); });
+    g += tx(cx[0] + 3, P.y + 31, '00', { fs: 5.6, b: 1 }) + tx(cx[1] + 3, P.y + 31, hoje(), { fs: 5.2, b: 1 }) + tx(cx[2] + 3, P.y + 31, 'EMISSÃO INICIAL', { fs: 5.2, b: 1 });
+    return g;
   }
   function carimbo(l, m) {
     const P = A.cb, Lg = BU.Prancha.logos ? BU.Prancha.logos() : {}; let g = box(P.x, P.y, P.w, P.h, BLUE, 1);
