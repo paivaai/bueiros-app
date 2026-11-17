@@ -265,6 +265,7 @@
 
   /* ---------------------------------------------------------------- detalhe */
   async function viewDetalhe(id) {
+    try { await BU.Prancha.logosPronto; } catch (e) { /* segue sem logos */ }
     const [b, hist, fotos, eixo, pres, coms] = await Promise.all([D.bueiro(id), D.historico(id), D.fotos(id), D.eixo(S.projeto.id).catch(() => null), (D.presencas ? D.presencas(id) : Promise.resolve([])).catch(() => []), D.comentarios(id).catch(e => ({ erro: e }))]);
     if (!b) { pagina('bueiros', '<div class="erro">Bueiro não encontrado.</div>'); return; }
     const d = b.dados || {}, c = d.caracteristicas || {}, campo = S.usuarios.filter(u => u.papel === 'campo');
