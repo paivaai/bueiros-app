@@ -7,11 +7,13 @@
   /* Monta o levantamento completo a partir da linha do servidor (igual ao que o app de campo faz ao receber). */
   function levantamento(b) {
     const d = b.dados || {};
-    return BU.Modelo.normalizar({
+    const l = BU.Modelo.normalizar({
       ...d, id: b.id, status: b.status, codigo: d.codigo || b.codigo, km: d.km || b.km || '',
       latitude: d.latitude != null ? d.latitude : b.latitude, longitude: d.longitude != null ? d.longitude : b.longitude,
       leste: d.leste != null ? d.leste : b.leste, norte: d.norte != null ? d.norte : b.norte, zona: d.zona || b.zona || '23',
     });
+    try { if (BU.Prancha && BU.Prancha.temDados(l)) BU.Prancha.sincronizarMedicoes(l); } catch (e) { /* segue sem sincronizar */ }
+    return l;
   }
 
   /* tipo: 'antt' | 'relatorio' | 'prancha' */
