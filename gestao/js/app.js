@@ -49,7 +49,7 @@
       </nav>`;
   }
   /* Perfil "Visualização": o servidor já bloqueia qualquer gravação; aqui some também o que seria inútil na tela. */
-  const SO_VER_OCULTAR = ['#barra-atrib', '[data-sel]', '#d-atrib', '#r-com', '[data-a=aprovar]', '[data-a=atribuir]', '[data-a=devolver]', '[data-a=salvar-equipe]', '[data-a=arquivar]', '[href$="/editar"]', '[href="#/novo"]'];
+  const SO_VER_OCULTAR = ['#barra-atrib', '[data-sel]', '#d-atrib', '#r-com', '[data-a=aprovar]', '[data-a=atribuir]', '[data-a=devolver]', '[data-a=salvar-equipe]', '[data-a=arquivar]', '#card-txt', '[href$="/editar"]', '[href="#/novo"]'];
   function pagina(aba, corpo) {
     raiz.innerHTML = topo(aba) + `<main>${corpo}</main>`;
     if (soVer()) {
@@ -219,7 +219,7 @@
     const d = b.dados || {}, c = d.caracteristicas || {}, campo = S.usuarios.filter(u => u.papel === 'campo');
     let prancha = '';
     if (BU.Prancha && Array.isArray(d.pontos) && d.pontos.length) {
-      try { BU.Prancha.sincronizarMedicoes(d); prancha = BU.Prancha.gerarSVG(d, { foco: 'tudo' }); } catch (e) { prancha = ''; }
+      try { const lv = window.Documentos.levantamento(b); BU.Prancha.sincronizarMedicoes(lv); prancha = BU.Prancha.gerarSVG(lv, { foco: 'tudo' }); } catch (e) { prancha = ''; }
     }
     const revisavel = ['concluido', 'nao_localizado'].includes(b.status);
     const volta = `#/p/${S.projeto.id}/bueiros`;
@@ -253,6 +253,8 @@
       <div class="card"><h3>Capacidade hidráulica (Manning)</h3><div class="kv-lista" style="margin-top:8px">${(() => { try { return window.BU.Hidraulica.resumo(window.Documentos.levantamento(b)).filter(([, v]) => v).map(([k, v]) => `<div class="kv"><span>${esc(k)}</span><b>${esc(v)}</b></div>`).join(''); } catch (e) { return '<p class="muted small">Não foi possível calcular.</p>'; } })()}</div></div>
       <div class="card"><h3>Documentos para o cliente</h3><p class="muted small" style="margin:6px 0 10px">Gerados na hora com os dados e as fotos enviados pelo campo. Abrem em outra aba: use “Imprimir / salvar PDF”.</p>
         <div class="linha"><button class="btn" data-a="doc" data-tipo="antt" data-id="${b.id}">Ficha padrão ANTT</button><button class="btn" data-a="doc" data-tipo="relatorio" data-id="${b.id}">Relatório geral</button><button class="btn" data-a="doc" data-tipo="prancha" data-id="${b.id}">Prancha (PNG)</button><button class="btn" data-a="doc" data-tipo="prancha-pdf" data-id="${b.id}">Prancha (PDF A3)</button><button class="btn" data-a="doc" data-tipo="prancha-dxf" data-id="${b.id}">Prancha (DXF/CAD)</button></div><div id="doc-msg" class="muted small" style="margin-top:8px"></div></div>
+      <div class="card" id="card-txt"><h3>Pontos do levantamento (TXT)</h3><p class="muted small" style="margin:6px 0 10px">Envie o arquivo do RTK (<span class="mono">ID X Y Z "CÓDIGO"</span>). O painel monta a planta, o perfil e o DXF para o CAD a partir dos pontos.${Array.isArray(d.pontos) && d.pontos.length ? ` Hoje há <b>${d.pontos.length}</b> ponto(s)${d.pontosArquivo ? ' de <span class="mono">' + esc(d.pontosArquivo) + '</span>' : ''}.` : ' Este bueiro ainda não tem pontos.'}</p>
+        <div class="linha"><input type="file" id="txt-pontos" accept=".txt,.csv,.xyz,text/plain" data-id="${b.id}"></div><div id="txt-msg" class="small" style="margin-top:8px"></div></div>
       <div class="card"><h3>Prancha (gerada dos pontos RTK)</h3><div style="margin-top:10px">${prancha ? `<div class="prancha">${prancha}</div>` : '<p class="muted" style="margin:0">Sem pontos RTK enviados ainda.</p>'}</div></div>
       <div class="card"><h3>Fotos</h3><div style="margin-top:10px">${fotos.length ? `<div class="fotos">${fotos.map(f => `<figure><a href="${esc(f.url)}" target="_blank" rel="noopener"><img src="${esc(f.url)}" alt="${esc(f.categoria || 'Foto')}" loading="lazy"></a><figcaption>${esc(f.legenda || f.categoria || '')}</figcaption></figure>`).join('')}</div>` : '<p class="muted" style="margin:0">Sem fotos.</p>'}</div></div>
       <div class="card"><h3>Histórico</h3><ul class="hist" style="margin-top:10px">${hist.map(h => `<li><b>${esc(TXT_ACAO(h))}</b><small>${esc(h.usuario_nome || '—')} · ${quando(h.em)}</small>${h.detalhe && h.detalhe.comentario ? `<small>“${esc(h.detalhe.comentario)}”</small>` : ''}</li>`).join('') || '<li>Sem registros.</li>'}</ul></div>`);
@@ -433,6 +435,21 @@
   });
   document.addEventListener('input', ev => { if (ev.target.id === 'f-q') { S.filtro.q = ev.target.value; viewBueiros(); } });
   document.addEventListener('change', async ev => {
+    if (ev.target.id === 'txt-pontos') {
+      const inp = ev.target, f = inp.files && inp.files[0], msg = document.getElementById('txt-msg'); if (!f) return;
+      try {
+        const texto = await new Promise((ok, er) => { const fr = new FileReader(); fr.onload = () => ok(String(fr.result)); fr.onerror = () => er(fr.error); fr.readAsText(f); });
+        const r = BU.Pontos.parsear(texto);
+        if (!r.ok.length) { msg.innerHTML = '<span class="erro">Nenhuma linha válida. O formato é: ID X Y Z "CÓDIGO".</span>'; inp.value = ''; return; }
+        const b = await D.bueiro(inp.dataset.id), n = ((b.dados || {}).pontos || []).length; let subst = true;
+        if (n) { const r2 = window.confirm(`Este bueiro já tem ${n} ponto(s).\n\nOK = substituir pelos ${r.ok.length} do arquivo\nCancelar = manter os atuais`); if (!r2) { inp.value = ''; return; } }
+        msg.textContent = 'Enviando…';
+        await D.anexarPontos(inp.dataset.id, r.ok.map(p => ({ id: p.id, x: p.x, y: p.y, z: p.z, codigo: p.codigo, obs: '' })), f.name, subst);
+        toast(`${r.ok.length} ponto(s) enviado(s)` + (r.ruins.length ? ` · ${r.ruins.length} linha(s) ignorada(s)` : '') + '.');
+        viewDetalhe(inp.dataset.id);
+      } catch (e) { msg.innerHTML = '<span class="erro">' + esc(e.message || e) + '</span>'; inp.value = ''; }
+      return;
+    }
     if (ev.target.dataset && ev.target.dataset.papel) { const sel = ev.target; try { await D.definirPapel(sel.dataset.papel, sel.value); toast('Papel alterado.'); viewEquipe(); } catch (e) { toast(esc(e.message || e)); viewEquipe(); } return; }
     if (ev.target.id === 'f-st') { S.filtro.st = ev.target.value; viewBueiros(); }
     else if (ev.target.id === 'f-resp') { S.filtro.resp = ev.target.value; viewBueiros(); }

@@ -114,6 +114,7 @@
       async historico(id) { return hist[id] || []; },
       async fotoBlobs() { return new Map(); },
       async comentarios(id) { return comentariosDemo.filter(c => c.bueiro_id === id); },
+      async anexarPontos(id, pontos, arquivo, substituir) { const b = bueiros.find(x => x.id === id); if (!b) return; b.dados = b.dados || {}; b.dados.pontos = substituir === false ? (b.dados.pontos || []).concat(pontos) : pontos; b.dados.pontosArquivo = arquivo || ''; b.versao = (b.versao || 1) + 1; },
       async comentar(id, texto) { const u = D.usuarioAtual; comentariosDemo.push({ id: 'c' + Date.now(), bueiro_id: id, texto, usuario_nome: u.nome, papel: u.papel, criado_em: new Date().toISOString() }); },
       async fotos(id) {
         const b = bueiros.find(x => x.id === id);
@@ -300,6 +301,11 @@
       async comentarios(id) {
         const { data, error } = await sb.from('comentarios').select('id,texto,usuario_nome,papel,criado_em').eq('bueiro_id', id).order('criado_em'); 
         if (error) throw error; return data || [];
+      },
+      async anexarPontos(id, pontos, arquivo, substituir) {
+        const { error } = await sb.rpc('anexar_pontos', { p_bueiro: id, p_pontos: pontos, p_arquivo: arquivo || null, p_substituir: substituir !== false });
+        if (error && /could not find the function|PGRST202/i.test((error.code || '') + error.message)) throw new Error('Falta rodar o script servidor/18_anexar_pontos.sql no Supabase.');
+        erro(error);
       },
       async comentar(id, texto) { const { error } = await sb.rpc('comentar_bueiro', { p_bueiro: id, p_texto: texto }); erro(error); },
       /* Baixa os arquivos das fotos do bueiro (para a ficha ANTT e o relatório): Map id → Blob. */
