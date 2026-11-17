@@ -112,6 +112,14 @@
     return g;
   }
 
+  /* Estacas da tabela do perfil: regulares em todo o trecho levantado do terreno (também fora do bueiro), mais as duas bocas. */
+  function passoEstaca(m) { const t = m.L + 20; return t <= 40 ? 2 : t <= 80 ? 2.5 : t <= 150 ? 5 : 10; }
+  function estacas(m, nl) {
+    const L = +m.L.toFixed(3), pa = passoEstaca(m), s0 = Math.min(0, ...nl.map(p => p.s)), s1 = Math.max(L, ...nl.map(p => p.s));
+    const r = [0, L];
+    for (let s = Math.ceil(s0 / pa) * pa; s <= s1 + 1e-9; s += pa) { const v = +s.toFixed(3); if (Math.abs(v) > pa * 0.45 && Math.abs(v - L) > pa * 0.45) r.push(v); }
+    return r.sort((a, b) => a - b);
+  }
   /* ---------- perfil longitudinal ---------- */
   function perfil(l, m, P) {
     const nl = m.linha, tab = 5, rh = 17, th = tab * rh;
@@ -125,6 +133,7 @@
     let g = box(P.x, P.y, P.w, P.h, RED, .9) + `<clipPath id="cp-pf"><rect x="${R.x - 2}" y="${R.y - 22}" width="${R.w + 4}" height="${R.h + 24}"/></clipPath>`;
     g += `<pattern id="hach" patternUnits="userSpaceOnUse" width="5" height="5" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="5" stroke="${MAG}" stroke-width=".6"/></pattern>`;
     const pz = passo(zMax - zMin, Math.max(4, Math.round(R.h / 22))), px = passo(xMax - xMin, 14);
+    { const pm = pz / 4; for (let z = Math.ceil(zMin / pm) * pm; z <= zMax + 1e-9; z += pm) g += ln(R.x, Y(z), R.x + R.w, Y(z), `stroke="${GRID}" stroke-width=".25"`); }
     for (let z = Math.ceil(zMin / pz) * pz; z <= zMax + 1e-9; z += pz) g += ln(R.x, Y(z), R.x + R.w, Y(z), `stroke="${GRID}" stroke-width=".6"`) + tx(R.x - 4, Y(z) + 2, fmt(z, pz < 1 ? 1 : 0), { fs: 5.2, c: MUTED, a: 'end' });
     for (let x = Math.ceil(xMin / px) * px; x <= xMax + 1e-9; x += px) g += ln(X(x), R.y, X(x), yBase, `stroke="${GRID}" stroke-width=".6"`);
     g += box(R.x, R.y, R.w, R.h, '#9AA09C', .6) + `<g clip-path="url(#cp-pf)">`;
@@ -143,15 +152,16 @@
     }
     g += tx(X(L / 2), Y(m.A.Z + (m.B.Z - m.A.Z) / 2 - e) + 14, `L = ${fmt(L, 2)} m · i = ${fmt(m.decl, 2)} % · ${m.dims ? m.dims.rotulo : 'H = ' + fmt(H, 2) + ' m'}`, { fs: 7, b: 1, a: 'middle', halo: 1 });
     g += '</g>';
+    { const alvo = 80 / sx, lb = [1, 2, 5, 10, 20, 50, 100].filter(v => v <= alvo).pop() || 1, wB = lb * sx, bx = P.x + P.w - 14 - wB, by = P.y + 20;
+      for (let i = 0; i < 4; i++) g += `<rect x="${p1(bx + i * wB / 4)}" y="${by}" width="${p1(wB / 4)}" height="4" fill="${i % 2 ? '#fff' : INK}" stroke="${INK}" stroke-width=".5"/>`;
+      g += tx(bx, by - 2, '0', { fs: 5 }) + tx(bx + wB, by - 2, lb + ' m', { fs: 5, a: 'middle' }) + tx(bx + wB, by + 12, 'ESC. HORIZ. = DA PLANTA', { fs: 4.6, c: MUTED, a: 'end' }); }
     // título e escala
     g += `<circle cx="${P.x + 10}" cy="${P.y + 14}" r="5" fill="none" stroke="${RED}" stroke-width=".8"/><circle cx="${P.x + 10}" cy="${P.y + 14}" r="2" fill="#18A0C8"/>`
       + tx(P.x + 20, P.y + 16, 'PERFIL LONGITUDINAL PELO EIXO DO BUEIRO', { fs: 9, b: 1, c: '#0B7C99' })
       + tx(P.x + 20, P.y + 27, `EXAGERO VERTICAL ${String(ex.toFixed(1)).replace('.', ',')}× · DISTÂNCIAS A PARTIR DA GERATRIZ INFERIOR DE MONTANTE · COTAS EM METROS`, { fs: 5.2, c: '#9A8200' });
     // tabela de estacas
     const terrenoEm = s => { if (!nl.length) return null; if (s <= nl[0].s) return nl[0].Z; for (let i = 1; i < nl.length; i++) if (s <= nl[i].s) { const a = nl[i - 1], b = nl[i]; return b.s === a.s ? b.Z : a.Z + (b.Z - a.Z) * (s - a.s) / (b.s - a.s); } return nl[nl.length - 1].Z; };
-    const passoE = L <= 12 ? 2 : L <= 30 ? 5 : L <= 80 ? 10 : 20, ests = new Set([0, +L.toFixed(3)]);
-    for (let s = passoE; s < L - passoE * 0.35; s += passoE) ests.add(+s.toFixed(3));
-    const sel = [...ests].sort((a, b) => a - b).map(s => ({ s, fixo: s === 0 || s === +L.toFixed(3) }));
+    const sel = estacas(m, nl).map(s => ({ s, fixo: s === 0 || s === +L.toFixed(3) })), passoE = passoEstaca(m);
     const ty = P.y + P.h - th - 22, rot = ['ESTACA / DIST. (m)', 'COTA DO TERRENO (m)', 'COTA GERATRIZ INF. (m)', 'RECOBRIMENTO (m)', 'DECLIVIDADE (%)'];
     g += box(P.x + 8, ty, R.x + R.w - P.x - 8, th, '#888', .6);
     rot.forEach((t, i) => { g += tx(P.x + 12, ty + i * rh + 11, t, { fs: 5.4, b: 1, c: '#0B7C99' }) + (i ? ln(P.x + 8, ty + i * rh, R.x + R.w, ty + i * rh, 'stroke="#BBB" stroke-width=".5"') : ''); });
@@ -246,7 +256,7 @@
     const v = FOCOS[foco] || FOCOS.tudo;
     const aviso = m.modo === 'estimado' ? tx(A.p1.x + 6, A.p1.y + 12, 'Eixo estimado: não achei GI MONT / GI JUS nem geratrizes. Use esses códigos no RTK.', { fs: 6, b: 1, c: '#B45309' }) : '';
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${v.join(' ')}" width="${v[2]}" height="${v[3]}" font-family="Arial, Helvetica, sans-serif" role="img" aria-label="Folha da prancha: plantas, perfil longitudinal, legenda, coordenadas e carimbo do bueiro">
-<rect x="0" y="0" width="${SW}" height="${SH}" fill="#fff"/><rect x="5" y="5" width="${SW - 10}" height="${SH - 10}" fill="none" stroke="${BLUE}" stroke-width="1.1"/><rect x="34" y="14" width="1143" height="812" fill="none" stroke="${BLUE}" stroke-width=".8"/>
+<rect x="0" y="0" width="${SW}" height="${SH}" fill="#fff"/><rect x="5" y="5" width="${SW - 10}" height="${SH - 10}" fill="none" stroke="${BLUE}" stroke-width="1.1"/><rect x="34" y="14" width="1143" height="812" fill="none" stroke="${BLUE}" stroke-width=".8"/>${[0.166, 0.34, 0.559].map(k => `<line x1="${p1(SW * k)}" y1="5" x2="${p1(SW * k)}" y2="14" stroke="${RED}" stroke-width=".7"/><line x1="${p1(SW * k)}" y1="${SH - 14}" x2="${p1(SW * k)}" y2="${SH - 5}" stroke="${RED}" stroke-width=".7"/>`).join('')}<line x1="5" y1="${SH / 2}" x2="34" y2="${SH / 2}" stroke="${RED}" stroke-width=".7"/><line x1="${SW - 34}" y1="${SH / 2}" x2="${SW - 5}" y2="${SH / 2}" stroke="${RED}" stroke-width=".7"/>
 ${planta(l, m, A.p1, tin, 'geral')}${planta(l, m, A.p2, tin, 'detalhe')}${perfil(l, m, A.p3)}${notas(l, m)}${legenda()}${coordenadas(m)}${mapa(l)}${revisoes(l)}${carimbo(l, m)}${aviso}</svg>`;
   }
 
@@ -302,8 +312,7 @@ ${planta(l, m, A.p1, tin, 'geral')}${planta(l, m, A.p2, tin, 'detalhe')}${perfil
     if (m.cob && m.cob.valor > 0) { const s = m.cob.s; LINE('PERFIL_TEXTO', [X(s), Y(m.inv(s) + H + e)], [X(s), Y(m.cob.zTopoPista)]); TEXT('PERFIL_TEXTO', X(s) + h * 0.6, (Y(m.inv(s) + H + e) + Y(m.cob.zTopoPista)) / 2, h, `recobrimento ${fmt(m.cob.valor, 2)} m`); }
     // tabela de estacas
     const terrenoEm = s => { if (!nl.length) return null; if (s <= nl[0].s) return nl[0].Z; for (let i = 1; i < nl.length; i++) if (s <= nl[i].s) { const a = nl[i - 1], b = nl[i]; return b.s === a.s ? b.Z : a.Z + (b.Z - a.Z) * (s - a.s) / (b.s - a.s); } return nl[nl.length - 1].Z; };
-    const passoE = L <= 12 ? 2 : L <= 30 ? 5 : L <= 80 ? 10 : 20, ests = new Set([0, +L.toFixed(3)]); for (let s = passoE; s < L - passoE * 0.35; s += passoE) ests.add(+s.toFixed(3));
-    const cols = [...ests].sort((a, b) => a - b).map(s => ({ s })), lab = ['ESTACA (m)', 'COTA TERRENO', 'COTA GI', 'RECOBRIMENTO', 'DECLIVIDADE %'], yT = Y(zMin) - h * 5;
+    const cols = estacas(m, nl).map(s => ({ s })), lab = ['ESTACA (m)', 'COTA TERRENO', 'COTA GI', 'RECOBRIMENTO', 'DECLIVIDADE %'], yT = Y(zMin) - h * 5;
     lab.forEach((t, i) => { LINE('TABELA', [X(sMin), yT - i * linhaH], [X(sMax), yT - i * linhaH]); TEXT('TABELA', X(sMin) - h * 12, yT - i * linhaH - linhaH * 0.7, h * 0.8, t); }); LINE('TABELA', [X(sMin), yT - 5 * linhaH], [X(sMax), yT - 5 * linhaH]);
     let ult = -1e9; for (const c of cols) {
       ult = c.s;

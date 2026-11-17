@@ -139,13 +139,13 @@
     const cand = pts.filter(p => p.papel === 'terreno' || p.papel === 'pista' || p.papel === 'outro');
     let linha = cand.filter(p => Math.abs(p.t) <= tol).sort((x, y) => x.s - y.s), seLinha = true;
     if (linha.length < 2) { linha = cand.slice().sort((x, y) => x.s - y.s); seLinha = false; }
-    /* Perfil do terreno pelo eixo: cota interpolada na triangulação (TIN) a cada 25 cm, 6 m além de cada boca.
+    /* Perfil do terreno pelo eixo: cota interpolada na triangulação (TIN) a cada 25 cm, 10 m além de cada boca.
        Os pontos levantados perto do eixo (pontosEixo) ficam só como marcas; a linha deixa de zigue-zaguear entre pontos de lados diferentes. */
     let pontosEixo = linha, perfilTin = null;
     try {
       const base = pts.filter(p => p.papel === 'terreno' || p.papel === 'pista' || p.papel === 'outro');
       if (base.length >= 3 && BU.TIN) {
-        const tin = BU.TIN.triangular(base), EXT = 6, passo = 0.25, amostra = [];
+        const tin = BU.TIN.triangular(base), EXT = 10, passo = 0.25, amostra = [];
         const tris = tin.tri.map(t => t.map(i => base[i]));
         for (let s = -EXT; s <= L + EXT + 1e-9; s += passo) {
           const E = A.E + uE * s, N = A.N + uN * s;
@@ -158,7 +158,7 @@
         if (amostra.length >= 4) perfilTin = amostra;
       }
     } catch (er) { perfilTin = null; }
-    if (perfilTin) { linha = perfilTin; seLinha = true; pontosEixo = pontosEixo.filter(p => Math.abs(p.t) <= tol && p.s >= -6 && p.s <= L + 6); }
+    if (perfilTin) { linha = perfilTin; seLinha = true; pontosEixo = pontosEixo.filter(p => Math.abs(p.t) <= tol && p.s >= -10 && p.s <= L + 10); }
     const dentro = linha.filter(p => p.s >= 0 && p.s <= L);
     let cob = null;
     if (dentro.length) { const t = maxZ(dentro); cob = { s: t.s, zTopoPista: t.Z, valor: t.Z - (inv(t.s) + Hint + e) }; }
