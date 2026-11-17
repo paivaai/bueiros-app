@@ -23,8 +23,10 @@
   }
   /* Lista ordenada dos pontos vermelhos: { k, nome, cod } */
   function pontosDaBoca(l, lado) {
-    const P = perfilBoca(l, lado), out = [], sufx = k => (P.n > 1 ? ` · linha ${k}` : '');
-    for (let k = 1; k <= P.n; k++) out.push({ k: `GTZ-${k}`, nome: 'Geratriz · centro da boca' + sufx(k), cod: 'OAC-GTZ' });
+    const P = perfilBoca(l, lado), out = [];
+    /* Pedido do cliente: só a geratriz inferior da boca. Em bueiro duplo, triplo ou quádruplo vale a mesma informação para todos os tubos. */
+    out.push({ k: 'GTZ-1', nome: P.n > 1 ? `Geratriz inferior · vale para os ${P.n} tubos` : 'Geratriz inferior · centro da boca', cod: 'OAC-GTZ' });
+    return out;
     const cod = P.alas ? 'OAC-ALA' : 'OAC-MURO', quem = P.alas ? 'Ala' : 'Muro';
     if (P.muro) {
       [['AE', 'esquerda'], ['AD', 'direita']].forEach(([s, lado2]) => {
@@ -83,6 +85,7 @@
     // aberturas (uma por linha)
     const yMuro = P.inclinada || P.soMuro || P.caixa ? 80 : P.reta ? 210 : 90, topo = P.inclinada || P.soMuro || P.caixa ? 0 : P.reta ? 121 : 20;
     for (let k = 1; k <= n; k++) { g += cel(gx(k), topo, yMuro - topo + (P.reta ? 0 : 0)); pos[`GTZ-${k}`] = [gx(k), P.reta ? 201 : yMuro]; }
+    pos['GTZ-1'] = [0, P.reta ? 201 : yMuro]; // único ponto pedido: no centro da boca (vale para todos os tubos)
     if (P.inclinada || P.soMuro) {
       g += `<path d="M${f(-half - 50)} 228L${f(-half)} 80H${f(half)}L${f(half + 50)} 228" fill="none" stroke="${GR}" stroke-width="28" stroke-linejoin="miter"/>`;
       pos['AE-JT'] = [-half, 80]; pos['AE-JB'] = [-half - 50, 228]; pos['AD-JT'] = [half, 80]; pos['AD-JB'] = [half + 50, 228];
@@ -120,7 +123,7 @@
   function localizacaoHTML(l, lado) {
     const b = l.bocas[lado], tem = b.leste != null && b.norte != null;
     return `<div class="card"><h3>${LADOS[lado]} · SIRGAS 2000</h3>
-      <p class="${tem ? 'ok-txt' : 'muted'} small">${tem ? utmTxt(b, l) + (b.origem === 'gps' ? ' · do GPS do celular' : b.origem === 'mapa' ? ' · marcado no mapa' : '') : 'Sem coordenadas. Capture pelo GPS no local, marque no mapa ou digite.'}</p>
+      <p class="${tem ? 'ok-txt' : 'muted'} small">${tem ? utmTxt(b, l) + (b.origem === 'gps' ? ' · do GPS do celular' : b.origem === 'mapa' ? ' · marcado no mapa' : b.origem === 'rtk' ? ' · igual à geratriz inferior do RTK' : '') : 'Sem coordenadas. Capture pelo GPS no local, marque no mapa ou digite.'}</p>
       <div class="row"><button type="button" class="btn primary" data-bc="gps" data-lado="${lado}">📍 GPS aqui</button><button type="button" class="btn" data-bc="mapa" data-lado="${lado}">🗺️ Marcar no mapa</button><button type="button" class="btn" data-bc="digitar" data-lado="${lado}">⌨️ Digitar</button></div>
       <p class="muted small" style="margin:8px 0 0">O “GPS aqui” converte a posição do celular para UTM SIRGAS 2000 e registra a sua presença no local para o escritório acompanhar a equipe.</p></div>`;
   }
@@ -145,7 +148,7 @@
         <div class="f"><label>Estado da boca <span class="req">*</span></label>${chips('estado', Cat.ESTADOS, b.estado, lado)}</div>
         <div class="f"><label for="f-obstr-${lado}">Obstrução da seção: <b id="obstr-v-${lado}">${ob}%</b></label><input id="f-obstr-${lado}" type="range" min="0" max="100" step="5" value="${ob}" data-fm="obstr" data-lado="${lado}"></div></div></div>
       <div class="card boca"><h3>Pontos a levantar <span class="chip ${falta ? 'rascunho' : 'concluido'}">${marcados}/${pts.length}</span></h3>
-        <p class="muted small" style="margin:0 0 6px">Marque cada ponto vermelho do desenho com X, Y e Z. Os números do desenho são os mesmos da lista abaixo. Toque no ponto, ou na linha da lista, para preencher.</p>
+        <p class="muted small" style="margin:0 0 6px">Marque só a geratriz inferior da boca (X, Y e Z). Em bueiro com mais de um tubo, vale a mesma informação para todos. Toque no ponto, ou na linha da lista, para preencher.</p>
         ${aviso}${desenho(l, lado)}
         <div class="dotlist">${lista}</div></div>
       ${BU.Form.dispositivosHTML(l, lado)}
@@ -283,7 +286,7 @@
     l.pontos.push(...novos); l.pontosArquivo = file.name;
     const n = distribuir(l);
     App.marcarSujo(); App.renderEtapa();
-    UI.toast(`${novos.length} ponto(s) importado(s); ${n} colocado(s) nos pontos vermelhos.${r.ruins.length ? ` ${r.ruins.length} linha(s) ignorada(s).` : ''}`, n ? '' : 'aviso');
+    UI.toast(`${novos.length} ponto(s) importado(s); ${n} colocado(s) nas bocas.${r.ruins.length ? ` ${r.ruins.length} linha(s) ignorada(s).` : ''}`, n ? '' : 'aviso');
   }
 
   /* ---------- GPS aqui, mapa e digitar ---------- */
