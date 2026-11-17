@@ -19,7 +19,7 @@
   const INK = '#16201A', MUTED = '#56635A', GRID = '#E1E7E2', FRAME = '#16201A';
   const COR = { gi: '#C0392B', contorno: '#2E8B57', pista: '#1F3A93', terreno: '#D9822B', rn: '#7B2D8E', outro: '#6B7280' };
   const T = { foco: 'tudo', zoom: 1 };
-  let LOGO_ANTT = '', LOGO_ARTERIS = '';
+  let LOGO_ANTT = '', LOGO_ARTERIS = '', LOGO_GFA = '';
   let LOGO = ''; // data URL da logo da empresa (config "logoEmpresa")
 
   /* ---------- números ---------- */
@@ -425,8 +425,12 @@
     return g;
   }
 
-  const FOCOS = { tudo: [0, 0, SW, SH], planta: [8, 8, 802, 312], perfil: [8, 316, 802, 302], detalhes: [8, 614, 802, 220], quadro: [812, 8, 372, 828] };
-  function gerarSVG(l, { foco = 'tudo' } = {}) {
+  const FOCOS = { tudo: [0, 0, SW, SH], planta: [8, 8, 802, 312], perfil: [8, 316, 802, 302], detalhes: [8, 614, 802, 220], quadro: [812, 8, 372, 828] }; // só da versão antiga
+  function gerarSVG(l, opc = {}) {
+    if (BU.Folha) return BU.Folha.svg(l, opc); // folha no modelo do CAD do cliente (js/folha.js)
+    return gerarSVGAntigo(l, opc);
+  }
+  function gerarSVGAntigo(l, { foco = 'tudo' } = {}) {
     const m = modelo(l); if (!m) return '';
     const v = FOCOS[foco] || FOCOS.tudo;
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${v.join(' ')}" width="${v[2]}" height="${v[3]}" font-family="Arial, Helvetica, sans-serif" role="img" aria-label="Planta, detalhes das bocas, perfil, legenda, notas e quadro de dados do bueiro">
@@ -450,7 +454,7 @@ ${planta(l, m)}${perfil(l, m)}${detalhe(l, m, { x: 14, y: 620, w: 258, h: 208 },
     return `<div class="card prancha-card"><h3>Planta, perfil e quadro de dados</h3>
       <p class="muted small">Gerados a partir dos <b>${m.pts.length}</b> pontos${l.pontosArquivo ? ` de <span class="mono">${esc(l.pontosArquivo)}</span>` : ''}. Montante: <b>${esc(m.A.id ? 'ponto ' + m.A.id : 'cota ' + fmt(m.A.Z, 3))}</b> · Jusante: <b>${esc(m.B.id ? 'ponto ' + m.B.id : 'cota ' + fmt(m.B.Z, 3))}</b>.</p>
       ${avisos.map(a => `<div class="aviso-pr">⚠️ ${a}</div>`).join('')}
-      <div class="seg-tools" role="group" aria-label="Parte da prancha">${aba('tudo', 'Prancha')}${aba('planta', 'Planta')}${aba('perfil', 'Perfil')}${aba('detalhes', 'Detalhes')}${aba('quadro', 'Quadro')}</div>
+      <div class="seg-tools" role="group" aria-label="Parte da prancha">${aba('tudo', 'Prancha')}${aba('planta', 'Planta geral')}${aba('detalhe', 'Detalhe')}${aba('perfil', 'Perfil')}${aba('quadro', 'Legenda e carimbo')}</div>
       <div class="row"><button type="button" class="btn sm" data-pr="zoom-">−</button><button type="button" class="btn sm" data-pr="ajustar">Ajustar</button><button type="button" class="btn sm" data-pr="zoom+">+</button>
         <button type="button" class="btn sm" data-pr="inverter">⇄ Inverter montante/jusante</button></div>
       <div id="prancha-box" class="prancha-wrap"><div id="prancha-svg" style="width:${Math.round(T.zoom * 100)}%">${gerarSVG(l, { foco: T.foco })}</div></div>
@@ -466,7 +470,8 @@ ${planta(l, m)}${perfil(l, m)}${detalhe(l, m, { x: 14, y: 620, w: 258, h: 208 },
 
   /* ---------- DXF (CAD editável) ----------
      Planta em coordenadas UTM reais (E, N) e perfil ao lado (x = distância, y = cota × exagero), em metros. ASCII R12. */
-  function gerarDXF(l) {
+  function gerarDXF(l) { return BU.Folha ? BU.Folha.dxf(l) : gerarDXFAntigo(l); }
+  function gerarDXFAntigo(l) {
     const m = modelo(l); if (!m) return '';
     const sem = t => String(t == null ? '' : t).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\x20-\x7E]/g, '?');
     const CAMADAS = { EIXO: 5, CORPO: 3, CONTORNO: 3, PTS_GI: 1, PTS_CONTORNO: 3, PTS_PISTA: 5, PTS_TERRENO: 30, PTS_RN: 6, PTS_OUTROS: 8, TEXTO: 7, PERFIL: 7, PERFIL_TERRENO: 40, PERFIL_GI: 1, CARIMBO: 7 };
@@ -543,7 +548,7 @@ ${planta(l, m)}${perfil(l, m)}${detalhe(l, m, { x: 14, y: 620, w: 258, h: 208 },
   /* Logos do cliente (ANTT e Arteris) no carimbo: carregadas uma vez e embutidas no SVG (PNG e PDF não dependem da rede). */
   const RAIZ = (document.currentScript && document.currentScript.src) ? new URL('../', document.currentScript.src).href : '';
   const dataURL = u => fetch(u).then(r => r.ok ? r.blob() : Promise.reject()).then(b => new Promise(ok => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.readAsDataURL(b); })).catch(() => '');
-  const logosPronto = Promise.all([dataURL(RAIZ + 'assets/logo-antt.png'), dataURL(RAIZ + 'assets/logo-arteris.png')]).then(([a, b]) => { LOGO_ANTT = a; LOGO_ARTERIS = b; try { redesenhar(); } catch (e) { /* sem tela aberta */ } });
+  const logosPronto = Promise.all([dataURL(RAIZ + 'assets/logo-antt-pb.png'), dataURL(RAIZ + 'assets/logo-arteris.png'), dataURL(RAIZ + 'assets/logo-gfa.png')]).then(([a, b, c]) => { LOGO_ANTT = a; LOGO_ARTERIS = b; LOGO_GFA = c || LOGO; try { redesenhar(); } catch (e) { /* sem tela aberta */ } });
 
   /* Prancha em PDF: abre a folha A3 paisagem pronta para "Imprimir / Salvar como PDF". */
   async function imprimir(l, janela) {
@@ -558,5 +563,5 @@ ${planta(l, m)}${perfil(l, m)}${detalhe(l, m, { x: 14, y: 620, w: 258, h: 208 },
   }
 
 
-  BU.Prancha = { get logo() { return LOGO; }, imprimir, gerarDXF, get logosPronto() { return logosPronto; }, etapaHTML, redesenhar, miniatura, gerarSVG, exportarPNG, temDados, croquiPronto, modelo, sincronizarMedicoes, usarCentroComoCoordenada, setLogo, papel, fmt };
+  BU.Prancha = { get logo() { return LOGO; }, logos: () => ({ antt: LOGO_ANTT, arteris: LOGO_ARTERIS, gfa: LOGO || LOGO_GFA }), imprimir, gerarDXF, get logosPronto() { return logosPronto; }, etapaHTML, redesenhar, miniatura, gerarSVG, exportarPNG, temDados, croquiPronto, modelo, sincronizarMedicoes, usarCentroComoCoordenada, setLogo, papel, fmt };
 })();
