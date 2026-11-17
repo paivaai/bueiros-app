@@ -122,7 +122,7 @@
   }
   function localizacaoHTML(l, lado) {
     const b = l.bocas[lado], tem = b.leste != null && b.norte != null;
-    return `<div class="card"><h3>${LADOS[lado]} · SIRGAS 2000</h3>
+    return `<div class="card"><h3>${LADOS[lado]} · SIRGAS 2000 <button type="button" class="btn sm" data-bc="info" data-lado="${lado}" aria-label="Como a posição da boca é definida" style="padding:0 8px;min-width:0">ⓘ</button></h3>
       <p class="${tem ? 'ok-txt' : 'muted'} small">${tem ? utmTxt(b, l) + (b.origem === 'gps' ? ' · do GPS do celular' : b.origem === 'mapa' ? ' · marcado no mapa' : b.origem === 'rtk' ? ' · igual à geratriz inferior do RTK' : '') : 'Sem coordenadas. Capture pelo GPS no local, marque no mapa ou digite.'}</p>
       <div class="row"><button type="button" class="btn primary" data-bc="gps" data-lado="${lado}">📍 GPS aqui</button><button type="button" class="btn" data-bc="mapa" data-lado="${lado}">🗺️ Marcar no mapa</button><button type="button" class="btn" data-bc="digitar" data-lado="${lado}">⌨️ Digitar</button></div>
       <p class="muted small" style="margin:8px 0 0">O “GPS aqui” converte a posição do celular para UTM SIRGAS 2000 e registra a sua presença no local para o escritório acompanhar a equipe.</p></div>`;
@@ -290,10 +290,14 @@
     const zm = gm.length ? nz(gm) : m.A.Z, zj = gj.length ? nz(gj) : m.B.Z, f = v => v == null ? '—' : v.toFixed(3).replace('.', ',');
     const html = `<p>O app identificou os grupos de geratrizes assim:</p>
       <p><b>Montante</b> (entrada): ${gm.length || 1} ponto(s), cota média <b>${f(zm)}</b> m<br><b>Jusante</b> (saída): ${gj.length || 1} ponto(s), cota média <b>${f(zj)}</b> m</p>
-      <p class="muted small">Comprimento ${m.L.toFixed(2).replace('.', ',')} m · declividade ${m.decl.toFixed(2).replace('.', ',')}%. Se a montante é o outro lado (ala quebrada, suja ou alagada, por exemplo), toque em “Não, inverter”.</p>`;
+      <p class="muted small">Comprimento ${m.L.toFixed(2).replace('.', ',')} m · declividade ${m.decl.toFixed(2).replace('.', ',')}%. Se a montante é o outro lado (ala quebrada, suja ou alagada, por exemplo), toque em “Não, inverter”.</p>
+      <details><summary class="small">ⓘ Como o app decide</summary><div class="small">${INFO_HTML}</div></details>`;
     const r = await UI.escolher('Confirmar montante e jusante', html, [{ k: 'ok', label: 'Confirmar', cls: 'primary' }, { k: 'inv', label: 'Não, inverter' }]);
     if (r === 'inv') { trocarLados(l); UI.toast('Montante e jusante invertidas', ''); }
   }
+  const INFO_HTML = `<p><b>Posição da boca</b><br>Ao importar o TXT do RTK, a posição de cada boca (SIRGAS 2000) é preenchida sozinha com a das <b>geratrizes inferiores</b> levantadas. Em bueiro duplo ou triplo vale o <b>centro</b> das geratrizes de todos os tubos daquela boca. Basta importar o TXT: não precisa digitar nem usar o GPS.</p>
+    <p><b>Montante e jusante</b><br>O app considera como montante o grupo de geratrizes de <b>cota mais alta</b>. Isso nem sempre é verdade (ala quebrada, suja ou alagada). Por isso, depois de importar, ele mostra o que identificou: toque em <b>Confirmar</b> se estiver certo ou em <b>Não, inverter</b> para trocar os lados. Cotas, comprimento, declividade e posição das bocas são recalculados.</p>
+    <p><b>Tubos</b><br>O tubo 1 é o da esquerda, olhando para jusante.</p>`;
   async function importar(file, lado) {
     const App = BU.App, l = App.cur(); if (!l) return;
     let texto; try { texto = await new Promise((ok, er) => { const fr = new FileReader(); fr.onload = () => ok(String(fr.result)); fr.onerror = () => er(fr.error); fr.readAsText(file); }); } catch (e) { UI.toast('Não foi possível ler o arquivo', 'erro'); return; }
@@ -382,6 +386,7 @@
     const dot = e.target.closest('[data-bc]'); if (!dot) return;
     const a = dot.dataset.bc, lado = dot.dataset.lado;
     if (a === 'dot') abrirDot(lado, dot.dataset.k);
+    else if (a === 'info') UI.escolher('Como a posição da boca é definida', INFO_HTML, [{ k: 'x', label: 'Entendi', cls: 'primary' }]);
     else if (a === 'gps') gpsAqui(lado);
     else if (a === 'mapa') marcarNoMapa(lado);
     else if (a === 'digitar') digitar(lado);
