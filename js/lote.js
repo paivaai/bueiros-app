@@ -63,7 +63,7 @@
   }
 
   /* ---------- 2) ligar geratrizes e alas aos tubos ---------- */
-  function parear(pontos, celulas) {
+  function parear(pontos, celulas, { inverter = false } = {}) {
     const avisos = [], limpar = p => { if (/^(montante|jusante):(GTZ|ALA)/.test(String(p.ref || ''))) delete p.ref; delete p.tubo; };
     pontos.forEach(limpar);
     const todos = coordenadas(pontos), gi = todos.filter(q => ehGI(q.p));
@@ -83,6 +83,7 @@
       const zA = A.reduce((s, u) => s + u.Z, 0) / A.length, zB = B.reduce((s, u) => s + u.Z, 0) / B.length;
       [M, J] = zA >= zB ? [A, B] : [B, A];
     }
+    if (inverter) [M, J] = [J, M];
     const cM = centro(M), cJ = centro(J), L = Math.hypot(cJ.E - cM.E, cJ.N - cM.N);
     if (L < 0.5) return { tubos: [], avisos: ['bocas de montante e jusante no mesmo lugar'] };
     const uE = (cJ.E - cM.E) / L, uN = (cJ.N - cM.N) / L, vE = -uN, vN = uE; // v = esquerda de quem olha para jusante
@@ -106,7 +107,7 @@
       let k = 0; arr.forEach((u, i) => { if (d2(q, u) < d2(q, arr[k])) k = i; });
       q.p.ref = `${lado}:ALA-${tDe(q) >= 0 ? 'E' : 'D'}-${++ia[lado]}`; q.p.tubo = k + 1; if (tubos[k]) tubos[k].alas++;
     });
-    return { tubos, avisos };
+    return { tubos, avisos, zMont: M.reduce((s, u) => s + u.Z, 0) / M.length, zJus: J.reduce((s, u) => s + u.Z, 0) / J.length };
   }
 
   BU.Lote = { separar, parear, coordenadas };

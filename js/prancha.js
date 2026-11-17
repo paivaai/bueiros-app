@@ -80,7 +80,7 @@
     const gim = pts.filter(p => p.papel === 'gim'), gij = pts.filter(p => p.papel === 'gij');
     if (gim.length && gij.length) {
       const a = minZ(gim), b = minZ(gij);
-      if (Math.hypot(a.E - b.E, a.N - b.N) >= 0.5) return { A: { E: a.E, N: a.N, Z: a.Z, id: a.id }, B: { E: b.E, N: b.N, Z: b.Z, id: b.id }, modo: 'GI', rotulado: true };
+      if (Math.hypot(a.E - b.E, a.N - b.N) >= 0.5) return { A: { E: a.E, N: a.N, Z: a.Z, id: a.id, c: centro(gim) }, B: { E: b.E, N: b.N, Z: b.Z, id: b.id, c: centro(gij) }, modo: 'GI', rotulado: true };
     }
     const gs = pts.filter(p => p.papel === 'gim' || p.papel === 'gij' || p.papel === 'gtz');
     if (gs.length >= 2) {
@@ -160,9 +160,9 @@
       const zona = parseInt(l.zona, 10) || undefined, hem = l.hemisferio || 'S';
       for (const [lado, pt] of [['montante', m.A], ['jusante', m.B]]) {
         const b = l.bocas[lado]; if (!b) continue;
-        const e = +pt.E.toFixed(3), n = +pt.N.toFixed(3);
+        const pc = pt.c || pt, e = +pc.E.toFixed(3), n = +pc.N.toFixed(3); // centro de todas as geratrizes da boca (duplo/triplo)
         if (b.leste !== e || b.norte !== n || b.origem !== 'rtk') {
-          try { const g = BU.GPS.deUTM(pt.E, pt.N, zona, hem); if (isFinite(g.lat) && isFinite(g.lon)) { b.lat = +g.lat.toFixed(7); b.lon = +g.lon.toFixed(7); } } catch (er) { /* mantém lat/lon antigos */ }
+          try { const g = BU.GPS.deUTM(pc.E, pc.N, zona, hem); if (isFinite(g.lat) && isFinite(g.lon)) { b.lat = +g.lat.toFixed(7); b.lon = +g.lon.toFixed(7); } } catch (er) { /* mantém lat/lon antigos */ }
           b.leste = e; b.norte = n; b.zona = String(zona || l.zona || ''); b.origem = 'rtk'; mudou = true;
         }
       }
