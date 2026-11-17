@@ -46,6 +46,21 @@
     return out;
   }
 
+  /* Linhas de feição: pontos com o mesmo código ligados na ordem do ID (pista, bordas, talude, terreno), como no CAD. */
+  function feicoes(m) {
+    const por = new Map();
+    for (const p of m.pts) { const g = grupo(p.papel); if (g === 'gi' || g === 'rn' || g === 'contorno') continue; const k = String(p.cod || '').trim().toUpperCase(); if (!k) continue; if (!por.has(k)) por.set(k, []); por.get(k).push(p); }
+    const out = [];
+    for (const [cod, arr] of por) {
+      arr.sort((a, b) => (parseFloat(a.id) - parseFloat(b.id)) || String(a.id).localeCompare(String(b.id)));
+      let atual = [arr[0]];
+      for (let i = 1; i < arr.length; i++) { if (Math.hypot(arr[i].E - arr[i - 1].E, arr[i].N - arr[i - 1].N) <= 40) atual.push(arr[i]); else { if (atual.length > 1) out.push({ cod, g: grupo(arr[0].papel), pts: atual }); atual = [arr[i]]; } }
+      if (atual.length > 1) out.push({ cod, g: grupo(arr[0].papel), pts: atual });
+    }
+    return out;
+  }
+  const COR_FEICAO = { pista: '#D9822B', terreno: '#1B9E8A', outro: '#7A7F7C' };
+
   /* ---------- planta (norte para cima, com triangulação) ---------- */
   function planta(l, m, P, tin, modo) {
     const geral = modo === 'geral', cs = cantos(m);
@@ -67,6 +82,8 @@
     for (let n = Math.ceil((cN - R.h / 2 / sc) / st) * st; n <= cN + R.h / 2 / sc; n += st) g += tx(P.x + 9, Y(n), fmt(n, 0), { fs: 4.8, c: '#8A8F8C', a: 'middle', rot: -90 });
     // triangulação
     if (tin) g += `<g stroke="#6F7773" stroke-width="${geral ? .4 : .5}" fill="none">${tin.arestas.map(([a, b]) => ln(X(m.pts[a].E), Y(m.pts[a].N), X(m.pts[b].E), Y(m.pts[b].N))).join('')}</g>`;
+    // linhas de feição (pista, bordas, talude)
+    for (const f of feicoes(m)) g += `<polyline points="${f.pts.map(p => p1(X(p.E)) + ',' + p1(Y(p.N))).join(' ')}" fill="none" stroke="${COR_FEICAO[f.g] || COR_FEICAO.outro}" stroke-width="${geral ? .7 : .9}" stroke-linejoin="round"/>`;
     // corpo, eixo e arestas do tubo
     g += `<polygon points="${cs.map(c => p1(X(c.E)) + ',' + p1(Y(c.N))).join(' ')}" fill="#CFCFCF" fill-opacity=".92" stroke="#555" stroke-width=".7"/>`;
     const ext = Math.max(4, 0.25 * m.L), a0 = pontoEm(m, -ext, 0), b0 = pontoEm(m, m.L + ext, 0);
@@ -165,9 +182,9 @@
   function legenda() {
     const P = A.lg; let g = titulo(P, 'LEGENDA'), y = P.y + 27;
     const it = [['l', MAG, 'Eixo do bueiro'], ['r', '#CFCFCF', 'Corpo do bueiro (planta)'], ['p', COR.contorno, 'Ala / muro de boca'], ['s', 'gi', 'Geratriz inferior (GI)'], ['s', 'terreno', 'Ponto de terreno'],
-      ['s', 'pista', 'Ponto de pista'], ['s', 'rn', 'RN — referência de nível'], ['t', '#6F7773', 'Triangulação dos pontos'], ['q', '#8A5A00', 'Terreno no perfil'], ['q', COR.gi, 'GI no perfil']];
+      ['s', 'pista', 'Ponto de pista'], ['s', 'rn', 'RN — referência de nível'], ['t', '#6F7773', 'Triangulação dos pontos'], ['q', '#D9822B', 'Linha de pista / borda'], ['q', '#1B9E8A', 'Linha de terreno / talude'], ['q', '#8A5A00', 'Terreno no perfil'], ['q', COR.gi, 'GI no perfil']];
     it.forEach(([k, c, t], i) => {
-      const col = i % 2, row = i >> 1, x = P.x + 8 + col * 122, yy = y + row * 24;
+      const col = i % 2, row = i >> 1, x = P.x + 8 + col * 122, yy = y + row * 18;
       g += k === 's' ? SIMB(c, x + 8, yy - 2, 1.2) : k === 'r' ? `<rect x="${x}" y="${yy - 6}" width="16" height="9" fill="${c}" stroke="#555" stroke-width=".6"/>` : `${ln(x, yy - 2, x + 16, yy - 2, `stroke="${c}" stroke-width="${k === 'l' ? 1.2 : 1.4}" ${k === 'l' ? 'stroke-dasharray="6 2 1.5 2"' : ''}`)}`;
       g += quebrar(t, 20).map((s, j) => tx(x + 21, yy + j * 7, s, { fs: 5.2 })).join('');
     });
@@ -236,7 +253,7 @@ ${planta(l, m, A.p1, tin, 'geral')}${planta(l, m, A.p2, tin, 'detalhe')}${perfil
   function dxf(l) {
     const m = BU.Prancha.modelo(l); if (!m) return '';
     const sem = t => String(t == null ? '' : t).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\x20-\x7E]/g, '?');
-    const CAM = { TIN: 8, CORPO: 8, EIXO: 6, BUEIRO: 6, ALAS: 2, PTS_GI: 1, PTS_PISTA: 30, PTS_TERRENO: 5, PTS_RN: 6, PTS_OUTROS: 8, TEXTO: 7, GRADE: 9, PERFIL_BUEIRO: 6, PERFIL_HACHURA: 6, PERFIL_TERRENO: 30, PERFIL_GI: 1, PERFIL_TEXTO: 7, TABELA: 7, CARIMBO: 4 };
+    const CAM = { TIN: 8, CORPO: 8, EIXO: 6, BUEIRO: 6, ALAS: 2, PTS_GI: 1, PTS_PISTA: 30, PTS_TERRENO: 5, PTS_RN: 6, PTS_OUTROS: 8, LINHAS_PISTA: 30, LINHAS_TERRENO: 4, LINHAS_OUTROS: 8, TEXTO: 7, GRADE: 9, PERFIL_BUEIRO: 6, PERFIL_HACHURA: 6, PERFIL_TERRENO: 30, PERFIL_GI: 1, PERFIL_TEXTO: 7, TABELA: 7, CARIMBO: 4 };
     const mapaCam = { gi: 'PTS_GI', contorno: 'ALAS', pista: 'PTS_PISTA', terreno: 'PTS_TERRENO', rn: 'PTS_RN', outro: 'PTS_OUTROS' };
     const E = m.pts.map(p => p.E), N = m.pts.map(p => p.N), e0 = Math.min(...E), e1 = Math.max(...E), n0 = Math.min(...N), n1 = Math.max(...N), ext = Math.max(e1 - e0, n1 - n0, 10);
     const h = Math.min(1.2, Math.max(0.16, ext / 120)); // altura dos textos
@@ -258,6 +275,7 @@ ${planta(l, m, A.p1, tin, 'geral')}${planta(l, m, A.p2, tin, 'detalhe')}${perfil
     const ext2 = Math.max(4, 0.25 * m.L), ax = (t, s0, s1) => [pontoEm(m, s0, t), pontoEm(m, s1, t)].map(p => [p.E, p.N]);
     LINE('EIXO', ...ax(0, -ext2, m.L + ext2)); for (const t of [m.H / 2 + m.e / 2, -(m.H / 2 + m.e / 2)]) LINE('BUEIRO', ...ax(t, -ext2, m.L + ext2));
     for (const c of ligaAlas(m)) POLI('ALAS', c.map(p => [p.E, p.N]), false);
+    for (const fe of feicoes(m)) POLI(fe.g === 'pista' ? 'LINHAS_PISTA' : fe.g === 'terreno' ? 'LINHAS_TERRENO' : 'LINHAS_OUTROS', fe.pts.map(p => [p.E, p.N]), false);
     for (const p of m.pts) { PT(mapaCam[grupo(p.papel)] || 'PTS_OUTROS', p.E, p.N, p.Z); TEXT('TEXTO', p.E + h * 0.4, p.N + h * 0.4, h * 0.8, `${p.id} ${f(p.Z)}${p.cod ? ' ' + p.cod : ''}`); }
     TEXT('TEXTO', pontoEm(m, 0, 0).E - h * 6, pontoEm(m, 0, 0).N + h * 2, h * 1.4, 'MONTANTE'); TEXT('TEXTO', pontoEm(m, m.L, 0).E + h, pontoEm(m, m.L, 0).N + h * 2, h * 1.4, 'JUSANTE');
     TEXT('TEXTO', e0, n1 + h * 3, h * 2, `${l.codigo || ''}  PLANTA - UTM SIRGAS 2000 - L=${fmt(m.L, 2)} m  i=${fmt(m.decl, 2)} %`);
