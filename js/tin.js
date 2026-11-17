@@ -1,6 +1,6 @@
 /* tin.js — triangulação de Delaunay (Bowyer–Watson) dos pontos do levantamento, para a planta e o DXF.
    BU.TIN.triangular(pontos[{E,N,Z}], { maxAresta }) → { tri: [[i,j,k]], arestas: [[i,j]] }  (índices do vetor recebido).
-   Arestas muito longas (vãos sem ponto) são descartadas: o limite padrão é 4× a mediana das menores arestas. */
+   Triângulos com lado acima de 100 m (padrão do Civil 3D) são descartados; fora isso a superfície cobre todos os pontos. */
 (function () {
   'use strict';
   const BU = window.BU;
@@ -37,11 +37,7 @@
     let tri = T.filter(t => t.v.every(v => v < n)).map(t => t.v.map(v => P[v].i));
     // limite de aresta
     const len = (a, b) => Math.hypot(pts[a].E - pts[b].E, pts[a].N - pts[b].N);
-    let lim = opc.maxAresta;
-    if (!lim) {
-      const menor = idx.map(i => { let m = Infinity; for (const j of idx) if (j !== i) { const d2 = len(i, j); if (d2 < m) m = d2; } return m; }).sort((a, b) => a - b);
-      lim = Math.max(6, 4 * menor[menor.length >> 1] || 6);
-    }
+    const lim = opc.maxAresta || 100; // como no Civil 3D: a superfície cobre todos os pontos; só triângulos com lado acima de 100 m são descartados
     tri = tri.filter(t => len(t[0], t[1]) <= lim && len(t[1], t[2]) <= lim && len(t[2], t[0]) <= lim);
     const ar = new Map();
     tri.forEach(t => { for (let e = 0; e < 3; e++) { const a = t[e], b = t[(e + 1) % 3], k = a < b ? a + ',' + b : b + ',' + a; if (!ar.has(k)) ar.set(k, a < b ? [a, b] : [b, a]); } });
