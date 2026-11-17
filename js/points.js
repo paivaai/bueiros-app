@@ -65,15 +65,16 @@
   }
 
   /* Importar dentro do levantamento aberto (etapa Pontos). */
-  async function importarNoAtual(file) {
+  async function importarNoAtual(file, trocar) {
     const App = BU.App, l = App.cur(); if (!l) return;
     let texto; try { texto = await lerArquivo(file); } catch (e) { UI.toast('Não foi possível ler o arquivo', 'erro'); return; }
     const r = parsear(texto);
     if (!r.ok.length) { await UI.escolher('Nada para importar', resumoHTML(r, '<p>Nenhuma linha no formato <span class="mono">ID X Y Z "CÓDIGO"</span>.</p>'), [{ k: 'x', label: 'Fechar' }]); return; }
     const n = l.pontos.length;
     const ac = await UI.escolher('Importar ' + file.name, resumoHTML(r, n ? `<p>O levantamento já tem <b>${n}</b> ponto(s).</p>` : ''), [
-      { k: 'add', label: n ? 'Adicionar aos existentes' : 'Importar', cls: 'primary' },
-      ...(n ? [{ k: 'sub', label: `Substituir os ${n} atuais` }] : []),
+      ...(n && trocar ? [{ k: 'sub', label: `Trocar: substituir os ${n} atuais`, cls: 'primary' }] : []),
+      { k: 'add', label: n ? 'Adicionar aos existentes' : 'Importar', cls: n && trocar ? '' : 'primary' },
+      ...(n && !trocar ? [{ k: 'sub', label: `Substituir os ${n} atuais` }] : []),
       { k: 'x', label: 'Cancelar' }]);
     if (!ac || ac === 'x') return;
     if (ac === 'sub') {
@@ -83,6 +84,7 @@
     }
     l.pontos.push(...r.ok); l.pontosArquivo = file.name;
     await lembrarCodigos(r.ok.map(p => p.codigo));
+    try { l.pontos.forEach(q => { if (/^(montante|jusante):GTZ/.test(String(q.ref || ''))) delete q.ref; }); BU.Bocas.distribuir(l); await BU.Bocas.confirmarLados(l); BU.Prancha.sincronizarMedicoes(l); } catch (e) { /* sem geratrizes ainda */ }
     App.marcarSujo(); App.renderEtapa();
     const dup = duplicados(l).size;
     UI.toast(`${r.ok.length} ponto(s) importado(s)` + (dup ? ` · atenção: ${dup} ID(s) repetido(s)` : ''), dup ? 'aviso' : '');
@@ -98,6 +100,7 @@
     if (ac !== 'novo') return;
     const l = BU.App.novo(); l.pontos = r.ok; l.pontosArquivo = file.name; l.codigo = '';
     try { await BU.App.prefillNovo(l); } catch (e) { /* segue sem preencher */ }
+    try { BU.Bocas.distribuir(l); await BU.Bocas.confirmarLados(l); BU.Prancha.sincronizarMedicoes(l); } catch (e) { /* sem geratrizes ainda */ }
     await lembrarCodigos(r.ok.map(p => p.codigo));
     try { await DB.salvar(l); } catch (e) { UI.toast('Erro ao salvar: ' + e.message, 'erro'); return; }
     location.hash = `#/lev/${l.id}/${BU.App.E.RTK}`;
@@ -177,6 +180,7 @@
         <div class="row" style="margin-top:10px">
           <button type="button" class="btn primary" data-pt="novo">+ Ponto</button>
           <button type="button" class="btn" data-pt="importar">Importar TXT</button>
+          ${l.pontos.length ? '<button type="button" class="btn" data-pt="trocar">🔄 Trocar o TXT</button><button type="button" class="btn" data-pt="lados">⇄ Rever montante/jusante</button>' : ''}
           <button type="button" class="btn" data-pt="exportar">Exportar TXT</button>
           ${navigator.share ? '<button type="button" class="btn" data-pt="compartilhar">Compartilhar</button>' : ''}
         </div>
@@ -230,7 +234,9 @@
     }
     else if (a === 'cancelar') { P.edit = null; App.renderEtapa(); }
     else if (a === 'salvar') salvarPonto(l);
-    else if (a === 'importar') document.getElementById('pt-file').click();
+    else if (a === 'importar') { P.trocar = false; document.getElementById('pt-file').click(); }
+    else if (a === 'trocar') { P.trocar = true; document.getElementById('pt-file').click(); }
+    else if (a === 'lados') { await BU.Bocas.confirmarLados(l); try { BU.Prancha.sincronizarMedicoes(l); } catch (er) { /* */ } App.marcarSujo(); App.renderEtapa(); }
     else if (a === 'exportar') exportar(l);
     else if (a === 'compartilhar') compartilhar(l);
     else if (a === 'ordem') { P.ordem = { cad: 'asc', asc: 'desc', desc: 'cad' }[P.ordem]; App.renderEtapa(); }
@@ -244,7 +250,7 @@
       P.edit.draft[el.dataset.pf] = el.value;
       if (el.dataset.pf === 'codigo' && e.type === 'change') App.renderEtapa(); // mostra/oculta o campo "novo código"
     } else if ('ptFiltro' in el.dataset) { P.filtro = el.value; App.renderEtapa(); }
-    else if (el.id === 'pt-file' && el.files && el.files[0]) { const f = el.files[0]; el.value = ''; importarNoAtual(f); }
+    else if (el.id === 'pt-file' && el.files && el.files[0]) { const f = el.files[0]; el.value = ''; const tr = P.trocar; P.trocar = false; importarNoAtual(f, tr); }
   }
   document.addEventListener('input', aoMudar);
   document.addEventListener('change', aoMudar);
