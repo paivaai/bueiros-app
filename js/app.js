@@ -105,7 +105,7 @@
     if (!l.classificacao) av('Classificação (grota ou greide) não informada', E.GERAL);
     if (!c.celulas || !c.tipo || !c.material) av('Tipo de bueiro incompleto (nº de linhas, forma e material)', E.GERAL);
     if (l.rtk && l.rtk.alturaAntena == null) av('Altura da antena do RTK não informada', E.GERAL);
-    if (!BU.GPS.utmDe(l)) av('Coordenadas não definidas: marque os pontos vermelhos das bocas', E.MONT);
+    if (!BU.GPS.utmDe(l)) av('Coordenadas não definidas: marque a geratriz inferior das bocas', E.MONT);
     else if (l.coordOrigem === 'cadastro') av('Coordenadas ainda são as do cadastro: serão substituídas quando os pontos das bocas forem marcados', E.MONT);
     const dimOk = c.tipo === 'Tubular' ? c.diametro != null : (c.largura != null && c.altura != null);
     if (c.tipo && !dimOk) av(c.tipo === 'Tubular' ? 'Diâmetro do corpo não informado' : 'Base e altura do corpo não informadas', E.CORPO);
@@ -116,7 +116,7 @@
       if (!bc.tipo) ob(`Tipo da boca de ${nomeBoca(k)} não informado`, e);
       if (!bc.estado) av(`Estado da boca de ${nomeBoca(k)} não informado`, e);
       const f = B.faltando(l, k);
-      if (f.length) ob(`Boca de ${nomeBoca(k)}: ${f.length} ponto(s) vermelho(s) sem marcar (${f.slice(0, 3).map(x => x.nome.split(' (')[0]).join('; ')}${f.length > 3 ? '…' : ''})`, e);
+      if (f.length) ob(`Boca de ${nomeBoca(k)}: ${f.length} ponto(s) sem marcar (${f.slice(0, 3).map(x => x.nome.split(' (')[0]).join('; ')}${f.length > 3 ? '…' : ''})`, e);
     });
     if (!l.pontos.length) av('Nenhum ponto cadastrado', E.MONT);
     if (!BU.Prancha.croquiPronto(l)) av('Croqui ainda não gerado (marque os pontos das bocas ou informe as dimensões)', E.MONT);

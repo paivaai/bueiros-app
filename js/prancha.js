@@ -155,6 +155,18 @@
     const novos = { comprimentoBueiro: +m.L.toFixed(2), declividade: +m.decl.toFixed(2), cotaEntrada: +m.A.Z.toFixed(3), cotaSaida: +m.B.Z.toFixed(3), recobrimento: m.cob && m.cob.valor > 0 ? +m.cob.valor.toFixed(2) : null };
     l.medicoesAuto = l.medicoesAuto || {};
     let mudou = false;
+    /* A posição de cada boca (SIRGAS 2000) passa a ser a da geratriz inferior levantada no RTK: assim ficam iguais, sem digitar duas vezes. */
+    if (l.bocas && m.modo !== 'estimado') {
+      const zona = parseInt(l.zona, 10) || undefined, hem = l.hemisferio || 'S';
+      for (const [lado, pt] of [['montante', m.A], ['jusante', m.B]]) {
+        const b = l.bocas[lado]; if (!b) continue;
+        const e = +pt.E.toFixed(3), n = +pt.N.toFixed(3);
+        if (b.leste !== e || b.norte !== n || b.origem !== 'rtk') {
+          try { const g = BU.GPS.deUTM(pt.E, pt.N, zona, hem); if (isFinite(g.lat) && isFinite(g.lon)) { b.lat = +g.lat.toFixed(7); b.lon = +g.lon.toFixed(7); } } catch (er) { /* mantém lat/lon antigos */ }
+          b.leste = e; b.norte = n; b.zona = String(zona || l.zona || ''); b.origem = 'rtk'; mudou = true;
+        }
+      }
+    }
     for (const k in novos) {
       if (l.medicoes[k] == null || l.medicoesAuto[k]) { if (l.medicoes[k] !== novos[k]) { l.medicoes[k] = novos[k]; mudou = true; } l.medicoesAuto[k] = true; }
     }
