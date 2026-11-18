@@ -314,11 +314,15 @@
     g += `<g clip-path="url(#cl-pf)">`;
     // corpo do bueiro
     const A = m.A, B = m.B, L = m.L, e = m.e, H = m.H;
-    const poly = (a, b, c, d) => `${p1(X(a[0]))},${p1(Y(a[1]))} ${p1(X(b[0]))},${p1(Y(b[1]))} ${p1(X(c[0]))},${p1(Y(c[1]))} ${p1(X(d[0]))},${p1(Y(d[1]))}`;
-    g += `<polygon points="${poly([0, A.Z - e], [L, B.Z - e], [L, B.Z + H + e], [0, A.Z + H + e])}" fill="#DDE3EA" stroke="#55606F" stroke-width="1"/>`
-      + `<polygon points="${poly([0, A.Z], [L, B.Z], [L, B.Z + H], [0, A.Z + H])}" fill="#F6F8FA" stroke="#55606F" stroke-width=".7"/>`
-      + `<polygon points="${poly([0, A.Z + H], [L, B.Z + H], [L, B.Z + H + e], [0, A.Z + H + e])}" fill="#8C98A8" stroke="#55606F" stroke-width=".7"/>`
-      + ln(X(0), Y(A.Z), X(L), Y(B.Z), `stroke="${COR.gi}" stroke-width="2.2"`);
+    const nos = m.nos || [{ s: 0, Z: A.Z }, { s: L, Z: B.Z }], rv = nos.slice().reverse();
+    const polN = (dz0, dz1) => [...nos.map(n => [n.s, n.Z + dz0]), ...rv.map(n => [n.s, n.Z + dz1])].map(q => `${p1(X(q[0]))},${p1(Y(q[1]))}`).join(' ');
+    g += `<polygon points="${polN(-e, H + e)}" fill="#DDE3EA" stroke="#55606F" stroke-width="1"/>`
+      + `<polygon points="${polN(0, H)}" fill="#F6F8FA" stroke="#55606F" stroke-width=".7"/>`
+      + `<polygon points="${polN(H, H + e)}" fill="#8C98A8" stroke="#55606F" stroke-width=".7"/>`
+      + `<polyline points="${nos.map(n => p1(X(n.s)) + ',' + p1(Y(n.Z))).join(' ')}" fill="none" stroke="${COR.gi}" stroke-width="2.2"/>`;
+    (m.caixas || []).forEach(c => { const zt = c.Zs != null ? c.Zs : c.Z + H;
+      g += `<rect x="${p1(X(c.s - 0.5))}" y="${p1(Y(zt))}" width="${p1(X(c.s + 0.5) - X(c.s - 0.5))}" height="${p1(Y(c.Z - 0.15) - Y(zt))}" fill="rgba(47,75,216,.12)" stroke="#2F4BD8" stroke-width="1.2"/>` + tx(X(c.s), Y(zt) - 5, `CAIXA · GI ${fmt(c.Z, 3)}`, { fs: 7, b: 1, c: '#2F4BD8', a: 'middle', halo: 1 }); });
+    if ((m.trechos || []).length > 1) m.trechos.forEach((t, i) => { const ang = Math.atan2(Y(t.z1) - Y(t.z0), X(t.s1) - X(t.s0)) * 180 / Math.PI; g += tx(X((t.s0 + t.s1) / 2), Y((t.z0 + t.z1) / 2 + H / 2) + 3, `trecho ${i + 1}: L = ${fmt(t.s1 - t.s0, 2)} m · i = ${fmt(t.decl, 2)} %`, { fs: 7.5, b: 1, a: 'middle', rot: p1(ang) }); });
     g += tx(X(0) - 4, Y(A.Z) + 11, `GI ${fmt(A.Z, 3)}`, { fs: 7.5, b: 1, c: COR.gi, a: 'end', halo: 1 }) + tx(X(L) + 4, Y(B.Z) + 11, `GI ${fmt(B.Z, 3)}`, { fs: 7.5, b: 1, c: COR.gi, a: 'start', halo: 1 });
     // terreno / pista
     if (m.seLinha) g += `<polyline points="${m.linha.map(p => p1(X(p.s)) + ',' + p1(Y(p.Z))).join(' ')}" fill="none" stroke="#8A6D1F" stroke-width="1.5" stroke-linejoin="round"/>`;
@@ -333,7 +337,7 @@
       g += ln(xc, yT, xc, yP, 'stroke="#6B2FA0" stroke-width="1.4"') + ln(xc - 3.5, yT, xc + 3.5, yT, 'stroke="#6B2FA0" stroke-width="1.4"') + ln(xc - 3.5, yP, xc + 3.5, yP, 'stroke="#6B2FA0" stroke-width="1.4"')
         + tx(xc - 5, (yT + yP) / 2 + 2.5, `recobrimento ${fmt(m.cob.valor, 2)} m`, { fs: 7.5, b: 1, c: '#6B2FA0', a: 'end', halo: 1 });
     }
-    g += tx(X(L / 2), Y(A.Z + (B.Z - A.Z) / 2 + H / 2) + 3, `L = ${fmt(L, 2)} m · i = ${fmt(m.decl, 2)} % · H = ${fmt(H, 2)} m${m.ilustrativo ? ' (ilustrativo)' : ''}`, { fs: 8.5, b: 1, a: 'middle', halo: 1 });
+    if (!(m.trechos && m.trechos.length > 1)) g += tx(X(L / 2), Y(A.Z + (B.Z - A.Z) / 2 + H / 2) + 3, `L = ${fmt(L, 2)} m · i = ${fmt(m.decl, 2)} % · H = ${fmt(H, 2)} m${m.ilustrativo ? ' (ilustrativo)' : ''}`, { fs: 8.5, b: 1, a: 'middle', halo: 1 });
     g += '</g>';
     // legenda
     const it = [['#8A6D1F', 'Terreno / pista (eixo)', 'l'], ['#DDE3EA', 'Corpo do bueiro', 'r'], [COR.gi, 'GI (geratriz inferior)', 'l'], ['#8C98A8', 'Laje superior', 'r']];
