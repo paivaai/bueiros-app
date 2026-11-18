@@ -78,7 +78,27 @@
 
   /* geratriz superior: maior cota entre os pontos de geratriz a menos de 0,5 m da inferior (o par topo/base do RTK) */
   function topoDe(a, pts) { const z = pts.filter(q => (q.papel === 'gim' || q.papel === 'gij' || q.papel === 'gtz') && Math.hypot(q.E - a.E, q.N - a.N) <= 0.5).map(q => q.Z); const t = z.length ? Math.max(...z) : null; return t != null && t - a.Z >= 0.15 ? t : null; }
+  /* Várias geratrizes (≥3 grupos): as duas mais afastadas são as bocas; as que ficam entre elas são CAIXAS no meio do bueiro
+     (mudança de declividade). Montante = a ponta com mais pontos GIM (se rotulado) ou, senão, a de cota mais alta. */
+  function eixoComCaixas(pts) {
+    const gs = pts.filter(p => p.papel === 'gim' || p.papel === 'gij' || p.papel === 'gtz');
+    if (gs.length < 3) return null;
+    const cl = agrupar(gs, 1.5); if (cl.length < 3) return null;
+    let mel = null;
+    for (let i = 0; i < cl.length; i++) for (let j = i + 1; j < cl.length; j++) { const ci = centro(cl[i]), cj = centro(cl[j]), d = Math.hypot(ci.E - cj.E, ci.N - cj.N); if (!mel || d > mel.d) mel = { i, j, d }; }
+    if (!mel || mel.d < 2) return null;
+    const mk = c => { const lo = minZ(c), hi = maxZ(c), ce = centro(c); return { E: lo.E, N: lo.N, Z: lo.Z, id: lo.id, c: ce, Zs: hi.Z - lo.Z >= 0.15 ? hi.Z : null, n: c.length, gim: c.filter(q => q.papel === 'gim').length, gij: c.filter(q => q.papel === 'gij').length, pts: c }; };
+    let a = mk(cl[mel.i]), b = mk(cl[mel.j]);
+    const sc = x => x.gim - x.gij;
+    if (sc(a) !== sc(b) ? sc(a) < sc(b) : a.Z < b.Z) { const t = a; a = b; b = t; }
+    const ux = b.c.E - a.c.E, uy = b.c.N - a.c.N, L = Math.hypot(ux, uy), caixas = [];
+    cl.forEach((c, k) => { if (k === mel.i || k === mel.j) return; const x = mk(c), ce = x.c, s = ((ce.E - a.c.E) * ux + (ce.N - a.c.N) * uy) / L, t = Math.abs(((ce.E - a.c.E) * -uy + (ce.N - a.c.N) * ux) / L); if (s > 0.8 && s < L - 0.8 && t <= Math.max(1.5, 0.2 * L)) caixas.push({ E: ce.E, N: ce.N, Z: x.Z, id: x.id, Zs: x.Zs, pts: x.pts }); });
+    if (!caixas.length) return null;
+    const strip = o => { const r = Object.assign({}, o); delete r.pts; delete r.n; delete r.gim; delete r.gij; return r; };
+    return { A: strip(a), B: strip(b), caixas, modo: 'GI', rotulado: true };
+  }
   function acharEixo(pts) {
+    const cxs = eixoComCaixas(pts); if (cxs) return cxs;
     const gim = pts.filter(p => p.papel === 'gim'), gij = pts.filter(p => p.papel === 'gij');
     if (gim.length && gij.length) {
       const a = minZ(gim), b = minZ(gij);
@@ -133,7 +153,10 @@
     const d = BU.Secao.dims(l);
     const Hint = d ? d.H : (ex.Hgeratriz || 1), e = d ? d.e : Hint * 0.08, Wplan = d ? d.W : Hint + 2 * e;
     const ilustrativo = !d && !ex.Hgeratriz;
-    const inv = s => A.Z + (B.Z - A.Z) * s / L;
+    const cx = (ex.caixas || []).map(c => Object.assign({}, c, loc(c))).filter(c => c.s > 0.3 && c.s < L - 0.3).sort((x, y) => x.s - y.s);
+    const nos = [{ s: 0, Z: A.Z }, ...cx.map(c => ({ s: c.s, Z: c.Z })), { s: L, Z: B.Z }];
+    const trechos = nos.slice(1).map((q, i) => ({ s0: nos[i].s, s1: q.s, z0: nos[i].Z, z1: q.Z, decl: (nos[i].Z - q.Z) / (q.s - nos[i].s) * 100 }));
+    const inv = s => { let k = trechos.findIndex(t => s <= t.s1); if (k < 0) k = trechos.length - 1; const t = trechos[k]; return t.z0 + (t.z1 - t.z0) * (s - t.s0) / (t.s1 - t.s0); };
     /* altura do tubo em cada boca: medida (geratriz superior do RTK) ou, na falta, a das dimensões / padrão */
     const temGS = !d && A.Zs != null && B.Zs != null;
     const hA = temGS ? A.Zs - A.Z : Hint, hB = temGS ? B.Zs - B.Z : Hint;
@@ -168,7 +191,7 @@
     const dentro = linha.filter(p => p.s >= 0 && p.s <= L);
     let cob = null;
     if (dentro.length) { const t = maxZ(dentro); cob = { s: t.s, zTopoPista: t.Z, valor: temGS ? t.Z - gs(t.s) : t.Z - (inv(t.s) + Hint + e) }; }
-    return { pts, A, B, L, u: { E: uE, N: uN }, decl, H: Hint, hA, hB, gs, temGS, e, Wplan, ilustrativo, modo: ex.modo, linha, pontosEixo, seLinha, tol, cob, inv, rn: pts.find(p => p.papel === 'rn') || null, dims: d };
+    return { pts, A, B, L, u: { E: uE, N: uN }, decl, H: Hint, hA, hB, gs, temGS, e, Wplan, ilustrativo, modo: ex.modo, caixas: cx, nos, trechos, linha, pontosEixo, seLinha, tol, cob, inv, rn: pts.find(p => p.papel === 'rn') || null, dims: d };
   }
 
   const temDados = l => { try { return !!modelo(l); } catch (e) { console.error(e); return false; } };

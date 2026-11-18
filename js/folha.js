@@ -156,7 +156,7 @@
   /* ---------- perfil longitudinal ---------- */
   function perfil(l, m, P) {
     const nl = m.linha, L = m.L, tab = 5, rh = 28, th = tab * rh, labW = 104;
-    const gi = s => m.A.Z + (m.B.Z - m.A.Z) * s / L, gsf = s => m.gs ? m.gs(s) : gi(s) + m.H;
+    const gi = s => m.inv(s), gsf = s => m.gs ? m.gs(s) : gi(s) + m.H;
     // alcance horizontal: 5 m antes da boca de montante até 5 m depois da jusante (múltiplos de 2,5 m)
     const sIni = -5, sFim = Math.ceil((L + 5) / 2.5) * 2.5;
     const zT = nl.filter(p => p.s >= sIni && p.s <= sFim).map(p => p.Z);
@@ -186,7 +186,7 @@
     // terreno pelo eixo (TIN) e corpo do tubo (GI → GS)
     const nv = nl.filter(p => p.s >= sIni - 0.01 && p.s <= sFim + 0.01);
     if (m.seLinha && nv.length > 1) g += `<polyline points="${nv.map(p => p1(X(p.s)) + ',' + p1(Y(p.Z))).join(' ')}" fill="none" stroke="#B4793A" stroke-width="1.1" stroke-linejoin="round"/>`;
-    const tubo = [[0, gi(0)], [L, gi(L)], [L, gsf(L)], [0, gsf(0)]].map(q => p1(X(q[0])) + ',' + p1(Y(q[1]))).join(' ');
+    const ss = (m.nos || [{ s: 0 }, { s: L }]).map(n => n.s), tubo = [...ss.map(s => [s, gi(s)]), ...ss.slice().reverse().map(s => [s, gsf(s)])].map(q => p1(X(q[0])) + ',' + p1(Y(q[1]))).join(' ');
     g += `<polygon points="${tubo}" fill="url(#hach)" stroke="${MAG}" stroke-width="1"/>`;
     // alas / topo de ala e caixa coletora
     const perto = (E, N, r) => m.pts.filter(p => Math.hypot(p.E - E, p.N - N) <= r);
@@ -205,8 +205,11 @@
     if (m.cob && m.cob.valor > 0) { const xc = X(m.cob.s), yT = Y(gsf(m.cob.s)), yP = Y(m.cob.zTopoPista);
       g += ln(xc, yT, xc, yP, `stroke="${PURPLE}" stroke-width="1"`) + tx(xc + 3, (yT + yP) / 2 + 2, `rec. ${fmt(m.cob.valor, 2)} m`, { fs: 4.8, b: 1, c: PURPLE, halo: 1 }); }
     // rótulo do bueiro, paralelo ao tubo
-    { const ang = Math.atan2(Y(gi(L)) - Y(gi(0)), X(L) - X(0)) * 180 / Math.PI, mx = X(L / 2), my = Y(gi(L / 2)) + 12;
-      g += tx(mx, my, `BUEIRO Ø/H≈${fmt((m.hA + m.hB) / 2, 2)} m  -  L = ${fmt(L, 2)} m  -  i = ${fmt(m.decl, 2)} %`, { fs: 6, b: 1, a: 'middle', rot: p1(ang) }); }
+    { const tr = m.trechos && m.trechos.length > 1 ? m.trechos : [{ s0: 0, s1: L, z0: gi(0), z1: gi(L), decl: m.decl }];
+      tr.forEach((t, i) => { const ang = Math.atan2(Y(t.z1) - Y(t.z0), X(t.s1) - X(t.s0)) * 180 / Math.PI, mx = X((t.s0 + t.s1) / 2), my = Y((t.z0 + t.z1) / 2) + 12;
+        g += tx(mx, my, tr.length > 1 ? `TRECHO ${i + 1}: L = ${fmt(t.s1 - t.s0, 2)} m  -  i = ${fmt(t.decl, 2)} %` : `BUEIRO Ø/H≈${fmt((m.hA + m.hB) / 2, 2)} m  -  L = ${fmt(L, 2)} m  -  i = ${fmt(m.decl, 2)} %`, { fs: 6, b: 1, a: 'middle', rot: p1(ang) }); });
+      (m.caixas || []).forEach(c => { const zt = c.Zs != null ? c.Zs : c.Z + m.H, w = 0.5;
+        g += `<rect x="${p1(X(c.s - w))}" y="${p1(Y(zt))}" width="${p1(X(c.s + w) - X(c.s - w))}" height="${p1(Y(c.Z - 0.15) - Y(zt))}" fill="none" stroke="#2F4BD8" stroke-width=".9"/>` + tx(X(c.s), Y(zt) - 3, `CAIXA  GI = ${fmt(c.Z, 3)}`, { fs: 4.8, b: 1, c: '#2F4BD8', a: 'middle', halo: 1 }); }); }
     g += '</g>';
     // bocas: títulos, GI, Ø/H e topo de ala
     const bocaTxt = (s, b, h, t, nome) => tx(X(s), Y(b.Z) + 12, nome, { fs: 6.5, b: 1, a: 'middle' }) + tx(X(s), Y(b.Z) + 20, `GI = ${fmt(b.Z, 3)}  |  Ø/H≈${fmt(h, 2)} m`, { fs: 4.8, a: 'middle' }) + tx(X(s), Y(b.Z) + 27, `Topo ala = ${fmt(t != null ? t : b.Z + h, 3)}`, { fs: 4.8, a: 'middle' });
@@ -238,7 +241,7 @@
     for (let s = 0.5; s < m.L - 0.4; s += 0.5) { const zt = (() => { const nl = m.linha; if (nl.length < 2 || s < nl[0].s || s > nl[nl.length - 1].s) return null; for (let i = 1; i < nl.length; i++) if (s <= nl[i].s) { const a = nl[i - 1], b = nl[i]; return b.s === a.s ? b.Z : a.Z + (b.Z - a.Z) * (s - a.s) / (b.s - a.s); } return null; })(); if (zt == null) continue; const r = zt - (m.gs ? m.gs(s) : m.A.Z + (m.B.Z - m.A.Z) * s / m.L + m.H); if (r > 0) { rmin = rmin == null ? r : Math.min(rmin, r); rmax = rmax == null ? r : Math.max(rmax, r); } }
     const N = [`Coordenadas UTM (m): SIRGAS 2000 / UTM ${z || ''}${hem}${epsg}. Cotas em metros (RN do levantamento).`,
       'Superfície por TIN com linhas de quebra.',
-      `Bueiro: L = ${fmt(m.L, 2)} m; i = ${fmt(m.decl, 2)} %; GI ${fmt(m.A.Z, 3)} -> ${fmt(m.B.Z, 3)} m; Ø/H ≈ ${fmt(hA, 2)} / ${fmt(hB, 2)} m.`,
+      `Bueiro: L = ${fmt(m.L, 2)} m; ${m.trechos && m.trechos.length > 1 ? m.trechos.map((t, i) => `trecho ${i + 1} i = ${fmt(t.decl, 2)} %`).join('; ') + ' (caixa intermediária)' : `i = ${fmt(m.decl, 2)} %`}; GI ${fmt(m.A.Z, 3)} -> ${fmt(m.B.Z, 3)} m; Ø/H ≈ ${fmt(hA, 2)} / ${fmt(hB, 2)} m.`,
       rmin != null ? `Recobrimento do tubo: mín. ${fmt(rmin, 2)} m; máx. ${fmt(rmax, 2)} m.` : null,
       difere ? `Ø/H diferente nas bocas (${fmt(hA, 2)} x ${fmt(hB, 2)} m).` : null].filter(Boolean);
     let g = titulo(P, 'N O T A S'), y = P.y + 26;
@@ -417,12 +420,14 @@ ${planta(l, m, A.p1, tin, 'geral')}${planta(l, m, A.p2, tin, 'detalhe')}${perfil
     for (let z = Math.ceil(zMin / pz) * pz; z <= zMax; z += pz) { LINE('PERFIL_GRADE', [X(sMin), Y(z)], [X(sMax), Y(z)]); TEXT('PERFIL_TEXTO', X(sMin) - h * 5, Y(z) - h * 0.4, h * 0.9, fmt(z, 1)); }
     for (let s = Math.ceil(sMin / px) * px; s <= sMax; s += px) { LINE('PERFIL_GRADE', [X(s), Y(zMin)], [X(s), Y(zMax)]); TEXT('PERFIL_TEXTO', X(s) - h, Y(zMin) - h * 2, h * 0.9, fmt(s, 0)); }
     const L = m.L, H = m.H, e = m.e;
-    POLI('PERFIL_TUBO', [[X(0), Y(m.A.Z - e)], [X(L), Y(m.B.Z - e)], [X(L), Y(m.B.Z + H + e)], [X(0), Y(m.A.Z + H + e)]], true);
-    POLI('PERFIL_TUBO', [[X(0), Y(m.A.Z)], [X(L), Y(m.B.Z)], [X(L), Y(m.B.Z + H)], [X(0), Y(m.A.Z + H)]], true);
+    const nos = m.nos || [{ s: 0, Z: m.A.Z }, { s: L, Z: m.B.Z }];
+    POLI('PERFIL_TUBO', [...nos.map(n => [X(n.s), Y(n.Z - e)]), ...nos.slice().reverse().map(n => [X(n.s), Y(n.Z + H + e)])], true);
+    POLI('PERFIL_TUBO', [...nos.map(n => [X(n.s), Y(n.Z)]), ...nos.slice().reverse().map(n => [X(n.s), Y(n.Z + H)])], true);
+    (m.caixas || []).forEach(c => { POLI('PERFIL_ESTRUTURA', [[X(c.s - 0.5), Y(c.Z - 0.15)], [X(c.s + 0.5), Y(c.Z - 0.15)], [X(c.s + 0.5), Y(c.Z + H)], [X(c.s - 0.5), Y(c.Z + H)]], true); TEXT('PERFIL_TEXTO', X(c.s) - h * 2, Y(c.Z + H) + h, h, `CAIXA GI ${f(c.Z)}`); });
     const bx = z => (s => [Y(m.A.Z + (m.B.Z - m.A.Z) * s / L + z)]);
     for (let s = 0; s < L; s += Math.max(0.6, L / 40)) { const s2 = Math.min(L, s + (H + 2 * e) * 0.6), a = Y(m.A.Z + (m.B.Z - m.A.Z) * s / L - e), b = Y(m.A.Z + (m.B.Z - m.A.Z) * s2 / L + H + e); LINE('PERFIL_ESTRUTURA', [X(s), a], [X(s2), b]); }
     void bx;
-    LINE('PERFIL_DRENAGEM', [X(0), Y(m.A.Z)], [X(L), Y(m.B.Z)]); TEXT('PERFIL_TEXTO', X(0) - h * 8, Y(m.A.Z), h, `GI ${f(m.A.Z)}`); TEXT('PERFIL_TEXTO', X(L) + h, Y(m.B.Z), h, `GI ${f(m.B.Z)}`);
+    for (let i = 1; i < nos.length; i++) LINE('PERFIL_DRENAGEM', [X(nos[i - 1].s), Y(nos[i - 1].Z)], [X(nos[i].s), Y(nos[i].Z)]); TEXT('PERFIL_TEXTO', X(0) - h * 8, Y(m.A.Z), h, `GI ${f(m.A.Z)}`); TEXT('PERFIL_TEXTO', X(L) + h, Y(m.B.Z), h, `GI ${f(m.B.Z)}`);
     if (m.seLinha && nl.length > 1) POLI('PERFIL_TERRENO', nl.map(p => [X(p.s), Y(p.Z)]), false);
     (m.pontosEixo || []).forEach(p => {  TEXT('PERFIL_TEXTO', X(p.s) + h * 0.3, Y(p.Z) + h * 0.8, h * 0.7, `${p.id} ${f(p.Z)}`, 90); });
     if (m.cob && m.cob.valor > 0) { const s = m.cob.s; LINE('PERFIL_TEXTO', [X(s), Y(m.inv(s) + H + e)], [X(s), Y(m.cob.zTopoPista)]); TEXT('PERFIL_TEXTO', X(s) + h * 0.6, (Y(m.inv(s) + H + e) + Y(m.cob.zTopoPista)) / 2, h, `recobrimento ${fmt(m.cob.valor, 2)} m`); }
@@ -433,7 +438,7 @@ ${planta(l, m, A.p1, tin, 'geral')}${planta(l, m, A.p2, tin, 'detalhe')}${perfil
     let ult = -1e9; for (const c of cols) {
       ult = c.s;
       const dentro = c.s >= 0 && c.s <= L, Zt = terrenoEm(c.s), inv = dentro ? m.inv(c.s) : null, rec = dentro && Zt != null ? Zt - (inv + H + e) : null;
-      [fmt(c.s, 1), Zt != null ? fmt(Zt, 3) : '-', inv != null ? fmt(inv, 3) : '-', rec != null && rec > 0 ? fmt(rec, 2) : '-', dentro ? fmt(m.decl, 2) : '-'].forEach((t, i) => TEXT('L-TABELA', X(c.s) - h * 1.4, yT - i * linhaH - linhaH * 0.7, h * 0.75, t));
+      [fmt(c.s, 1), Zt != null ? fmt(Zt, 3) : '-', inv != null ? fmt(inv, 3) : '-', rec != null && rec > 0 ? fmt(rec, 2) : '-', dentro ? fmt((m.trechos || []).find(t => c.s <= t.s1 + 1e-6) ? m.trechos.find(t => c.s <= t.s1 + 1e-6).decl : m.decl, 2) : '-'].forEach((t, i) => TEXT('L-TABELA', X(c.s) - h * 1.4, yT - i * linhaH - linhaH * 0.7, h * 0.75, t));
       LINE('L-TABELA', [X(c.s), yT - 5 * linhaH], [X(c.s), yT]);
     }
     // carimbo (texto)
